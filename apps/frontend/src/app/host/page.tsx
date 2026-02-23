@@ -88,7 +88,7 @@ export default function HostPage() {
         ) : (
           <>
             <RoomHeader roomCode={roomCode} />
-            <section className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+            <section className="lg:grid lg:grid-cols-[2fr_1fr] lg:gap-4">
               <div className="space-y-3 rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
                 <YouTubeHostPlayer
                   videoId={nowPlaying?.videoId ?? null}
@@ -100,7 +100,7 @@ export default function HostPage() {
                   <p className="text-sm text-slate-400">{nowPlaying?.addedByName ?? "Dang cho hang doi"}</p>
                   <p className="mt-1 text-xs text-slate-500">Hang doi: {queue.length}/{maxQueueSize}</p>
                 </div>
-                <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 p-3">
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 p-3">
                   <label className="text-xs text-slate-400">Gioi han hang doi</label>
                   <input
                     className="w-20 rounded border border-slate-600 bg-slate-900 px-2 py-1 text-sm"
@@ -120,30 +120,36 @@ export default function HostPage() {
                     Ap dung
                   </button>
                 </div>
-                <button
-                  className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-900"
-                  onClick={() => {
-                    void skipSong("manual");
-                  }}
-                  disabled={!isHostReady}
-                >
-                  Bo qua bai
-                </button>
-                <button
-                  className="rounded-lg border border-red-400/60 px-4 py-2 text-sm font-semibold text-red-200"
-                  onClick={() => {
-                    void closeRoom();
-                  }}
-                  disabled={!isHostReady}
-                >
-                  Huy phong
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-900"
+                    onClick={() => {
+                      void skipSong("manual");
+                    }}
+                    disabled={!isHostReady}
+                  >
+                    Bo qua bai
+                  </button>
+                  <button
+                    className="rounded-lg border border-red-400/60 px-4 py-2 text-sm font-semibold text-red-200"
+                    onClick={() => {
+                      void closeRoom();
+                    }}
+                    disabled={!isHostReady}
+                  >
+                    Huy phong
+                  </button>
+                </div>
               </div>
 
-              <aside className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
+              <aside className="mt-4 hidden rounded-2xl border border-slate-700 bg-slate-900/60 p-4 lg:mt-0 lg:block">
                 <h2 className="mb-3 text-lg font-semibold">Hang doi</h2>
                 <QueueList queue={queue} canRemove onRemove={removeSong} />
               </aside>
+            </section>
+            <section className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/60 p-4 lg:hidden">
+              <h2 className="mb-3 text-lg font-semibold">Hang doi</h2>
+              <QueueList queue={queue} canRemove onRemove={removeSong} />
             </section>
           </>
         )}
