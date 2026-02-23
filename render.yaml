@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: realtime-karaoke-room
+    env: node
+    plan: free
+    rootDir: .
+    autoDeploy: true
+    buildCommand: npm install && npm run build
+    startCommand: npm run start -w @karaoke/frontend
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_APP_ORIGIN
+        sync: false
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: ""
+      - key: NEXT_PUBLIC_SOCKET_URL
+        value: ""

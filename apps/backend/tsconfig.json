@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "include": [
+    "src/server.ts",
+    "src/app.ts",
+    "src/config/env.ts",
+    "src/config/logger.ts",
+    "src/controllers/**/*.ts",
+    "src/middleware/**/*.ts",
+    "src/services/**/*.ts",
+    "src/sockets/**/*.ts",
+    "src/utils/**/*.ts",
+    "src/validators/**/*.ts",
+    "src/types/**/*.d.ts"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "karaoke-room-app",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @karaoke/frontend",
+    "build": "npm run build -w @karaoke/shared && npm run build -w @karaoke/frontend",
+    "lint": "npm run lint -w @karaoke/frontend",
+    "typecheck": "npm run build -w @karaoke/shared && npm run typecheck -w @karaoke/frontend"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
