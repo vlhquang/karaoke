@@ -2,6 +2,8 @@ declare global {
   interface YouTubePlayerInstance {
     loadVideoById?: (videoId: string) => void;
     cueVideoById?: (videoId: string) => void;
+    playVideo?: () => void;
+    getIframe?: () => HTMLIFrameElement;
     destroy: () => void;
   }
 
@@ -22,6 +24,7 @@ declare global {
       ) => YouTubePlayerInstance;
       PlayerState: {
         ENDED: number;
+        CUED: number;
       };
     };
     onYouTubeIframeAPIReady?: () => void;

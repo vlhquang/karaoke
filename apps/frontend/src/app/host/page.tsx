@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRoomStore } from "../../store/room-store";
 import { RoomHeader } from "../../components/room-header";
 import { QueueList } from "../../components/queue-list";
@@ -27,6 +27,9 @@ export default function HostPage() {
   const [loading, setLoading] = useState(false);
   const [queueLimitInput, setQueueLimitInput] = useState("10");
   const isHostReady = role === "host" && Boolean(roomCode);
+  const handleEnded = useCallback(() => {
+    void skipSong("ended");
+  }, [skipSong]);
 
   useEffect(() => {
     connect();
@@ -89,9 +92,7 @@ export default function HostPage() {
               <div className="space-y-3 rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
                 <YouTubeHostPlayer
                   videoId={nowPlaying?.videoId ?? null}
-                  onEnded={async () => {
-                    await skipSong("ended");
-                  }}
+                  onEnded={handleEnded}
                 />
                 <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-3">
                   <p className="text-xs uppercase tracking-widest text-slate-400">Dang phat</p>
