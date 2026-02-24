@@ -3,23 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Quan ly Co phieu</title>
+    <title>Quản lý Cổ phiếu</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body class="min-h-screen bg-slate-100 text-slate-900">
     <main class="mx-auto max-w-6xl p-4 md:p-6">
       <section id="loginCard" class="mx-auto mt-10 max-w-md rounded-2xl bg-white p-6 shadow">
-        <h1 class="text-2xl font-bold">Quan ly Co phieu</h1>
-        <p class="mt-2 text-sm text-slate-500">Nhap ma truy cap de su dung.</p>
+        <h1 class="text-2xl font-bold">Quản lý Cổ phiếu</h1>
+        <p class="mt-2 text-sm text-slate-500">Nhập mã truy cập để sử dụng.</p>
         <form id="loginForm" class="mt-4 space-y-3">
           <input
             id="accessCode"
             type="password"
             class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-cyan-500"
-            placeholder="Ma truy cap"
+            placeholder="Mã truy cập"
             required
           />
-          <button class="w-full rounded-lg bg-cyan-600 px-4 py-2 font-semibold text-white" type="submit">Dang nhap</button>
+          <button class="w-full rounded-lg bg-cyan-600 px-4 py-2 font-semibold text-white" type="submit">Đăng nhập</button>
         </form>
         <p id="loginError" class="mt-3 hidden rounded-md bg-red-50 px-3 py-2 text-sm text-red-600"></p>
       </section>
@@ -27,21 +27,28 @@
       <section id="appCard" class="hidden space-y-4">
         <header class="rounded-2xl bg-white p-4 shadow">
           <div class="flex flex-wrap items-center justify-between gap-3">
-            <h2 class="text-xl font-bold">Giao dich dang HOLD</h2>
-            <button id="refreshBtn" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">Lam moi</button>
+            <h2 class="text-xl font-bold">Giao dịch đang HOLD</h2>
+            <button id="refreshBtn" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">Làm mới</button>
           </div>
         </header>
 
         <section class="rounded-2xl bg-white p-4 shadow">
-          <h3 class="text-lg font-semibold">Them lenh mua</h3>
+          <h3 class="text-lg font-semibold">Thêm lệnh mua</h3>
           <form id="addForm" class="mt-3 grid gap-3 md:grid-cols-5">
-            <input id="symbolInput" class="rounded-lg border border-slate-300 px-3 py-2 uppercase" placeholder="Symbol (VD: FPT)" maxlength="10" required />
+            <input id="symbolInput" class="rounded-lg border border-slate-300 px-3 py-2 uppercase" placeholder="Mã CP (VD: FPT)" maxlength="10" required />
             <input id="dateInput" type="date" class="rounded-lg border border-slate-300 px-3 py-2" required />
-            <input id="priceInput" type="text" inputmode="numeric" class="rounded-lg border border-slate-300 px-3 py-2" placeholder="Gia mua" required />
-            <input id="quantityInput" type="text" inputmode="numeric" class="rounded-lg border border-slate-300 px-3 py-2" placeholder="So luong" required />
-            <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 font-semibold text-white">Them</button>
+            <input id="priceInput" type="text" inputmode="numeric" class="rounded-lg border border-slate-300 px-3 py-2" placeholder="Giá mua" required />
+            <input id="quantityInput" type="text" inputmode="numeric" class="rounded-lg border border-slate-300 px-3 py-2" placeholder="Số lượng" required />
+            <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 font-semibold text-white">Thêm</button>
           </form>
           <p id="addError" class="mt-3 hidden rounded-md bg-red-50 px-3 py-2 text-sm text-red-600"></p>
+        </section>
+
+        <section id="listLoading" class="hidden rounded-2xl bg-white p-4 shadow">
+          <div class="flex items-center gap-3 text-sm text-slate-600">
+            <span class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-cyan-600"></span>
+            <span>Đang tải dữ liệu từ Google Sheet...</span>
+          </div>
         </section>
 
         <section id="cardsBody" class="space-y-3 md:hidden"></section>
@@ -51,14 +58,14 @@
             <table class="min-w-full text-sm">
               <thead class="bg-slate-100 text-left">
                 <tr>
-                  <th class="px-3 py-3">Symbol</th>
-                  <th class="px-3 py-3">Ngay mua</th>
-                  <th class="px-3 py-3">Gia mua</th>
-                  <th class="px-3 py-3">So luong</th>
-                  <th class="px-3 py-3">Gia hien tai</th>
-                  <th class="px-3 py-3">Lai/Lo</th>
+                  <th class="px-3 py-3">Mã CP</th>
+                  <th class="px-3 py-3">Ngày mua</th>
+                  <th class="px-3 py-3">Giá mua</th>
+                  <th class="px-3 py-3">Số lượng</th>
+                  <th class="px-3 py-3">Giá hiện tại</th>
+                  <th class="px-3 py-3">Lãi/Lỗ</th>
                   <th class="px-3 py-3">%</th>
-                  <th class="px-3 py-3">Hanh dong</th>
+                  <th class="px-3 py-3">Hành động</th>
                 </tr>
               </thead>
               <tbody id="rowsBody"></tbody>
@@ -83,6 +90,7 @@
       const addError = document.getElementById("addError");
       const rowsBody = document.getElementById("rowsBody");
       const cardsBody = document.getElementById("cardsBody");
+      const listLoading = document.getElementById("listLoading");
 
       const postAction = async (action, payload = {}) => {
         const response = await fetch(APPS_SCRIPT_URL, {
@@ -97,7 +105,7 @@
           body = null;
         }
         if (!response.ok) {
-          const message = body && body.message ? body.message : "Khong goi duoc API";
+          const message = body && body.message ? body.message : "Không gọi được API";
           const details = body && body.details ? ` - ${body.details}` : "";
           throw new Error(`${message}${details}`);
         }
@@ -146,7 +154,7 @@
         return raw;
       };
 
-      const setButtonLoading = (button, loading, loadingText = "Dang xu ly...") => {
+      const setButtonLoading = (button, loading, loadingText = "Đang xử lý...") => {
         if (!button) return;
         if (loading) {
           button.dataset.originalText = button.textContent || "";
@@ -158,6 +166,15 @@
         button.textContent = button.dataset.originalText || button.textContent;
         button.disabled = false;
         button.classList.remove("opacity-70", "cursor-not-allowed");
+      };
+
+      const setListLoading = (loading) => {
+        if (!listLoading) return;
+        if (loading) {
+          listLoading.classList.remove("hidden");
+          return;
+        }
+        listLoading.classList.add("hidden");
       };
 
       const updateRowMetrics = (row, tx) => {
@@ -182,12 +199,31 @@
         }
       };
 
+      const syncSymbolViews = (symbol, sourceInput) => {
+        const currentPriceRaw = state.currentPrices[symbol];
+        const currentPrice = Number(currentPriceRaw);
+        const formattedValue = Number.isFinite(currentPrice) ? formatMoney(currentPrice) : "";
+
+        document.querySelectorAll(`input[data-symbol="${symbol}"]`).forEach((input) => {
+          if (sourceInput && input === sourceInput) return;
+          input.value = formattedValue;
+        });
+
+        state.transactions
+          .filter((tx) => tx.symbol === symbol)
+          .forEach((tx) => {
+            document.querySelectorAll(`[data-tx-id="${tx.id}"]`).forEach((container) => {
+              updateRowMetrics(container, tx);
+            });
+          });
+      };
+
       const renderRows = () => {
         rowsBody.innerHTML = "";
         cardsBody.innerHTML = "";
         if (state.transactions.length === 0) {
-          rowsBody.innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-center text-slate-500">Khong co lenh HOLD.</td></tr>';
-          cardsBody.innerHTML = '<div class="rounded-2xl bg-white p-4 text-center text-sm text-slate-500 shadow">Khong co lenh HOLD.</div>';
+          rowsBody.innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-center text-slate-500">Không có lệnh HOLD.</td></tr>';
+          cardsBody.innerHTML = '<div class="rounded-2xl bg-white p-4 text-center text-sm text-slate-500 shadow">Không có lệnh HOLD.</div>';
           return;
         }
 
@@ -209,13 +245,13 @@
             <td class="px-3 py-3">${formatMoney(tx.quantity)}</td>
             <td class="px-3 py-3">
               <input data-symbol="${tx.symbol}" type="text" inputmode="numeric" value="${hasCurrentPrice ? formatMoney(currentPrice) : ""}"
-                class="w-28 rounded border border-slate-300 px-2 py-1" placeholder="Gia" />
+                class="w-28 rounded border border-slate-300 px-2 py-1" placeholder="Giá" />
             </td>
             <td data-profit-cell class="px-3 py-3 font-semibold ${profitClass}">${profit === null ? "-" : formatMoney(profit)}</td>
             <td data-percent-cell class="px-3 py-3 font-semibold ${profitClass}">${percent === null ? "-" : percent.toFixed(2) + "%"}</td>
             <td class="px-3 py-3">
               <button data-sell-id="${tx.id}" class="rounded bg-amber-500 px-3 py-1 text-xs font-semibold text-white">
-                Mark as Sold
+                Đánh dấu đã bán
               </button>
             </td>
           `;
@@ -231,31 +267,31 @@
                 <p class="text-xs text-slate-500">${formatDateVi(tx.date)}</p>
               </div>
               <button data-sell-id="${tx.id}" class="rounded bg-amber-500 px-3 py-1 text-xs font-semibold text-white">
-                Mark as Sold
+                Đánh dấu đã bán
               </button>
             </div>
             <div class="grid grid-cols-2 gap-2 text-sm">
               <div class="rounded-lg bg-slate-50 p-2">
-                <p class="text-[11px] text-slate-500">Gia mua</p>
+                <p class="text-[11px] text-slate-500">Giá mua</p>
                 <p class="font-semibold">${formatMoney(tx.price)}</p>
               </div>
               <div class="rounded-lg bg-slate-50 p-2">
-                <p class="text-[11px] text-slate-500">So luong</p>
+                <p class="text-[11px] text-slate-500">Số lượng</p>
                 <p class="font-semibold">${formatMoney(tx.quantity)}</p>
               </div>
             </div>
             <div class="mt-2">
-              <p class="mb-1 text-[11px] text-slate-500">Gia hien tai</p>
+              <p class="mb-1 text-[11px] text-slate-500">Giá hiện tại</p>
               <input data-symbol="${tx.symbol}" type="text" inputmode="numeric" value="${hasCurrentPrice ? formatMoney(currentPrice) : ""}"
-                class="w-full rounded border border-slate-300 px-2 py-2" placeholder="Nhap gia hien tai" />
+                class="w-full rounded border border-slate-300 px-2 py-2" placeholder="Nhập giá hiện tại" />
             </div>
             <div class="mt-2 grid grid-cols-2 gap-2 text-sm">
               <div class="rounded-lg bg-slate-50 p-2">
-                <p class="text-[11px] text-slate-500">Lai/Lo</p>
+                <p class="text-[11px] text-slate-500">Lãi/Lỗ</p>
                 <p data-profit-cell class="font-semibold ${profitClass}">${profit === null ? "-" : formatMoney(profit)}</p>
               </div>
               <div class="rounded-lg bg-slate-50 p-2">
-                <p class="text-[11px] text-slate-500">Phan tram</p>
+                <p class="text-[11px] text-slate-500">Phần trăm</p>
                 <p data-percent-cell class="font-semibold ${profitClass}">${percent === null ? "-" : percent.toFixed(2) + "%"}</p>
               </div>
             </div>
@@ -270,17 +306,16 @@
             if (!symbol) return;
             state.currentPrices[symbol] = Number.isFinite(value) ? value : "";
             event.target.value = Number.isFinite(value) ? formatMoney(value) : "";
-            const container = event.target.closest("tr, article");
-            const txId = Number(container?.dataset.txId || NaN);
-            const tx = state.transactions.find((item) => item.id === txId);
-            if (container && tx) {
-              updateRowMetrics(container, tx);
-            }
+            syncSymbolViews(symbol, event.target);
           });
 
           input.addEventListener("blur", (event) => {
+            const symbol = event.target.dataset.symbol;
             const value = parseMoney(event.target.value);
             event.target.value = Number.isFinite(value) ? formatMoney(value) : "";
+            if (!symbol) return;
+            state.currentPrices[symbol] = Number.isFinite(value) ? value : "";
+            syncSymbolViews(symbol, event.target);
           });
         });
 
@@ -288,15 +323,15 @@
           button.addEventListener("click", async (event) => {
             const id = Number(event.target.dataset.sellId);
             if (!Number.isFinite(id)) return;
-            setButtonLoading(button, true, "Dang ban...");
+            setButtonLoading(button, true, "Đang bán...");
             try {
               const result = await postAction("sell", { accessCode: state.accessCode, id });
               if (!result.ok) {
-                throw new Error(result.message || "Sell that bai");
+                throw new Error(result.message || "Bán thất bại");
               }
-              await loadTransactions();
+              removeTransactionFromState(id);
             } catch (error) {
-              alert(error.message || "Co loi xay ra");
+              alert(error.message || "Có lỗi xảy ra");
             } finally {
               setButtonLoading(button, false);
             }
@@ -305,12 +340,30 @@
       };
 
       const loadTransactions = async () => {
-        const result = await postAction("list", { accessCode: state.accessCode });
-        if (!result.ok) {
-          throw new Error(result.message || "Khong tai du lieu");
+        setListLoading(true);
+        try {
+          const result = await postAction("list", { accessCode: state.accessCode });
+          if (!result.ok) {
+            throw new Error(result.message || "Không tải dữ liệu");
+          }
+          state.transactions = result.data || [];
+          renderRows();
+        } finally {
+          setListLoading(false);
         }
-        state.transactions = result.data || [];
+      };
+
+      const addTransactionToState = (tx) => {
+        state.transactions = [tx, ...state.transactions];
         renderRows();
+      };
+
+      const removeTransactionFromState = (id) => {
+        const before = state.transactions.length;
+        state.transactions = state.transactions.filter((tx) => tx.id !== id);
+        if (state.transactions.length !== before) {
+          renderRows();
+        }
       };
 
       const loginForm = document.getElementById("loginForm");
@@ -335,23 +388,23 @@
 
         const accessCode = document.getElementById("accessCode").value.trim();
         if (!accessCode) {
-          loginError.textContent = "Vui long nhap ma truy cap.";
+          loginError.textContent = "Vui lòng nhập mã truy cập.";
           loginError.classList.remove("hidden");
           return;
         }
 
         try {
-          setButtonLoading(loginSubmitButton, true, "Dang dang nhap...");
+          setButtonLoading(loginSubmitButton, true, "Đang đăng nhập...");
           const result = await postAction("login", { accessCode });
           if (!result.ok) {
-            throw new Error(result.message || "Sai ma truy cap");
+            throw new Error(result.message || "Sai mã truy cập");
           }
           state.accessCode = accessCode;
           loginCard.classList.add("hidden");
           appCard.classList.remove("hidden");
           await loadTransactions();
         } catch (error) {
-          loginError.textContent = error.message || "Dang nhap that bai.";
+          loginError.textContent = error.message || "Đăng nhập thất bại.";
           loginError.classList.remove("hidden");
         } finally {
           setButtonLoading(loginSubmitButton, false);
@@ -368,13 +421,13 @@
         const quantity = parseMoney(document.getElementById("quantityInput").value);
 
         if (!symbol || !date || !Number.isFinite(price) || price <= 0 || !Number.isInteger(quantity) || quantity <= 0) {
-          addError.textContent = "Du lieu khong hop le.";
+          addError.textContent = "Dữ liệu không hợp lệ.";
           addError.classList.remove("hidden");
           return;
         }
 
         try {
-          setButtonLoading(addSubmitButton, true, "Dang them...");
+          setButtonLoading(addSubmitButton, true, "Đang thêm...");
           const result = await postAction("add", {
             accessCode: state.accessCode,
             symbol,
@@ -383,12 +436,20 @@
             quantity
           });
           if (!result.ok) {
-            throw new Error(result.message || "Them giao dich that bai");
+            throw new Error(result.message || "Thêm giao dịch thất bại");
           }
+          const createdId = Number(result?.data?.id);
+          addTransactionToState({
+            id: Number.isFinite(createdId) ? createdId : Date.now(),
+            symbol,
+            date,
+            price,
+            quantity,
+            status: "HOLD"
+          });
           event.target.reset();
-          await loadTransactions();
         } catch (error) {
-          addError.textContent = error.message || "Them giao dich that bai";
+          addError.textContent = error.message || "Thêm giao dịch thất bại";
           addError.classList.remove("hidden");
         } finally {
           setButtonLoading(addSubmitButton, false);
@@ -397,10 +458,10 @@
 
       refreshBtn.addEventListener("click", async () => {
         try {
-          setButtonLoading(refreshBtn, true, "Dang tai...");
+          setButtonLoading(refreshBtn, true, "Đang tải...");
           await loadTransactions();
         } catch (error) {
-          alert(error.message || "Lam moi that bai");
+          alert(error.message || "Làm mới thất bại");
         } finally {
           setButtonLoading(refreshBtn, false);
         }
