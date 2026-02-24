@@ -19,6 +19,12 @@ export default function HomePage() {
       title: "Lo to",
       description: "Game lo to tren web (dang phat trien).",
       badge: "Soon"
+    },
+    {
+      href: "/co-phieu/index.html",
+      title: "Co phieu",
+      description: "Quan ly giao dich mua co phieu ca nhan voi Google Sheets.",
+      badge: "New"
     }
   ];
 
