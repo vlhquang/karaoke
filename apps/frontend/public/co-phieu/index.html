@@ -115,11 +115,35 @@
         if (!cleaned) return NaN;
         return Number(cleaned);
       };
-      const formatDateVi = (isoDate) => {
-        const raw = String(isoDate || "").trim();
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-        const [year, month, day] = raw.split("-");
-        return `${day}/${month}/${year}`;
+      const formatDateVi = (value) => {
+        if (value === null || value === undefined) return "";
+
+        if (typeof value === "number" && Number.isFinite(value)) {
+          const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+          const date = new Date(excelEpoch.getTime() + value * 86400000);
+          if (!Number.isNaN(date.getTime())) {
+            return date.toLocaleDateString("vi-VN");
+          }
+        }
+
+        const raw = String(value).trim();
+        if (!raw) return "";
+
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+          const [year, month, day] = raw.split("-");
+          return `${day}/${month}/${year}`;
+        }
+
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+          return raw;
+        }
+
+        const parsed = new Date(raw);
+        if (!Number.isNaN(parsed.getTime())) {
+          return parsed.toLocaleDateString("vi-VN");
+        }
+
+        return raw;
       };
 
       const setButtonLoading = (button, loading, loadingText = "Dang xu ly...") => {
