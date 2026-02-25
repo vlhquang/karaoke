@@ -19,7 +19,20 @@ import type {
   RoomState,
   ServerToClientEvents,
   SetQueueLimitPayload,
-  SkipSongPayload
+  SkipSongPayload,
+  LotoClientToServerEvents,
+  LotoConfig,
+  LotoCreateRoomPayload,
+  LotoJoinRoomPayload,
+  LotoStartGamePayload,
+  LotoCallNumberPayload,
+  LotoClaimWinPayload,
+  LotoCloseRoomPayload,
+  LotoToggleReadyPayload,
+  LotoResetRoundPayload,
+  LotoRoomSnapshot,
+  LotoRoomState,
+  LotoGameStatus
 } from "@karaoke/shared";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -128,6 +141,62 @@ const snapshot = (room: InternalRoom): RoomSnapshot => ({
 
 const alreadyInRoom = (room: InternalRoom, videoId: string): boolean =>
   room.nowPlaying?.videoId === videoId || room.queue.some((song) => song.videoId === videoId);
+
+// ── Lô tô room data ──
+
+interface LotoMember {
+  userId: string;
+  displayName: string;
+  socketId: string;
+  ready: boolean;
+  winnerQrImage?: string;
+}
+
+interface LotoInternalRoom {
+  roomCode: string;
+  hostId: string;
+  config: LotoConfig;
+  calledNumbers: number[];
+  currentNumber: number | null;
+  gameStatus: LotoGameStatus;
+  members: Map<string, LotoMember>;
+  createdAt: string;
+  autoCallTimer: ReturnType<typeof setInterval> | null;
+}
+
+const lotoRooms = new Map<string, LotoInternalRoom>();
+
+const lotoSnapshot = (room: LotoInternalRoom): LotoRoomSnapshot => ({
+  room: {
+    roomCode: room.roomCode,
+    hostId: room.hostId,
+    config: room.config,
+    calledNumbers: [...room.calledNumbers],
+    currentNumber: room.currentNumber,
+    gameStatus: room.gameStatus,
+    memberCount: room.members.size,
+    readyCount: [...room.members.values()].filter((m) => m.ready).length,
+    members: [...room.members.values()].map((member) => ({
+      userId: member.userId,
+      displayName: member.displayName,
+      ready: member.ready,
+      hasQrImage: Boolean(member.winnerQrImage)
+    })),
+    createdAt: room.createdAt
+  }
+});
+
+const pickNextNumber = (room: LotoInternalRoom): number | null => {
+  const max = room.config.maxNumber;
+  const remaining: number[] = [];
+  for (let i = 1; i <= max; i++) {
+    if (!room.calledNumbers.includes(i)) {
+      remaining.push(i);
+    }
+  }
+  if (remaining.length === 0) return null;
+  return remaining[Math.floor(Math.random() * remaining.length)];
+};
 
 const app = next({ dev, hostname: host, port });
 const handle = app.getRequestHandler();
@@ -451,6 +520,339 @@ app.prepare().then(() => {
         ack({ ok: true });
       } catch (error) {
         ack({ ok: false, message: error instanceof Error ? error.message : "Set queue limit failed" });
+      }
+    });
+
+    // ── Lô tô socket handlers ──
+
+    const lotoRoomPrefix = "loto:";
+
+    const emitLotoState = (roomCode: string): void => {
+      const room = lotoRooms.get(roomCode);
+      if (!room) return;
+      io.to(lotoRoomPrefix + roomCode).emit("loto_state_updated", lotoSnapshot(room));
+    };
+
+    const startAutoCall = (room: LotoInternalRoom): void => {
+      stopAutoCall(room);
+      room.autoCallTimer = setInterval(() => {
+        const num = pickNextNumber(room);
+        if (num === null) {
+          room.gameStatus = "finished";
+          stopAutoCall(room);
+          emitLotoState(room.roomCode);
+          return;
+        }
+        room.currentNumber = num;
+        room.calledNumbers.push(num);
+        io.to(lotoRoomPrefix + room.roomCode).emit("loto_number_called", {
+          number: num,
+          calledNumbers: [...room.calledNumbers]
+        });
+        emitLotoState(room.roomCode);
+      }, room.config.intervalSeconds * 1000);
+    };
+
+    const stopAutoCall = (room: LotoInternalRoom): void => {
+      if (room.autoCallTimer) {
+        clearInterval(room.autoCallTimer);
+        room.autoCallTimer = null;
+      }
+    };
+
+    socket.on("loto_create_room", (payload: LotoCreateRoomPayload, ack) => {
+      try {
+        const displayName = String(payload.displayName ?? "").trim() || "Host";
+        const winnerQrImage = typeof payload.winnerQrImage === "string" ? payload.winnerQrImage.trim() : "";
+        const config = payload.config;
+        if (!config || ![60, 90].includes(config.maxNumber)) {
+          ack({ ok: false, message: "maxNumber must be 60 or 90" });
+          return;
+        }
+        const interval = Number(config.intervalSeconds);
+        if (!Number.isFinite(interval) || interval < 1 || interval > 60) {
+          ack({ ok: false, message: "intervalSeconds must be between 1 and 60" });
+          return;
+        }
+        if (winnerQrImage && !winnerQrImage.startsWith("data:image/")) {
+          ack({ ok: false, message: "QR image must be a valid image data URL" });
+          return;
+        }
+        if (winnerQrImage.length > 500_000) {
+          ack({ ok: false, message: "QR image is too large" });
+          return;
+        }
+
+        const hostUserId = randomUUID();
+        let roomCode = "";
+        for (let i = 0; i < 8; i++) {
+          const candidate = generateRoomCode();
+          if (!lotoRooms.has(candidate)) {
+            roomCode = candidate;
+            break;
+          }
+        }
+        if (!roomCode) {
+          ack({ ok: false, message: "Failed to allocate room code" });
+          return;
+        }
+
+        const room: LotoInternalRoom = {
+          roomCode,
+          hostId: hostUserId,
+          config: {
+            maxNumber: config.maxNumber as 60 | 90,
+            intervalSeconds: interval,
+            voiceEnabled: Boolean(config.voiceEnabled)
+          },
+          calledNumbers: [],
+          currentNumber: null,
+          gameStatus: "waiting",
+          members: new Map([[hostUserId, {
+            userId: hostUserId,
+            displayName,
+            socketId: socket.id,
+            ready: false,
+            winnerQrImage: winnerQrImage || undefined
+          }]]),
+          createdAt: new Date().toISOString(),
+          autoCallTimer: null
+        };
+
+        lotoRooms.set(roomCode, room);
+        socket.join(lotoRoomPrefix + roomCode);
+        socket.data.user = { userId: hostUserId, roomCode, displayName, role: "host" };
+
+        socket.emit("loto_room_created", lotoSnapshot(room));
+        ack({ ok: true, roomCode, userId: hostUserId });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Create loto room failed" });
+      }
+    });
+
+    socket.on("loto_join_room", (payload: LotoJoinRoomPayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const displayName = String(payload.displayName ?? "").trim() || "Guest";
+        const winnerQrImage = typeof payload.winnerQrImage === "string" ? payload.winnerQrImage.trim() : "";
+        const room = lotoRooms.get(roomCode);
+        if (!room) {
+          ack({ ok: false, message: "Room not found" });
+          return;
+        }
+        if (winnerQrImage && !winnerQrImage.startsWith("data:image/")) {
+          ack({ ok: false, message: "QR image must be a valid image data URL" });
+          return;
+        }
+        if (winnerQrImage.length > 500_000) {
+          ack({ ok: false, message: "QR image is too large" });
+          return;
+        }
+
+        const userId = randomUUID();
+        room.members.set(userId, {
+          userId,
+          displayName,
+          socketId: socket.id,
+          ready: false,
+          winnerQrImage: winnerQrImage || undefined
+        });
+
+        socket.join(lotoRoomPrefix + roomCode);
+        socket.data.user = { userId, roomCode, displayName, role: "guest" };
+
+        socket.emit("loto_room_joined", lotoSnapshot(room));
+        emitLotoState(roomCode);
+        ack({ ok: true, roomCode, userId });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Join loto room failed" });
+      }
+    });
+
+    socket.on("loto_start_game", (payload: LotoStartGamePayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || room.hostId !== user.userId) {
+          ack({ ok: false, message: "Only host can start the game" });
+          return;
+        }
+        if (room.gameStatus === "playing") {
+          ack({ ok: false, message: "Game is already playing" });
+          return;
+        }
+        const hasReadyPlayer = [...room.members.values()].some((member) => member.ready);
+        if (!hasReadyPlayer) {
+          ack({ ok: false, message: "At least one player must be ready" });
+          return;
+        }
+
+        room.gameStatus = "playing";
+        startAutoCall(room);
+        emitLotoState(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Start game failed" });
+      }
+    });
+
+    socket.on("loto_pause_game", (payload: { roomCode: string }, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || room.hostId !== user.userId) {
+          ack({ ok: false, message: "Only host can pause" });
+          return;
+        }
+
+        room.gameStatus = "paused";
+        stopAutoCall(room);
+        emitLotoState(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Pause failed" });
+      }
+    });
+
+    socket.on("loto_call_number", (payload: LotoCallNumberPayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || room.hostId !== user.userId) {
+          ack({ ok: false, message: "Only host can call numbers" });
+          return;
+        }
+        if (room.gameStatus !== "playing") {
+          ack({ ok: false, message: "Game is not in playing state" });
+          return;
+        }
+
+        const num = pickNextNumber(room);
+        if (num === null) {
+          room.gameStatus = "finished";
+          stopAutoCall(room);
+          emitLotoState(roomCode);
+          ack({ ok: false, message: "All numbers have been called" });
+          return;
+        }
+
+        room.currentNumber = num;
+        room.calledNumbers.push(num);
+        io.to(lotoRoomPrefix + roomCode).emit("loto_number_called", {
+          number: num,
+          calledNumbers: [...room.calledNumbers]
+        });
+        emitLotoState(roomCode);
+        ack({ ok: true, number: num });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Call number failed" });
+      }
+    });
+
+    socket.on("loto_claim_win", (payload: LotoClaimWinPayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || user.roomCode !== roomCode) {
+          ack({ ok: false, message: "Join room first" });
+          return;
+        }
+        if (room.gameStatus !== "playing") {
+          ack({ ok: false, message: "Game is not in playing state" });
+          return;
+        }
+        const member = room.members.get(user.userId);
+        if (!member || !member.ready) {
+          ack({ ok: false, message: "Only ready players can claim win" });
+          return;
+        }
+
+        room.gameStatus = "finished";
+        stopAutoCall(room);
+        io.to(lotoRoomPrefix + roomCode).emit("loto_game_won", {
+          winnerName: member.displayName,
+          roomCode,
+          winnerQrImage: member.winnerQrImage
+        });
+        emitLotoState(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Claim win failed" });
+      }
+    });
+
+    socket.on("loto_close_room", (payload: LotoCloseRoomPayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || room.hostId !== user.userId) {
+          ack({ ok: false, message: "Only host can close room" });
+          return;
+        }
+
+        stopAutoCall(room);
+        io.to(lotoRoomPrefix + roomCode).emit("loto_room_closed", { roomCode, message: "Host closed this room" });
+        lotoRooms.delete(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Close loto room failed" });
+      }
+    });
+
+    socket.on("loto_toggle_ready", (payload: LotoToggleReadyPayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const ready = Boolean(payload.ready);
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || user.roomCode !== roomCode) {
+          ack({ ok: false, message: "Join room first" });
+          return;
+        }
+        const member = room.members.get(user.userId);
+        if (!member) {
+          ack({ ok: false, message: "Member not found" });
+          return;
+        }
+        member.ready = ready;
+        room.members.set(member.userId, member);
+        emitLotoState(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Toggle ready failed" });
+      }
+    });
+
+    socket.on("loto_reset_round", (payload: LotoResetRoundPayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || room.hostId !== user.userId) {
+          ack({ ok: false, message: "Only host can reset round" });
+          return;
+        }
+
+        room.calledNumbers = [];
+        room.currentNumber = null;
+        room.gameStatus = "waiting";
+        stopAutoCall(room);
+        emitLotoState(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Reset round failed" });
       }
     });
   });

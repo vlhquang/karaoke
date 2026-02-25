@@ -142,4 +142,124 @@ export type ServerToClientEvents = {
   now_playing: (song: QueueSong | null) => void;
   room_closed: (payload: { roomCode: string; message: string }) => void;
   error: (error: ApiErrorBody) => void;
+
+  // Lô tô events
+  loto_room_created: (snapshot: LotoRoomSnapshot) => void;
+  loto_room_joined: (snapshot: LotoRoomSnapshot) => void;
+  loto_state_updated: (snapshot: LotoRoomSnapshot) => void;
+  loto_number_called: (payload: { number: number; calledNumbers: number[] }) => void;
+  loto_game_won: (payload: { winnerName: string; roomCode: string; winnerQrImage?: string }) => void;
+  loto_room_closed: (payload: { roomCode: string; message: string }) => void;
+};
+
+// ── Lô tô types ──
+
+export type LotoMaxNumber = 60 | 90;
+
+export interface LotoConfig {
+  maxNumber: LotoMaxNumber;
+  intervalSeconds: number;
+  voiceEnabled: boolean;
+}
+
+export type LotoGameStatus = "waiting" | "playing" | "paused" | "finished";
+
+export interface LotoRoomState {
+  roomCode: string;
+  hostId: string;
+  config: LotoConfig;
+  calledNumbers: number[];
+  currentNumber: number | null;
+  gameStatus: LotoGameStatus;
+  memberCount: number;
+  readyCount: number;
+  members: LotoMemberState[];
+  createdAt: string;
+}
+
+export interface LotoRoomSnapshot {
+  room: LotoRoomState;
+}
+
+export interface LotoMemberState {
+  userId: string;
+  displayName: string;
+  ready: boolean;
+  hasQrImage: boolean;
+}
+
+export interface LotoCreateRoomPayload {
+  displayName: string;
+  config: LotoConfig;
+  winnerQrImage?: string;
+}
+
+export interface LotoJoinRoomPayload {
+  roomCode: string;
+  displayName: string;
+  winnerQrImage?: string;
+}
+
+export interface LotoStartGamePayload {
+  roomCode: string;
+}
+
+export interface LotoCallNumberPayload {
+  roomCode: string;
+}
+
+export interface LotoClaimWinPayload {
+  roomCode: string;
+}
+
+export interface LotoCloseRoomPayload {
+  roomCode: string;
+}
+
+export interface LotoToggleReadyPayload {
+  roomCode: string;
+  ready: boolean;
+}
+
+export interface LotoResetRoundPayload {
+  roomCode: string;
+}
+
+export type LotoClientToServerEvents = {
+  loto_create_room: (
+    payload: LotoCreateRoomPayload,
+    ack: (response: { ok: true; roomCode: string; userId: string } | { ok: false; message: string }) => void
+  ) => void;
+  loto_join_room: (
+    payload: LotoJoinRoomPayload,
+    ack: (response: { ok: true; roomCode: string; userId: string } | { ok: false; message: string }) => void
+  ) => void;
+  loto_start_game: (
+    payload: LotoStartGamePayload,
+    ack: (response: { ok: true } | { ok: false; message: string }) => void
+  ) => void;
+  loto_pause_game: (
+    payload: { roomCode: string },
+    ack: (response: { ok: true } | { ok: false; message: string }) => void
+  ) => void;
+  loto_call_number: (
+    payload: LotoCallNumberPayload,
+    ack: (response: { ok: true; number: number } | { ok: false; message: string }) => void
+  ) => void;
+  loto_claim_win: (
+    payload: LotoClaimWinPayload,
+    ack: (response: { ok: true } | { ok: false; message: string }) => void
+  ) => void;
+  loto_close_room: (
+    payload: LotoCloseRoomPayload,
+    ack: (response: { ok: true } | { ok: false; message: string }) => void
+  ) => void;
+  loto_toggle_ready: (
+    payload: LotoToggleReadyPayload,
+    ack: (response: { ok: true } | { ok: false; message: string }) => void
+  ) => void;
+  loto_reset_round: (
+    payload: LotoResetRoundPayload,
+    ack: (response: { ok: true } | { ok: false; message: string }) => void
+  ) => void;
 };

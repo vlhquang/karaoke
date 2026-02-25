@@ -221,13 +221,24 @@
       const renderRows = () => {
         rowsBody.innerHTML = "";
         cardsBody.innerHTML = "";
-        if (state.transactions.length === 0) {
+        const sortedTransactions = [...state.transactions].sort((a, b) => {
+          const symbolCompare = String(a.symbol || "").localeCompare(String(b.symbol || ""), "vi", { sensitivity: "base" });
+          if (symbolCompare !== 0) return symbolCompare;
+          const dateA = new Date(a.date).getTime();
+          const dateB = new Date(b.date).getTime();
+          if (Number.isFinite(dateA) && Number.isFinite(dateB) && dateA !== dateB) {
+            return dateA - dateB;
+          }
+          return a.id - b.id;
+        });
+
+        if (sortedTransactions.length === 0) {
           rowsBody.innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-center text-slate-500">Không có lệnh HOLD.</td></tr>';
           cardsBody.innerHTML = '<div class="rounded-2xl bg-white p-4 text-center text-sm text-slate-500 shadow">Không có lệnh HOLD.</div>';
           return;
         }
 
-        state.transactions.forEach((tx) => {
+        sortedTransactions.forEach((tx) => {
           const currentPriceRaw = state.currentPrices[tx.symbol];
           const currentPrice = Number(currentPriceRaw);
           const hasCurrentPrice = Number.isFinite(currentPrice) && currentPrice >= 0;

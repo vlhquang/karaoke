@@ -17,8 +17,8 @@ export default function HomePage() {
     {
       href: "/lo-to",
       title: "Lo to",
-      description: "Game lo to tren web (dang phat trien).",
-      badge: "Soon"
+      description: "Game lo to tren web — tao phong, goi so va do bang.",
+      badge: "Live"
     },
     {
       href: "/co-phieu/index.html",
