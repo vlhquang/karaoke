@@ -179,6 +179,11 @@ export interface LotoRoomState {
 
 export interface LotoRoomSnapshot {
   room: LotoRoomState;
+  myBoard?: number[][];
+}
+
+export interface NearWinRowInfo {
+  waitingNumber: number;
 }
 
 export interface LotoMemberState {
@@ -186,6 +191,7 @@ export interface LotoMemberState {
   displayName: string;
   ready: boolean;
   hasQrImage: boolean;
+  nearWinRows: NearWinRowInfo[];
 }
 
 export interface LotoCreateRoomPayload {
@@ -261,5 +267,13 @@ export type LotoClientToServerEvents = {
   loto_reset_round: (
     payload: LotoResetRoundPayload,
     ack: (response: { ok: true } | { ok: false; message: string }) => void
+  ) => void;
+  loto_submit_board: (
+    payload: { roomCode: string; board: number[][] },
+    ack: (response: { ok: true } | { ok: false; message: string }) => void
+  ) => void;
+  loto_restore_session: (
+    payload: { roomCode: string; userId: string },
+    ack: (response: { ok: true; roomCode: string; userId: string; displayName: string; role: "host" | "guest" } | { ok: false; message: string }) => void
   ) => void;
 };

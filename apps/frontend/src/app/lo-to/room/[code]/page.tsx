@@ -7,6 +7,7 @@ import { useLotoStore } from "../../../../store/loto-store";
 import { LotoNumberBoard } from "../../../../components/loto-number-board";
 import { LotoBingoCard } from "../../../../components/loto-bingo-card";
 import { LotoWinnerPopup } from "../../../../components/loto-winner-popup";
+import { LotoNearWinPanel } from "../../../../components/loto-near-win-panel";
 
 const MAX_QR_SIZE = 500_000;
 
@@ -45,7 +46,7 @@ export default function LotoRoomPage() {
     const [showWinnerPopup, setShowWinnerPopup] = useState(false);
     const [showMore, setShowMore] = useState(false);
     const autoClaimedRef = useRef<string>("");
-    const isJoined = Boolean(roomCode);
+    const isJoined = Boolean(roomCode && roomCode === roomCodeParam);
 
     useEffect(() => {
         connect();
@@ -207,15 +208,14 @@ export default function LotoRoomPage() {
                                     {config.maxNumber} số · Sẵn sàng {readyCount}/{memberCount}
                                 </div>
                                 <div
-                                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                        gameStatus === "playing"
-                                            ? "bg-emerald-500/20 text-emerald-300"
-                                            : gameStatus === "paused"
-                                                ? "bg-amber-500/20 text-amber-300"
-                                                : gameStatus === "finished"
-                                                    ? "bg-red-500/20 text-red-300"
-                                                    : "bg-slate-700 text-slate-300"
-                                    }`}
+                                    className={`rounded-full px-3 py-1 text-xs font-semibold ${gameStatus === "playing"
+                                        ? "bg-emerald-500/20 text-emerald-300"
+                                        : gameStatus === "paused"
+                                            ? "bg-amber-500/20 text-amber-300"
+                                            : gameStatus === "finished"
+                                                ? "bg-red-500/20 text-red-300"
+                                                : "bg-slate-700 text-slate-300"
+                                        }`}
                                 >
                                     {gameStatus === "playing"
                                         ? "Đang chơi"
@@ -245,26 +245,14 @@ export default function LotoRoomPage() {
                             </div>
                         </div>
 
-                        {!isReady && (
-                            <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-200">
-                                Bạn cần bấm "Sẵn sàng" để dò số và báo trúng thưởng.
-                            </div>
-                        )}
-                        {isReady && (
-                            <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200">
-                                Bạn đã sẵn sàng. Chờ số được gọi để dò bảng.
-                            </div>
-                        )}
-
                         <button
                             onClick={() => {
                                 void toggleReady(!isReady);
                             }}
-                            className={`w-full rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                                isReady
-                                    ? "border border-emerald-400/60 text-emerald-200 hover:bg-emerald-500/10"
-                                    : "border border-slate-500 text-slate-200 hover:bg-slate-700/50"
-                            }`}
+                            className={`w-full rounded-xl px-4 py-3 font-semibold transition ${isReady
+                                ? "bg-emerald-500 text-slate-900 hover:bg-emerald-400"
+                                : "bg-amber-400 text-slate-900 hover:bg-amber-300"
+                                }`}
                         >
                             {isReady ? "Đã sẵn sàng" : "Sẵn sàng"}
                         </button>
@@ -279,6 +267,14 @@ export default function LotoRoomPage() {
                             <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-2 text-center text-sm text-amber-200">
                                 Trò chơi đã kết thúc.
                             </div>
+                        )}
+
+                        {gameStatus === "playing" && (
+                            <LotoNearWinPanel
+                                members={members}
+                                calledNumbers={calledNumbers}
+                                maxNumber={config.maxNumber}
+                            />
                         )}
 
                         <div className="grid gap-3 lg:grid-cols-[1fr_1fr] lg:gap-4">
