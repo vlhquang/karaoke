@@ -203,13 +203,16 @@ interface LotoStore {
     isReady: boolean;
     boards: BingoCard[];
     winnerName: string;
-    winnerQrImage: string;
+    winnerBankingInfo?: { bankId: string; accountNo: string };
+    betAmount: number;
     errorMessage: string;
     initialized: boolean;
+    theme: string;
 
+    setTheme: (theme: string) => void;
     connect: () => void;
-    createRoom: (displayName: string, config: LotoConfig, winnerQrImage?: string) => Promise<void>;
-    joinRoom: (roomCode: string, displayName: string, winnerQrImage?: string) => Promise<boolean>;
+    createRoom: (displayName: string, config: LotoConfig, bankingInfo?: { bankId: string; accountNo: string }) => Promise<void>;
+    joinRoom: (roomCode: string, displayName: string, bankingInfo?: { bankId: string; accountNo: string }) => Promise<boolean>;
     startGame: () => Promise<void>;
     pauseGame: () => Promise<void>;
     callNumber: () => Promise<void>;
@@ -253,7 +256,8 @@ const applyLotoSnapshot = (set: SetFn, snapshot: LotoRoomSnapshot): void => {
         members: snapshot.room.members,
         isReady: snapshot.room.members.some((m) => m.userId === state.userId && m.ready),
         winnerName: snapshot.room.gameStatus === "finished" ? state.winnerName : "",
-        winnerQrImage: snapshot.room.gameStatus === "finished" ? state.winnerQrImage : "",
+        winnerBankingInfo: snapshot.room.gameStatus === "finished" ? state.winnerBankingInfo : undefined,
+        betAmount: snapshot.room.config.betAmount,
         boards: snapshot.myBoard ? [snapshot.myBoard] : state.boards,
         errorMessage: ""
     }));
@@ -352,8 +356,8 @@ const setupLotoSocketListeners = async (set: SetFn, get: GetFn): Promise<void> =
     });
 
     socket.on("loto_game_won", (payload) => {
-        const data = payload as { winnerName: string; roomCode: string; winnerQrImage?: string };
-        set(() => ({ winnerName: data.winnerName, winnerQrImage: data.winnerQrImage ?? "", gameStatus: "finished" }));
+        const data = payload as { winnerName: string; roomCode: string; betAmount?: number; winnerBankingInfo?: { bankId: string; accountNo: string } };
+        set(() => ({ winnerName: data.winnerName, winnerBankingInfo: data.winnerBankingInfo, betAmount: data.betAmount || 0, gameStatus: "finished" }));
     });
 
     socket.on("loto_room_closed", () => {
@@ -371,7 +375,8 @@ const setupLotoSocketListeners = async (set: SetFn, get: GetFn): Promise<void> =
             isReady: false,
             boards: [],
             winnerName: "",
-            winnerQrImage: "",
+            winnerBankingInfo: undefined,
+            betAmount: 0,
             errorMessage: "Phòng đã bị đóng bởi chủ phòng"
         }));
     });
@@ -390,7 +395,7 @@ export const useLotoStore = create<LotoStore>((set, get) => ({
     userId: "",
     displayName: "",
     role: null,
-    config: { maxNumber: 90, intervalSeconds: 5, voiceEnabled: true },
+    config: { maxNumber: 90, intervalSeconds: 5, voiceEnabled: true, betAmount: 0 },
     calledNumbers: [],
     currentNumber: null,
     gameStatus: "waiting",
@@ -400,20 +405,37 @@ export const useLotoStore = create<LotoStore>((set, get) => ({
     isReady: false,
     boards: [],
     winnerName: "",
-    winnerQrImage: "",
+    winnerBankingInfo: undefined,
+    betAmount: 0,
     errorMessage: "",
     initialized: false,
+    theme: "default",
+
+    setTheme: (theme: string) => {
+        set(() => ({ theme }));
+        if (typeof window !== "undefined") {
+            localStorage.setItem("loto_theme", theme);
+        }
+    },
 
     connect: () => {
         if (get().initialized) return;
+
+        if (typeof window !== "undefined") {
+            const savedTheme = localStorage.getItem("loto_theme");
+            if (savedTheme) {
+                set(() => ({ theme: savedTheme }));
+            }
+        }
+
         void setupLotoSocketListeners(set, get);
         set(() => ({ initialized: true }));
     },
 
-    createRoom: async (displayName: string, config: LotoConfig, winnerQrImage?: string) => {
+    createRoom: async (displayName: string, config: LotoConfig, bankingInfo?: { bankId: string; accountNo: string }) => {
         const response = await emitWithAck<{ ok: true; roomCode: string; userId: string } | { ok: false; message: string }>(
             "loto_create_room",
-            { displayName, config, winnerQrImage }
+            { displayName, config, bankingInfo }
         );
         if (!response.ok) {
             set(() => ({ errorMessage: response.message }));
@@ -442,10 +464,10 @@ export const useLotoStore = create<LotoStore>((set, get) => ({
         }
     },
 
-    joinRoom: async (roomCode: string, displayName: string, winnerQrImage?: string) => {
+    joinRoom: async (roomCode: string, displayName: string, bankingInfo?: { bankId: string; accountNo: string }) => {
         const response = await emitWithAck<{ ok: true; roomCode: string; userId: string } | { ok: false; message: string }>(
             "loto_join_room",
-            { roomCode: roomCode.trim().toUpperCase(), displayName, winnerQrImage }
+            { roomCode: roomCode.trim().toUpperCase(), displayName, bankingInfo }
         );
         if (!response.ok) {
             set(() => ({ errorMessage: response.message }));
@@ -534,7 +556,7 @@ export const useLotoStore = create<LotoStore>((set, get) => ({
             set(() => ({ errorMessage: response.message }));
             return;
         }
-        set(() => ({ winnerName: "", winnerQrImage: "", boards: [] }));
+        set(() => ({ winnerName: "", winnerBankingInfo: undefined, boards: [] }));
     },
 
     closeRoom: async () => {
@@ -561,7 +583,8 @@ export const useLotoStore = create<LotoStore>((set, get) => ({
             isReady: false,
             boards: [],
             winnerName: "",
-            winnerQrImage: ""
+            winnerBankingInfo: undefined,
+            betAmount: 0
         }));
     },
 

@@ -149,7 +149,7 @@ interface LotoMember {
   displayName: string;
   socketId: string;
   ready: boolean;
-  winnerQrImage?: string;
+  bankingInfo?: { bankId: string; accountNo: string };
   board: number[][] | null;
 }
 
@@ -197,7 +197,7 @@ const lotoSnapshot = (room: LotoInternalRoom, forUserId?: string): LotoRoomSnaps
         userId: member.userId,
         displayName: member.displayName,
         ready: member.ready,
-        hasQrImage: Boolean(member.winnerQrImage),
+        bankingInfo: member.bankingInfo,
         nearWinRows: computeNearWin(member, room.calledNumbers)
       })),
       createdAt: room.createdAt
@@ -589,7 +589,6 @@ app.prepare().then(() => {
     socket.on("loto_create_room", (payload: LotoCreateRoomPayload, ack) => {
       try {
         const displayName = String(payload.displayName ?? "").trim() || "Host";
-        const winnerQrImage = typeof payload.winnerQrImage === "string" ? payload.winnerQrImage.trim() : "";
         const config = payload.config;
         if (!config || ![60, 90].includes(config.maxNumber)) {
           ack({ ok: false, message: "maxNumber must be 60 or 90" });
@@ -600,12 +599,8 @@ app.prepare().then(() => {
           ack({ ok: false, message: "intervalSeconds must be between 1 and 60" });
           return;
         }
-        if (winnerQrImage && !winnerQrImage.startsWith("data:image/")) {
-          ack({ ok: false, message: "QR image must be a valid image data URL" });
-          return;
-        }
-        if (winnerQrImage.length > 500_000) {
-          ack({ ok: false, message: "QR image is too large" });
+        if (payload.bankingInfo && (!payload.bankingInfo.bankId || !payload.bankingInfo.accountNo)) {
+          ack({ ok: false, message: "Invalid banking info" });
           return;
         }
 
@@ -639,7 +634,7 @@ app.prepare().then(() => {
             displayName,
             socketId: socket.id,
             ready: false,
-            winnerQrImage: winnerQrImage || undefined,
+            bankingInfo: payload.bankingInfo,
             board: null
           }]]),
           createdAt: new Date().toISOString(),
@@ -661,18 +656,13 @@ app.prepare().then(() => {
       try {
         const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
         const displayName = String(payload.displayName ?? "").trim() || "Guest";
-        const winnerQrImage = typeof payload.winnerQrImage === "string" ? payload.winnerQrImage.trim() : "";
         const room = lotoRooms.get(roomCode);
         if (!room) {
           ack({ ok: false, message: "Room not found" });
           return;
         }
-        if (winnerQrImage && !winnerQrImage.startsWith("data:image/")) {
-          ack({ ok: false, message: "QR image must be a valid image data URL" });
-          return;
-        }
-        if (winnerQrImage.length > 500_000) {
-          ack({ ok: false, message: "QR image is too large" });
+        if (payload.bankingInfo && (!payload.bankingInfo.bankId || !payload.bankingInfo.accountNo)) {
+          ack({ ok: false, message: "Invalid banking info" });
           return;
         }
 
@@ -682,7 +672,7 @@ app.prepare().then(() => {
           displayName,
           socketId: socket.id,
           ready: false,
-          winnerQrImage: winnerQrImage || undefined,
+          bankingInfo: payload.bankingInfo,
           board: null
         });
 
@@ -808,7 +798,8 @@ app.prepare().then(() => {
         io.to(lotoRoomPrefix + roomCode).emit("loto_game_won", {
           winnerName: member.displayName,
           roomCode,
-          winnerQrImage: member.winnerQrImage
+          betAmount: room.config.betAmount,
+          winnerBankingInfo: member.bankingInfo
         });
         emitLotoState(roomCode);
         ack({ ok: true });
@@ -939,6 +930,22 @@ app.prepare().then(() => {
         ack({ ok: true });
       } catch (error) {
         ack({ ok: false, message: error instanceof Error ? error.message : "Reset round failed" });
+      }
+    });
+
+    socket.on("disconnect", () => {
+      const user = socket.data.user;
+      if (user && (user.role === "host" || user.role === "guest")) {
+        const roomCode = user.roomCode;
+        const lotoRoom = lotoRooms.get(roomCode);
+        if (lotoRoom) {
+          lotoRoom.members.delete(user.userId);
+          if (lotoRoom.members.size === 0) {
+            lotoRooms.delete(roomCode);
+          } else {
+            emitLotoState(roomCode);
+          }
+        }
       }
     });
   });

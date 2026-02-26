@@ -148,7 +148,7 @@ export type ServerToClientEvents = {
   loto_room_joined: (snapshot: LotoRoomSnapshot) => void;
   loto_state_updated: (snapshot: LotoRoomSnapshot) => void;
   loto_number_called: (payload: { number: number; calledNumbers: number[] }) => void;
-  loto_game_won: (payload: { winnerName: string; roomCode: string; winnerQrImage?: string }) => void;
+  loto_game_won: (payload: { winnerName: string; roomCode: string; betAmount: number; winnerBankingInfo?: BankingInfo }) => void;
   loto_room_closed: (payload: { roomCode: string; message: string }) => void;
 };
 
@@ -160,6 +160,12 @@ export interface LotoConfig {
   maxNumber: LotoMaxNumber;
   intervalSeconds: number;
   voiceEnabled: boolean;
+  betAmount: number;
+}
+
+export interface BankingInfo {
+  bankId: string;
+  accountNo: string;
 }
 
 export type LotoGameStatus = "waiting" | "playing" | "paused" | "finished";
@@ -190,20 +196,20 @@ export interface LotoMemberState {
   userId: string;
   displayName: string;
   ready: boolean;
-  hasQrImage: boolean;
+  bankingInfo?: BankingInfo;
   nearWinRows: NearWinRowInfo[];
 }
 
 export interface LotoCreateRoomPayload {
   displayName: string;
   config: LotoConfig;
-  winnerQrImage?: string;
+  bankingInfo?: BankingInfo;
 }
 
 export interface LotoJoinRoomPayload {
   roomCode: string;
   displayName: string;
-  winnerQrImage?: string;
+  bankingInfo?: BankingInfo;
 }
 
 export interface LotoStartGamePayload {
