@@ -61,6 +61,7 @@ export default function LotoHostPage() {
     const [accountNo, setAccountNo] = useState("");
     const [betAmountStr, setBetAmountStr] = useState("0");
     const [showWinnerPopup, setShowWinnerPopup] = useState(false);
+    const [isAnimating, setIsAnimating] = useState(false);
     const autoClaimedRef = useRef<string>("");
     const isHost = role === "host" && Boolean(roomCode);
 
@@ -84,6 +85,12 @@ export default function LotoHostPage() {
             autoClaimedRef.current = "";
         }
     }, [calledNumbers.length, gameStatus]);
+
+    useEffect(() => {
+        if (currentNumber !== null) {
+            setIsAnimating(true);
+        }
+    }, [currentNumber]);
 
     const hasWinningRow = useMemo(() => {
         if (!isReady) {
@@ -432,6 +439,7 @@ export default function LotoHostPage() {
                                             currentNumber={currentNumber}
                                             maxNumber={config.maxNumber}
                                             gameStatus={gameStatus}
+                                            onAnimationComplete={() => setIsAnimating(false)}
                                         />
                                     )}
                                 </div>
@@ -440,8 +448,7 @@ export default function LotoHostPage() {
                                     maxNumber={config.maxNumber}
                                     calledNumbers={calledNumbers}
                                     currentNumber={currentNumber}
-                                    gameStatus={gameStatus}
-                                    showCurrentNumber={false}
+                                    isAnimating={isAnimating}
                                 />
                             </div>
                         </>

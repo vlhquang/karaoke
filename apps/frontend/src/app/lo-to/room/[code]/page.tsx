@@ -54,6 +54,7 @@ export default function LotoRoomPage() {
     const [bankId, setBankId] = useState("");
     const [accountNo, setAccountNo] = useState("");
     const [showWinnerPopup, setShowWinnerPopup] = useState(false);
+    const [isAnimating, setIsAnimating] = useState(false);
 
     const autoClaimedRef = useRef<string>("");
     const isJoined = Boolean(roomCode && roomCode === roomCodeParam);
@@ -84,6 +85,12 @@ export default function LotoRoomPage() {
             autoClaimedRef.current = "";
         }
     }, [calledNumbers.length, gameStatus]);
+
+    useEffect(() => {
+        if (currentNumber !== null) {
+            setIsAnimating(true);
+        }
+    }, [currentNumber]);
 
     const handleJoin = async () => {
         setLoading(true);
@@ -325,6 +332,7 @@ export default function LotoRoomPage() {
                                                 currentNumber={currentNumber}
                                                 maxNumber={config.maxNumber}
                                                 gameStatus={gameStatus}
+                                                onAnimationComplete={() => setIsAnimating(false)}
                                             />
                                         )}
                                     </div>
@@ -334,8 +342,7 @@ export default function LotoRoomPage() {
                                     maxNumber={config.maxNumber}
                                     calledNumbers={calledNumbers}
                                     currentNumber={currentNumber}
-                                    gameStatus={gameStatus}
-                                    showCurrentNumber={false}
+                                    isAnimating={isAnimating}
                                 />
                             </div>
                         </>
