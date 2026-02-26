@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLotoStore } from "../../../store/loto-store";
 
-const MAX_QR_SIZE = 500_000;
+import { VIET_BANKS } from "../../../lib/banks";
 
 export default function LotoJoinPage() {
     const router = useRouter();
@@ -12,9 +12,8 @@ export default function LotoJoinPage() {
 
     const [code, setCode] = useState("");
     const [displayName, setDisplayName] = useState("");
-    const [qrPreview, setQrPreview] = useState("");
-    const [qrLoading, setQrLoading] = useState(false);
-    const [qrError, setQrError] = useState("");
+    const [bankId, setBankId] = useState("");
+    const [accountNo, setAccountNo] = useState("");
     const [loading, setLoading] = useState(false);
 
     const normalizedCode = code.trim().toUpperCase();
@@ -23,39 +22,12 @@ export default function LotoJoinPage() {
         connect();
     }, [connect]);
 
-    const onQrFileChange = (file: File | null) => {
-        setQrError("");
-        if (!file) {
-            setQrPreview("");
-            setQrLoading(false);
-            return;
-        }
-        if (!file.type.startsWith("image/")) {
-            setQrError("File không hợp lệ. Vui lòng chọn ảnh QR.");
-            return;
-        }
-        if (file.size > MAX_QR_SIZE) {
-            setQrError("Ảnh QR quá lớn. Tối đa 500KB.");
-            return;
-        }
-        setQrLoading(true);
-        const reader = new FileReader();
-        reader.onload = () => {
-            setQrPreview(typeof reader.result === "string" ? reader.result : "");
-            setQrLoading(false);
-        };
-        reader.onerror = () => {
-            setQrLoading(false);
-            setQrError("Không đọc được file QR. Vui lòng thử lại.");
-        };
-        reader.readAsDataURL(file);
-    };
-
     const handleJoin = async () => {
         if (normalizedCode.length !== 6) return;
         setLoading(true);
         try {
-            const success = await joinRoom(normalizedCode, displayName.trim() || "Người chơi", qrPreview || undefined);
+            const bankingInfo = bankId && accountNo ? { bankId, accountNo } : undefined;
+            const success = await joinRoom(normalizedCode, displayName.trim() || "Người chơi", bankingInfo);
             if (success) {
                 router.push(`/lo-to/room/${normalizedCode}`);
             }
@@ -96,22 +68,37 @@ export default function LotoJoinPage() {
                     onChange={(e) => setDisplayName(e.target.value)}
                 />
 
-                <label className="mb-1 block text-sm text-slate-300">QR nhận thưởng (tuỳ chọn)</label>
-                <input
-                    type="file"
-                    accept="image/*"
-                    className="mb-2 block w-full text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-500 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-900"
-                    onChange={(event) => onQrFileChange(event.target.files?.[0] ?? null)}
-                />
-                <p className="mb-2 text-xs text-slate-500">Dung lượng tối đa 500KB.</p>
-                {qrError && <p className="mb-2 text-xs text-red-300">{qrError}</p>}
-                {qrLoading && <p className="mb-2 text-xs text-cyan-300">Đang xử lý ảnh QR...</p>}
-                {qrPreview && <img src={qrPreview} alt="QR xem trước" className="mb-4 h-24 w-24 rounded bg-white object-contain p-1" />}
+                <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <label className="mb-1 block text-sm text-slate-300">Ngân hàng nhận (Tuỳ chọn)</label>
+                        <select
+                            className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm"
+                            value={bankId}
+                            onChange={(e) => setBankId(e.target.value)}
+                        >
+                            <option value="">-- Chọn ngân hàng --</option>
+                            {VIET_BANKS.map((bank) => (
+                                <option key={bank.bin} value={bank.bin}>
+                                    {bank.shortName} - {bank.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="mb-1 block text-sm text-slate-300">Số tài khoản</label>
+                        <input
+                            className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm"
+                            value={accountNo}
+                            onChange={(e) => setAccountNo(e.target.value)}
+                            placeholder="Nhập số tài khoản"
+                        />
+                    </div>
+                </div>
 
                 <button
                     className="mt-2 w-full rounded-xl bg-cyan-500 px-4 py-3 font-semibold text-slate-900 transition hover:bg-cyan-400 disabled:opacity-50"
                     onClick={handleJoin}
-                    disabled={normalizedCode.length !== 6 || loading || !connected || qrLoading}
+                    disabled={normalizedCode.length !== 6 || loading || !connected}
                 >
                     {loading ? "Đang vào..." : "Vào phòng"}
                 </button>
