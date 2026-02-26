@@ -9,14 +9,22 @@ interface LotoBingoCardProps {
     currentNumber?: number | null;
     maxNumber?: 60 | 90;
     gameStatus?: "waiting" | "playing" | "paused" | "finished";
+    onAnimationComplete?: () => void;
 }
 
-export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNumber = 90, gameStatus }: LotoBingoCardProps) {
-    const calledSet = new Set(calledNumbers);
+export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNumber = 90, gameStatus, onAnimationComplete }: LotoBingoCardProps) {
     const cols = card[0]?.length ?? 0;
     const [displayNumber, setDisplayNumber] = useState<number | null>(currentNumber);
     const [isRolling, setIsRolling] = useState(false);
     const spinTimerRef = useRef<number | null>(null);
+
+    // While rolling, exclude currentNumber from the grid highlighting
+    const calledSet = new Set(calledNumbers);
+    if (isRolling && currentNumber !== null) {
+        calledSet.delete(currentNumber);
+    }
+
+    const recentCalled = [...calledNumbers].slice(-12).reverse();
 
     useEffect(() => {
         if (spinTimerRef.current !== null) {
@@ -42,6 +50,7 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
             if (elapsed >= totalDuration) {
                 setDisplayNumber(currentNumber);
                 setIsRolling(false);
+                onAnimationComplete?.();
                 spinTimerRef.current = null;
                 return;
             }
@@ -61,6 +70,7 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
                 spinTimerRef.current = null;
             }
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentNumber, maxNumber]);
 
     let totalNumbers = 0;
@@ -77,11 +87,10 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
 
     return (
         <div
-            className={`rounded-xl border p-3 transition-all ${
-                hasWinningRow
-                    ? "border-emerald-400 bg-emerald-500/10 shadow-[0_0_20px_rgba(52,211,153,0.3)]"
-                    : "border-slate-700 bg-slate-900/60"
-            }`}
+            className={`rounded-xl border p-3 transition-all ${hasWinningRow
+                ? "border-emerald-400 bg-emerald-500/10 shadow-[0_0_20px_rgba(52,211,153,0.3)]"
+                : "border-slate-700 bg-slate-900/60"
+                }`}
         >
             <div className="mb-2 flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-300">
@@ -97,15 +106,26 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
                 </span>
             </div>
 
-            <div className="mb-3 flex items-center justify-between rounded-lg border border-cyan-400/30 bg-slate-950/60 px-3 py-2">
-                <div>
-                    <p className="text-[11px] uppercase tracking-wider text-slate-400">Số vừa gọi</p>
-                    {gameStatus === "playing" && isRolling && (
-                        <p className="text-[11px] font-semibold text-cyan-300">Đang quay số...</p>
+            <div className="mb-3 rounded-lg border border-cyan-400/30 bg-slate-950/60 px-3 py-2">
+                <div className="flex items-center gap-3">
+                    <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-cyan-300 bg-cyan-500/20 text-2xl font-bold text-cyan-100 ${isRolling ? "animate-pulse" : ""}`}>
+                        {displayNumber ?? "-"}
+                    </div>
+                    {recentCalled.length > 0 && (
+                        <div className="flex flex-1 flex-wrap gap-1 overflow-hidden">
+                            {recentCalled.map((n, index) => (
+                                <span
+                                    key={`recent-${n}-${index}`}
+                                    className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${n === currentNumber && !isRolling
+                                        ? "bg-cyan-500 text-slate-900"
+                                        : "bg-slate-800 text-cyan-100"
+                                        } ${index >= 6 ? "hidden sm:inline-flex" : "inline-flex"}`}
+                                >
+                                    {n}
+                                </span>
+                            ))}
+                        </div>
                     )}
-                </div>
-                <div className={`flex h-14 w-14 items-center justify-center rounded-full border-2 border-cyan-300 bg-cyan-500/20 text-2xl font-bold text-cyan-100 ${isRolling ? "animate-pulse" : ""}`}>
-                    {displayNumber ?? "-"}
                 </div>
             </div>
 
@@ -118,9 +138,8 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
                     return (
                         <div
                             key={`row-${r}`}
-                            className={`grid gap-1 rounded-md p-1 ${
-                                rowComplete ? "bg-emerald-500/10" : "bg-transparent"
-                            }`}
+                            className={`grid gap-1 rounded-md p-1 ${rowComplete ? "bg-emerald-500/10" : "bg-transparent"
+                                }`}
                             style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
                         >
                             {row.map((n, c) => {
@@ -128,13 +147,12 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
                                 return (
                                     <div
                                         key={`${r}-${c}`}
-                                        className={`flex h-9 items-center justify-center rounded text-sm font-bold transition-all duration-300 ${
-                                            n === 0
-                                                ? "bg-slate-800/30"
-                                                : isMatched
-                                                    ? "bg-cyan-500 text-slate-900"
-                                                    : "border border-slate-700 bg-slate-800 text-slate-200"
-                                        }`}
+                                        className={`flex h-9 items-center justify-center rounded text-sm font-bold transition-all duration-300 ${n === 0
+                                            ? "bg-slate-800/30"
+                                            : isMatched
+                                                ? "bg-cyan-500 text-slate-900"
+                                                : "border border-slate-700 bg-slate-800 text-slate-200"
+                                            }`}
                                     >
                                         {n > 0 ? n : ""}
                                     </div>
