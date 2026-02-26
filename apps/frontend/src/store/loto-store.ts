@@ -206,6 +206,7 @@ interface LotoStore {
     winnerBankingInfo?: { bankId: string; accountNo: string };
     betAmount: number;
     errorMessage: string;
+    isSpinning: boolean;
     initialized: boolean;
     theme: string;
 
@@ -343,7 +344,8 @@ const setupLotoSocketListeners = async (set: SetFn, get: GetFn): Promise<void> =
         const data = payload as { number: number; calledNumbers: number[] };
         set(() => ({
             currentNumber: data.number,
-            calledNumbers: data.calledNumbers
+            calledNumbers: data.calledNumbers,
+            isSpinning: false
         }));
         // Voice announcement
         const { config } = get();
@@ -408,6 +410,7 @@ export const useLotoStore = create<LotoStore>((set, get) => ({
     winnerBankingInfo: undefined,
     betAmount: 0,
     errorMessage: "",
+    isSpinning: false,
     initialized: false,
     theme: "default",
 

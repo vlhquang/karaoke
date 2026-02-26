@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useLotoStore } from "../../../store/loto-store";
 import { LotoNumberBoard } from "../../../components/loto-number-board";
@@ -86,11 +86,11 @@ export default function LotoHostPage() {
         }
     }, [calledNumbers.length, gameStatus]);
 
-    useEffect(() => {
-        if (currentNumber !== null) {
-            setIsAnimating(true);
-        }
-    }, [currentNumber]);
+    const handleCallNumber = useCallback(async () => {
+        await callNumber();
+    }, [callNumber]);
+
+
 
     const hasWinningRow = useMemo(() => {
         if (!isReady) {
@@ -328,10 +328,10 @@ export default function LotoHostPage() {
 
                                     <button
                                         onClick={() => {
-                                            void callNumber();
+                                            void handleCallNumber();
                                         }}
                                         className="rounded-lg border border-cyan-400/50 px-4 py-1.5 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                                        disabled={!isHost || gameStatus !== "playing"}
+                                        disabled={!isHost || (gameStatus !== "playing" && gameStatus !== "paused")}
                                     >
                                         Gọi số
                                     </button>
@@ -439,7 +439,6 @@ export default function LotoHostPage() {
                                             currentNumber={currentNumber}
                                             maxNumber={config.maxNumber}
                                             gameStatus={gameStatus}
-                                            onAnimationComplete={() => setIsAnimating(false)}
                                         />
                                     )}
                                 </div>
@@ -448,7 +447,6 @@ export default function LotoHostPage() {
                                     maxNumber={config.maxNumber}
                                     calledNumbers={calledNumbers}
                                     currentNumber={currentNumber}
-                                    isAnimating={isAnimating}
                                 />
                             </div>
                         </>
