@@ -7,7 +7,7 @@ import { useLotoStore } from "../../../../store/loto-store";
 import { LotoNumberBoard } from "../../../../components/loto-number-board";
 import { LotoBingoCard } from "../../../../components/loto-bingo-card";
 import { LotoWinnerPopup } from "../../../../components/loto-winner-popup";
-import { LotoNearWinPanel } from "../../../../components/loto-near-win-panel";
+
 import { VIET_BANKS } from "../../../../lib/banks";
 
 const THEMES: Record<string, { name: string; classes: string }> = {
@@ -54,7 +54,7 @@ export default function LotoRoomPage() {
     const [bankId, setBankId] = useState("");
     const [accountNo, setAccountNo] = useState("");
     const [showWinnerPopup, setShowWinnerPopup] = useState(false);
-    const [showMore, setShowMore] = useState(false);
+
     const autoClaimedRef = useRef<string>("");
     const isJoined = Boolean(roomCode && roomCode === roomCodeParam);
 
@@ -207,16 +207,7 @@ export default function LotoRoomPage() {
                         </section>
                     ) : (
                         <>
-                            <div className="md:hidden">
-                                <button
-                                    onClick={() => setShowMore((prev) => !prev)}
-                                    className="w-full rounded-lg border border-slate-600 bg-slate-900/60 px-4 py-2 text-sm font-semibold text-slate-200"
-                                >
-                                    {showMore ? "Thu gọn" : "Show more"}
-                                </button>
-                            </div>
-
-                            <div className={`${showMore ? "block" : "hidden"} space-y-3 md:block`}>
+                            <div className="space-y-3">
                                 <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/60 p-3">
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs text-slate-400">Mã phòng:</span>
@@ -250,17 +241,32 @@ export default function LotoRoomPage() {
                                 <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3">
                                     <div className="mb-2 text-sm font-semibold text-slate-200">Người chơi trong phòng (sẵn sàng {readyCount}/{memberCount})</div>
                                     <div className="grid gap-2 sm:grid-cols-2">
-                                        {members.map((member) => (
-                                            <div key={member.userId} className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm">
-                                                <span className="truncate text-slate-200">{member.displayName}</span>
-                                                <div className="flex items-center gap-2">
-                                                    {member.bankingInfo && <span className="text-[10px] text-cyan-300">Có STK</span>}
-                                                    <span className={`rounded-full px-2 py-0.5 text-xs ${member.ready ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-700 text-slate-300"}`}>
-                                                        {member.ready ? "Sẵn sàng" : "Chưa sẵn sàng"}
-                                                    </span>
+                                        {members.map((member) => {
+                                            const uniqueWaiting = [...new Set(member.nearWinRows.map(r => r.waitingNumber))];
+                                            const uncalled = config.maxNumber - calledNumbers.length;
+                                            const probability = uncalled > 0 ? Math.min((uniqueWaiting.length / uncalled) * 100, 100) : 0;
+                                            return (
+                                                <div key={member.userId} className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-all ${member.nearWinRows.length > 0 ? "border-amber-400/40 bg-amber-500/10" : "border-slate-700 bg-slate-800/50"}`}>
+                                                    <div className="min-w-0 flex-1">
+                                                        <span className="truncate text-slate-200 block">{member.displayName}</span>
+                                                        {member.nearWinRows.length > 0 && (
+                                                            <span className="text-[10px] font-semibold text-amber-300 animate-pulse">
+                                                                🎯 Đợi {uniqueWaiting.sort((a, b) => a - b).join(", ")} · {member.nearWinRows.length} hàng
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 ml-2 shrink-0">
+                                                        {member.nearWinRows.length > 0 && (
+                                                            <span className="text-xs font-bold text-amber-300">{probability.toFixed(1)}%</span>
+                                                        )}
+                                                        {member.bankingInfo && <span className="text-[10px] text-cyan-300">STK</span>}
+                                                        <span className={`rounded-full px-2 py-0.5 text-xs ${member.ready ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-700 text-slate-300"}`}>
+                                                            {member.ready ? "Sẵn sàng" : "Chưa"}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             </div>
@@ -290,13 +296,7 @@ export default function LotoRoomPage() {
                                 </div>
                             )}
 
-                            {gameStatus === "playing" && (
-                                <LotoNearWinPanel
-                                    members={members}
-                                    calledNumbers={calledNumbers}
-                                    maxNumber={config.maxNumber}
-                                />
-                            )}
+
 
                             <div className="grid gap-3 lg:grid-cols-[1fr_1fr] lg:gap-4">
                                 <div className="space-y-3">
