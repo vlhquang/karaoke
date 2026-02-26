@@ -9,77 +9,19 @@ interface LotoBingoCardProps {
     currentNumber?: number | null;
     maxNumber?: 60 | 90;
     gameStatus?: "waiting" | "playing" | "paused" | "finished";
-    onAnimationComplete?: () => void;
-    disableAnimation?: boolean;
 }
 
-export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNumber = 90, gameStatus, onAnimationComplete, disableAnimation = false }: LotoBingoCardProps) {
+export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNumber = 90, gameStatus }: LotoBingoCardProps) {
     const cols = card[0]?.length ?? 0;
-    const [displayNumber, setDisplayNumber] = useState<number | null>(currentNumber);
-    const [isRolling, setIsRolling] = useState(false);
-    const spinTimerRef = useRef<number | null>(null);
 
-    // While rolling, exclude currentNumber from the grid highlighting
+    const isRolling = gameStatus === "playing";
+    const displayNumber = currentNumber;
+
+    // While rolling, we no longer hide the currentNumber. It stays visible.
     const calledSet = new Set(calledNumbers);
-    if (isRolling && currentNumber !== null) {
-        calledSet.delete(currentNumber);
-    }
 
-    const recentCalled = [...calledNumbers].slice(-12).reverse();
-
-    useEffect(() => {
-        if (spinTimerRef.current !== null) {
-            window.clearTimeout(spinTimerRef.current);
-            spinTimerRef.current = null;
-        }
-        if (currentNumber === null) {
-            setDisplayNumber(null);
-            setIsRolling(false);
-            return;
-        }
-
-        if (disableAnimation) {
-            setDisplayNumber(currentNumber);
-            setIsRolling(false);
-            onAnimationComplete?.();
-            return;
-        }
-
-        let cancelled = false;
-        let delay = 55;
-        let elapsed = 0;
-        const totalDuration = 1450;
-
-        const runSpin = () => {
-            if (cancelled) {
-                return;
-            }
-            elapsed += delay;
-            if (elapsed >= totalDuration) {
-                setDisplayNumber(currentNumber);
-                setIsRolling(false);
-                onAnimationComplete?.();
-                spinTimerRef.current = null;
-                return;
-            }
-            const randomNumber = Math.floor(Math.random() * maxNumber) + 1;
-            setDisplayNumber(randomNumber);
-            setIsRolling(true);
-            delay = Math.min(Math.floor(delay * 1.18), 240);
-            spinTimerRef.current = window.setTimeout(runSpin, delay);
-        };
-
-        runSpin();
-
-        return () => {
-            cancelled = true;
-            if (spinTimerRef.current !== null) {
-                window.clearTimeout(spinTimerRef.current);
-                spinTimerRef.current = null;
-            }
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentNumber, maxNumber]);
+    const recentCalled = [...calledNumbers]
+        .slice(-12).reverse();
 
     let totalNumbers = 0;
     let matchedNumbers = 0;
@@ -116,15 +58,18 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
 
             <div className="mb-3 rounded-lg border border-cyan-400/30 bg-slate-950/60 px-3 py-2">
                 <div className="flex items-center gap-3">
-                    <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-cyan-300 bg-cyan-500/20 text-2xl font-bold text-cyan-100 ${isRolling ? "animate-pulse" : ""}`}>
-                        {displayNumber ?? "-"}
+                    <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-cyan-300 bg-cyan-500/20 text-2xl font-bold text-cyan-100 relative ${isRolling ? "animate-pulse" : ""}`}>
+                        {isRolling && (
+                            <div className="absolute inset-0 rounded-full border-[3px] border-cyan-400 border-t-transparent animate-spin opacity-70"></div>
+                        )}
+                        {displayNumber ?? "—"}
                     </div>
                     {recentCalled.length > 0 && (
                         <div className="flex flex-1 flex-wrap gap-1 overflow-hidden">
                             {recentCalled.map((n, index) => (
                                 <span
                                     key={`recent-${n}-${index}`}
-                                    className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${n === currentNumber && !isRolling
+                                    className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${n === currentNumber
                                         ? "bg-cyan-500 text-slate-900"
                                         : "bg-slate-800 text-cyan-100"
                                         } ${index >= 6 ? "hidden sm:inline-flex" : "inline-flex"}`}

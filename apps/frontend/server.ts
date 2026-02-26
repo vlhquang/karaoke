@@ -581,7 +581,7 @@ app.prepare().then(() => {
 
     const stopAutoCall = (room: LotoInternalRoom): void => {
       if (room.autoCallTimer) {
-        clearInterval(room.autoCallTimer);
+        clearTimeout(room.autoCallTimer);
         room.autoCallTimer = null;
       }
     };
@@ -746,10 +746,6 @@ app.prepare().then(() => {
           ack({ ok: false, message: "Only host can call numbers" });
           return;
         }
-        if (room.gameStatus !== "playing") {
-          ack({ ok: false, message: "Game is not in playing state" });
-          return;
-        }
 
         const num = pickNextNumber(room);
         if (num === null) {
@@ -762,7 +758,7 @@ app.prepare().then(() => {
 
         room.currentNumber = num;
         room.calledNumbers.push(num);
-        io.to(lotoRoomPrefix + roomCode).emit("loto_number_called", {
+        io.to(lotoRoomPrefix + room.roomCode).emit("loto_number_called", {
           number: num,
           calledNumbers: [...room.calledNumbers]
         });

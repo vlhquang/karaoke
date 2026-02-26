@@ -4,17 +4,11 @@ interface LotoNumberBoardProps {
     maxNumber: 60 | 90;
     calledNumbers: number[];
     currentNumber: number | null;
-    isAnimating?: boolean;
 }
 
-export function LotoNumberBoard({ maxNumber, calledNumbers, currentNumber, isAnimating = false }: LotoNumberBoardProps) {
+export function LotoNumberBoard({ maxNumber, calledNumbers, currentNumber }: LotoNumberBoardProps) {
     const cols = maxNumber === 60 ? 6 : 9;
     const calledSet = new Set(calledNumbers);
-
-    // While animation is running, don't mark the current number yet
-    if (isAnimating && currentNumber !== null) {
-        calledSet.delete(currentNumber);
-    }
 
     const columns: { label: string; numbers: number[] }[] = [];
     for (let c = 0; c < cols; c++) {
@@ -44,7 +38,7 @@ export function LotoNumberBoard({ maxNumber, calledNumbers, currentNumber, isAni
                         </div>
                         {col.numbers.map((n) => {
                             const isCalled = calledSet.has(n);
-                            const isCurrent = n === currentNumber && !isAnimating;
+                            const isCurrent = n === currentNumber;
                             return (
                                 <div
                                     key={n}
