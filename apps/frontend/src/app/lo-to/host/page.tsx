@@ -6,6 +6,7 @@ import { useLotoStore } from "../../../store/loto-store";
 import { LotoNumberBoard } from "../../../components/loto-number-board";
 import { LotoBingoCard } from "../../../components/loto-bingo-card";
 import { LotoWinnerPopup } from "../../../components/loto-winner-popup";
+import { LotoNearWinPanel } from "../../../components/loto-near-win-panel";
 
 const MAX_QR_SIZE = 500_000;
 
@@ -194,11 +195,10 @@ export default function LotoHostPage() {
                                 <button
                                     key={n}
                                     onClick={() => setMaxNumber(n)}
-                                    className={`flex-1 rounded-lg border px-4 py-2 text-sm font-semibold transition ${
-                                        maxNumber === n
-                                            ? "border-cyan-400 bg-cyan-500/20 text-cyan-100"
-                                            : "border-slate-600 bg-slate-800 text-slate-300 hover:border-slate-500"
-                                    }`}
+                                    className={`flex-1 rounded-lg border px-4 py-2 text-sm font-semibold transition ${maxNumber === n
+                                        ? "border-cyan-400 bg-cyan-500/20 text-cyan-100"
+                                        : "border-slate-600 bg-slate-800 text-slate-300 hover:border-slate-500"
+                                        }`}
                                 >
                                     1 - {n}
                                 </button>
@@ -252,11 +252,10 @@ export default function LotoHostPage() {
                                     onClick={() => {
                                         void toggleReady(!isReady);
                                     }}
-                                    className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${
-                                        isReady
-                                            ? "border border-emerald-400/60 text-emerald-200 hover:bg-emerald-500/10"
-                                            : "border border-slate-500 text-slate-200 hover:bg-slate-700/50"
-                                    }`}
+                                    className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${isReady
+                                        ? "bg-emerald-500 text-slate-900 hover:bg-emerald-400"
+                                        : "bg-amber-400 text-slate-900 hover:bg-amber-300"
+                                        }`}
                                 >
                                     {isReady ? "Đã sẵn sàng" : "Sẵn sàng"}
                                 </button>
@@ -341,6 +340,14 @@ export default function LotoHostPage() {
                             <div className="rounded-xl border border-emerald-400/60 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200">
                                 Bạn đã đủ số trên một hàng. Hệ thống đang tự động thông báo chiến thắng.
                             </div>
+                        )}
+
+                        {gameStatus === "playing" && (
+                            <LotoNearWinPanel
+                                members={members}
+                                calledNumbers={calledNumbers}
+                                maxNumber={config.maxNumber}
+                            />
                         )}
 
                         <div className="grid gap-3 lg:grid-cols-[1fr_1fr] lg:gap-4">

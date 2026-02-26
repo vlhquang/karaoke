@@ -150,6 +150,7 @@ interface LotoMember {
   socketId: string;
   ready: boolean;
   winnerQrImage?: string;
+  board: number[][] | null;
 }
 
 interface LotoInternalRoom {
@@ -166,25 +167,50 @@ interface LotoInternalRoom {
 
 const lotoRooms = new Map<string, LotoInternalRoom>();
 
-const lotoSnapshot = (room: LotoInternalRoom): LotoRoomSnapshot => ({
-  room: {
-    roomCode: room.roomCode,
-    hostId: room.hostId,
-    config: room.config,
-    calledNumbers: [...room.calledNumbers],
-    currentNumber: room.currentNumber,
-    gameStatus: room.gameStatus,
-    memberCount: room.members.size,
-    readyCount: [...room.members.values()].filter((m) => m.ready).length,
-    members: [...room.members.values()].map((member) => ({
-      userId: member.userId,
-      displayName: member.displayName,
-      ready: member.ready,
-      hasQrImage: Boolean(member.winnerQrImage)
-    })),
-    createdAt: room.createdAt
+const computeNearWin = (member: LotoMember, calledNumbers: number[]): { waitingNumber: number }[] => {
+  if (!member.board || !member.ready) return [];
+  const calledSet = new Set(calledNumbers);
+  const results: { waitingNumber: number }[] = [];
+  for (const row of member.board) {
+    const rowNumbers = row.filter((n) => n > 0);
+    if (rowNumbers.length === 0) continue;
+    const missing = rowNumbers.filter((n) => !calledSet.has(n));
+    if (missing.length === 1) {
+      results.push({ waitingNumber: missing[0] });
+    }
   }
-});
+  return results;
+};
+
+const lotoSnapshot = (room: LotoInternalRoom, forUserId?: string): LotoRoomSnapshot => {
+  const snap: LotoRoomSnapshot = {
+    room: {
+      roomCode: room.roomCode,
+      hostId: room.hostId,
+      config: room.config,
+      calledNumbers: [...room.calledNumbers],
+      currentNumber: room.currentNumber,
+      gameStatus: room.gameStatus,
+      memberCount: room.members.size,
+      readyCount: [...room.members.values()].filter((m) => m.ready).length,
+      members: [...room.members.values()].map((member) => ({
+        userId: member.userId,
+        displayName: member.displayName,
+        ready: member.ready,
+        hasQrImage: Boolean(member.winnerQrImage),
+        nearWinRows: computeNearWin(member, room.calledNumbers)
+      })),
+      createdAt: room.createdAt
+    }
+  };
+  if (forUserId) {
+    const member = room.members.get(forUserId);
+    if (member?.board) {
+      snap.myBoard = member.board;
+    }
+  }
+  return snap;
+};
 
 const pickNextNumber = (room: LotoInternalRoom): number | null => {
   const max = room.config.maxNumber;
@@ -613,7 +639,8 @@ app.prepare().then(() => {
             displayName,
             socketId: socket.id,
             ready: false,
-            winnerQrImage: winnerQrImage || undefined
+            winnerQrImage: winnerQrImage || undefined,
+            board: null
           }]]),
           createdAt: new Date().toISOString(),
           autoCallTimer: null
@@ -655,7 +682,8 @@ app.prepare().then(() => {
           displayName,
           socketId: socket.id,
           ready: false,
-          winnerQrImage: winnerQrImage || undefined
+          winnerQrImage: winnerQrImage || undefined,
+          board: null
         });
 
         socket.join(lotoRoomPrefix + roomCode);
@@ -834,6 +862,61 @@ app.prepare().then(() => {
       }
     });
 
+    socket.on("loto_submit_board", (payload: { roomCode: string; board: number[][] }, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || user.roomCode !== roomCode) {
+          ack({ ok: false, message: "Join room first" });
+          return;
+        }
+        const member = room.members.get(user.userId);
+        if (!member) {
+          ack({ ok: false, message: "Member not found" });
+          return;
+        }
+        if (!Array.isArray(payload.board) || payload.board.length === 0 || payload.board.length > 9) {
+          ack({ ok: false, message: "Invalid board" });
+          return;
+        }
+        member.board = payload.board;
+        room.members.set(member.userId, member);
+        emitLotoState(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Submit board failed" });
+      }
+    });
+
+    socket.on("loto_restore_session", (payload: { roomCode: string; userId: string }, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const userId = String(payload.userId ?? "");
+        const room = lotoRooms.get(roomCode);
+        if (!room) {
+          ack({ ok: false, message: "Room not found" });
+          return;
+        }
+        const member = room.members.get(userId);
+        if (!member) {
+          ack({ ok: false, message: "Session expired" });
+          return;
+        }
+        member.socketId = socket.id;
+        room.members.set(userId, member);
+        const role = room.hostId === userId ? "host" : "guest";
+        socket.join(lotoRoomPrefix + roomCode);
+        socket.data.user = { userId, roomCode, displayName: member.displayName, role };
+        const snap = lotoSnapshot(room, userId);
+        socket.emit("loto_state_updated", snap);
+        ack({ ok: true, roomCode, userId, displayName: member.displayName, role });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Restore session failed" });
+      }
+    });
+
     socket.on("loto_reset_round", (payload: LotoResetRoundPayload, ack) => {
       try {
         const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
@@ -848,6 +931,9 @@ app.prepare().then(() => {
         room.calledNumbers = [];
         room.currentNumber = null;
         room.gameStatus = "waiting";
+        for (const m of room.members.values()) {
+          m.board = null;
+        }
         stopAutoCall(room);
         emitLotoState(roomCode);
         ack({ ok: true });
