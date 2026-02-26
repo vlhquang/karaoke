@@ -6,6 +6,40 @@ import { getSocket } from "../lib/socket";
 
 type LotoRole = "host" | "guest" | null;
 
+// ── Session cache ──
+
+const LOTO_SESSION_KEY = "loto_session_v1";
+
+interface LotoSessionCache {
+    roomCode: string;
+    userId: string;
+    displayName: string;
+    role: LotoRole;
+}
+
+const saveLotoSession = (session: LotoSessionCache): void => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(LOTO_SESSION_KEY, JSON.stringify(session));
+};
+
+const loadLotoSession = (): LotoSessionCache | null => {
+    if (typeof window === "undefined") return null;
+    const raw = localStorage.getItem(LOTO_SESSION_KEY);
+    if (!raw) return null;
+    try {
+        const parsed = JSON.parse(raw) as LotoSessionCache;
+        if (!parsed.roomCode || !parsed.userId || !parsed.role) return null;
+        return parsed;
+    } catch {
+        return null;
+    }
+};
+
+const clearLotoSession = (): void => {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(LOTO_SESSION_KEY);
+};
+
 // ── Bingo card generation ──
 
 type BingoCard = number[][]; // 9 rows, each row has numbers or 0 (blank)
@@ -220,8 +254,52 @@ const applyLotoSnapshot = (set: SetFn, snapshot: LotoRoomSnapshot): void => {
         isReady: snapshot.room.members.some((m) => m.userId === state.userId && m.ready),
         winnerName: snapshot.room.gameStatus === "finished" ? state.winnerName : "",
         winnerQrImage: snapshot.room.gameStatus === "finished" ? state.winnerQrImage : "",
+        boards: snapshot.myBoard ? [snapshot.myBoard] : state.boards,
         errorMessage: ""
     }));
+};
+
+const tryRestoreLotoSession = async (set: SetFn, get: GetFn): Promise<void> => {
+    const cached = loadLotoSession();
+    if (!cached) return;
+    // Don't restore if already in a room
+    if (get().roomCode) return;
+
+    const response = await emitWithAck<
+        { ok: true; roomCode: string; userId: string; displayName: string; role: "host" | "guest" } | { ok: false; message: string }
+    >("loto_restore_session", {
+        roomCode: cached.roomCode,
+        userId: cached.userId
+    });
+
+    if (!response.ok) {
+        clearLotoSession();
+        return;
+    }
+
+    saveLotoSession({
+        roomCode: response.roomCode,
+        userId: response.userId,
+        displayName: response.displayName,
+        role: response.role
+    });
+
+    set(() => ({
+        roomCode: response.roomCode,
+        userId: response.userId,
+        displayName: response.displayName,
+        role: response.role,
+        errorMessage: ""
+    }));
+};
+
+const submitBoardToServer = async (board: number[][], get: GetFn): Promise<void> => {
+    const { roomCode } = get();
+    if (!roomCode) return;
+    await emitWithAck<{ ok: true } | { ok: false; message: string }>(
+        "loto_submit_board",
+        { roomCode, board }
+    );
 };
 
 const setupLotoSocketListeners = async (set: SetFn, get: GetFn): Promise<void> => {
@@ -238,6 +316,7 @@ const setupLotoSocketListeners = async (set: SetFn, get: GetFn): Promise<void> =
 
     socket.on("connect", () => {
         set(() => ({ connected: true }));
+        void tryRestoreLotoSession(set, get);
     });
 
     socket.on("disconnect", () => {
@@ -278,6 +357,7 @@ const setupLotoSocketListeners = async (set: SetFn, get: GetFn): Promise<void> =
     });
 
     socket.on("loto_room_closed", () => {
+        clearLotoSession();
         set(() => ({
             roomCode: "",
             userId: "",
@@ -300,6 +380,7 @@ const setupLotoSocketListeners = async (set: SetFn, get: GetFn): Promise<void> =
         socket.connect();
     } else {
         set(() => ({ connected: true }));
+        void tryRestoreLotoSession(set, get);
     }
 };
 
@@ -338,6 +419,13 @@ export const useLotoStore = create<LotoStore>((set, get) => ({
             set(() => ({ errorMessage: response.message }));
             return;
         }
+        const boards = generateInitialBoards(config.maxNumber);
+        saveLotoSession({
+            roomCode: response.roomCode,
+            userId: response.userId,
+            displayName,
+            role: "host"
+        });
         set(() => ({
             roomCode: response.roomCode,
             userId: response.userId,
@@ -345,9 +433,13 @@ export const useLotoStore = create<LotoStore>((set, get) => ({
             role: "host",
             config,
             isReady: false,
-            boards: generateInitialBoards(config.maxNumber),
+            boards,
             errorMessage: ""
         }));
+        // Submit initial board to server
+        if (boards[0]) {
+            void submitBoardToServer(boards[0], get);
+        }
     },
 
     joinRoom: async (roomCode: string, displayName: string, winnerQrImage?: string) => {
@@ -359,6 +451,12 @@ export const useLotoStore = create<LotoStore>((set, get) => ({
             set(() => ({ errorMessage: response.message }));
             return false;
         }
+        saveLotoSession({
+            roomCode: response.roomCode,
+            userId: response.userId,
+            displayName,
+            role: "guest"
+        });
         set(() => ({
             roomCode: response.roomCode,
             userId: response.userId,
@@ -436,7 +534,7 @@ export const useLotoStore = create<LotoStore>((set, get) => ({
             set(() => ({ errorMessage: response.message }));
             return;
         }
-        set(() => ({ winnerName: "", winnerQrImage: "" }));
+        set(() => ({ winnerName: "", winnerQrImage: "", boards: [] }));
     },
 
     closeRoom: async () => {
@@ -449,6 +547,7 @@ export const useLotoStore = create<LotoStore>((set, get) => ({
             set(() => ({ errorMessage: response.message }));
             return;
         }
+        clearLotoSession();
         set(() => ({
             roomCode: "",
             userId: "",
@@ -470,6 +569,7 @@ export const useLotoStore = create<LotoStore>((set, get) => ({
         const { config } = get();
         const card = generateBingoCard(config.maxNumber);
         set(() => ({ boards: [card] }));
+        void submitBoardToServer(card, get);
     },
 
     clearError: () => {
