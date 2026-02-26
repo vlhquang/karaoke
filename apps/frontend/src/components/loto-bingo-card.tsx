@@ -10,9 +10,10 @@ interface LotoBingoCardProps {
     maxNumber?: 60 | 90;
     gameStatus?: "waiting" | "playing" | "paused" | "finished";
     onAnimationComplete?: () => void;
+    disableAnimation?: boolean;
 }
 
-export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNumber = 90, gameStatus, onAnimationComplete }: LotoBingoCardProps) {
+export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNumber = 90, gameStatus, onAnimationComplete, disableAnimation = false }: LotoBingoCardProps) {
     const cols = card[0]?.length ?? 0;
     const [displayNumber, setDisplayNumber] = useState<number | null>(currentNumber);
     const [isRolling, setIsRolling] = useState(false);
@@ -34,6 +35,13 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
         if (currentNumber === null) {
             setDisplayNumber(null);
             setIsRolling(false);
+            return;
+        }
+
+        if (disableAnimation) {
+            setDisplayNumber(currentNumber);
+            setIsRolling(false);
+            onAnimationComplete?.();
             return;
         }
 
@@ -147,7 +155,7 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
                                 return (
                                     <div
                                         key={`${r}-${c}`}
-                                        className={`flex h-9 items-center justify-center rounded text-sm font-bold transition-all duration-300 ${n === 0
+                                        className={`flex h-7 items-center justify-center rounded text-xs font-bold transition-all duration-300 sm:h-9 sm:text-sm ${n === 0
                                             ? "bg-slate-800/30"
                                             : isMatched
                                                 ? "bg-cyan-500 text-slate-900"

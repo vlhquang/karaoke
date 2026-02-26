@@ -333,6 +333,7 @@ export default function LotoRoomPage() {
                                                 maxNumber={config.maxNumber}
                                                 gameStatus={gameStatus}
                                                 onAnimationComplete={() => setIsAnimating(false)}
+                                                disableAnimation
                                             />
                                         )}
                                     </div>
