@@ -62,6 +62,7 @@ export default function LotoHostPage() {
     const [betAmountStr, setBetAmountStr] = useState("0");
     const [showWinnerPopup, setShowWinnerPopup] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
+    const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
     const autoClaimedRef = useRef<string>("");
     const isHost = role === "host" && Boolean(roomCode);
 
@@ -331,27 +332,35 @@ export default function LotoHostPage() {
                                             void handleCallNumber();
                                         }}
                                         className="rounded-lg border border-cyan-400/50 px-4 py-1.5 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                                        disabled={!isHost || (gameStatus !== "playing" && gameStatus !== "paused")}
+                                        disabled={!isHost || gameStatus !== "paused"}
                                     >
                                         Gọi số
                                     </button>
 
                                     <button
                                         onClick={() => {
-                                            void resetRound();
+                                            setConfirmAction({
+                                                title: "Ván mới",
+                                                message: "Bạn có chắc muốn bắt đầu ván mới? Kết quả ván hiện tại sẽ bị xóa.",
+                                                onConfirm: () => { void resetRound(); setConfirmAction(null); }
+                                            });
                                         }}
-                                        className="rounded-lg border border-violet-400/60 px-4 py-1.5 text-sm font-semibold text-violet-200 transition hover:bg-violet-500/20"
-                                        disabled={!isHost}
+                                        className="rounded-lg border border-violet-400/60 px-4 py-1.5 text-sm font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                        disabled={!isHost || (gameStatus !== "waiting" && gameStatus !== "paused")}
                                     >
-                                        Reset lượt
+                                        Ván mới
                                     </button>
 
                                     <button
                                         onClick={() => {
-                                            void closeRoom();
+                                            setConfirmAction({
+                                                title: "Đóng phòng",
+                                                message: "Bạn có chắc muốn đóng phòng? Tất cả người chơi sẽ bị ngắt kết nối.",
+                                                onConfirm: () => { void closeRoom(); setConfirmAction(null); }
+                                            });
                                         }}
-                                        className="rounded-lg border border-red-400/60 px-4 py-1.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/20"
-                                        disabled={!isHost}
+                                        className="rounded-lg border border-red-400/60 px-4 py-1.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                        disabled={!isHost || (gameStatus !== "waiting" && gameStatus !== "paused")}
                                     >
                                         Đóng phòng
                                     </button>
@@ -450,6 +459,29 @@ export default function LotoHostPage() {
                                 />
                             </div>
                         </>
+                    )}
+
+                    {confirmAction && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                            <div className="mx-4 w-full max-w-sm rounded-2xl border border-slate-600 bg-slate-900 p-6 shadow-2xl">
+                                <h3 className="mb-2 text-lg font-bold text-slate-100">{confirmAction.title}</h3>
+                                <p className="mb-6 text-sm text-slate-300">{confirmAction.message}</p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setConfirmAction(null)}
+                                        className="flex-1 rounded-xl border border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800"
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button
+                                        onClick={confirmAction.onConfirm}
+                                        className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-400"
+                                    >
+                                        Xác nhận
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             </main>
