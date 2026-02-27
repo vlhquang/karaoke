@@ -5,25 +5,25 @@ export default function HomePage() {
     {
       href: "/karaoke",
       title: "Karaoke",
-      description: "Phong hat realtime, tao phong va tham gia bang ma phong.",
+      description: "Phòng hát realtime, tạo phòng và tham gia bằng mã phòng.",
       badge: "Live"
     },
     {
       href: "/bao-li-xi",
-      title: "Bao li xi",
-      description: "Tinh nang gui bao li xi online (dang phat trien).",
-      badge: "Soon"
+      title: "Bao Lì Xì",
+      description: "Chia bao lì xì online, cào số may mắn.",
+      badge: "Live"
     },
     {
       href: "/lo-to",
-      title: "Lo to",
-      description: "Game lo to tren web — tao phong, goi so va do bang.",
+      title: "Lô Tô",
+      description: "Game lô tô trên web — tạo phòng, gọi số và dò bảng.",
       badge: "Live"
     },
     {
       href: "/co-phieu/index.html",
-      title: "Co phieu",
-      description: "Quan ly giao dich mua co phieu ca nhan voi Google Sheets.",
+      title: "Cổ Phiếu",
+      description: "Quản lý giao dịch mua cổ phiếu cá nhân với Google Sheets.",
       badge: "New"
     }
   ];
@@ -32,14 +32,14 @@ export default function HomePage() {
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-6 md:px-8 md:py-10">
       <div className="rounded-3xl border border-cyan-300/20 bg-slate-950/40 p-5 backdrop-blur md:p-8">
         <p className="text-xs uppercase tracking-[0.3em] text-cyan-200/80">Portal</p>
-        <h1 className="mt-3 text-2xl font-bold md:text-4xl">Trang chu ung dung</h1>
+        <h1 className="mt-3 text-2xl font-bold md:text-4xl">Trang chủ ứng dụng</h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-          Chay chung mot server Render va dieu huong sang cac ung dung con tu menu nay.
+          Chạy chung một server và điều hướng sang các ứng dụng con từ menu này.
         </p>
       </div>
 
       <section className="mt-5">
-        <h2 className="mb-3 text-lg font-semibold md:text-xl">Danh sach ung dung</h2>
+        <h2 className="mb-3 text-lg font-semibold md:text-xl">Danh sách ứng dụng</h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {appMenus.map((item) => (
             <Link
