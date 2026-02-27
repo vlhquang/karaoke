@@ -37,7 +37,7 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
 
     return (
         <div
-            className={`rounded-xl border p-3 transition-all ${hasWinningRow
+            className={`rounded-xl border p-2 transition-all sm:p-3 ${hasWinningRow
                 ? "border-emerald-400 bg-emerald-500/10 shadow-[0_0_20px_rgba(52,211,153,0.3)]"
                 : "border-slate-700 bg-slate-900/60"
                 }`}
@@ -56,9 +56,9 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
                 </span>
             </div>
 
-            <div className="mb-3 rounded-lg border border-cyan-400/30 bg-slate-950/60 px-3 py-2">
-                <div className="flex items-center gap-3">
-                    <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-cyan-300 bg-cyan-500/20 text-2xl font-bold text-cyan-100 relative ${isRolling ? "animate-pulse" : ""}`}>
+            <div className="mb-2 rounded-lg border border-cyan-400/30 bg-slate-950/60 px-2 py-1.5 sm:mb-3 sm:px-3 sm:py-2">
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-cyan-300 bg-cyan-500/20 text-lg font-bold text-cyan-100 relative sm:h-14 sm:w-14 sm:text-2xl ${isRolling ? "animate-pulse" : ""}`}>
                         {isRolling && (
                             <div className="absolute inset-0 rounded-full border-[3px] border-cyan-400 border-t-transparent animate-spin opacity-70"></div>
                         )}
@@ -82,7 +82,7 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
                 </div>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-0.5 sm:space-y-1">
                 {card.map((row, r) => {
                     const rowNumbers = row.filter((n) => n > 0);
                     const rowMatched = rowNumbers.filter((n) => calledSet.has(n)).length;
@@ -91,16 +91,16 @@ export function LotoBingoCard({ card, calledNumbers, currentNumber = null, maxNu
                     return (
                         <div
                             key={`row-${r}`}
-                            className={`grid gap-1 rounded-md p-1 ${rowComplete ? "bg-emerald-500/10" : "bg-transparent"
+                            className={`grid gap-0.5 rounded-md p-0.5 sm:gap-1 sm:p-1 ${rowComplete ? "bg-emerald-500/10" : "bg-transparent"
                                 }`}
-                            style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+                            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
                         >
                             {row.map((n, c) => {
                                 const isMatched = n > 0 && calledSet.has(n);
                                 return (
                                     <div
                                         key={`${r}-${c}`}
-                                        className={`flex h-7 items-center justify-center rounded text-xs font-bold transition-all duration-300 sm:h-9 sm:text-sm ${n === 0
+                                        className={`flex h-6 items-center justify-center rounded text-[10px] font-bold transition-all duration-300 sm:h-9 sm:text-sm ${n === 0
                                             ? "bg-slate-800/30"
                                             : isMatched
                                                 ? "bg-cyan-500 text-slate-900"
