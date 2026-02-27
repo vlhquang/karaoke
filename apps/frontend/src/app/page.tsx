@@ -21,7 +21,7 @@ export default function HomePage() {
       badge: "Live"
     },
     {
-      href: "/co-phieu/index.html",
+      href: "/co-phieu",
       title: "Cổ Phiếu",
       description: "Quản lý giao dịch mua cổ phiếu cá nhân với Google Sheets.",
       badge: "New"
