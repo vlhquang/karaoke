@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useLotoStore } from "../../../store/loto-store";
 
 import { VIET_BANKS } from "../../../lib/banks";
@@ -102,6 +103,12 @@ export default function LotoJoinPage() {
                 >
                     {loading ? "Đang vào..." : "Vào phòng"}
                 </button>
+                <Link
+                    href="/lo-to"
+                    className="mt-3 inline-block text-xs text-slate-400 hover:text-cyan-300"
+                >
+                    ← Quay lại Lô Tô
+                </Link>
             </section>
         </main>
     );

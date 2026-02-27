@@ -2,8 +2,8 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
-  title: "Realtime Karaoke Room",
-  description: "Host and queue YouTube karaoke songs in real time"
+  title: "Cổng ứng dụng Karaoke",
+  description: "Karaoke, Lô tô, Lì xì và nhiều ứng dụng giải trí khác"
 };
 
 export const viewport: Viewport = {
@@ -16,7 +16,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="vi">
       <body>{children}</body>
     </html>
   );
