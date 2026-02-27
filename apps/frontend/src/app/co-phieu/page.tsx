@@ -20,6 +20,7 @@ export default function StockPage() {
     const [loginError, setLoginError] = useState("");
     const [addError, setAddError] = useState("");
     const [isPricingLoading, setIsPricingLoading] = useState(false);
+    const [notification, setNotification] = useState<{ msg: string; type: "success" | "info" } | null>(null);
 
     // Form states
     const [symbolInput, setSymbolInput] = useState("");
@@ -29,6 +30,11 @@ export default function StockPage() {
 
     const formatMoney = (value: number) => {
         return Math.round(value).toLocaleString("vi-VN");
+    };
+
+    const showToast = (msg: string, type: "success" | "info" = "success") => {
+        setNotification({ msg, type });
+        setTimeout(() => setNotification(null), 3000);
     };
 
     const fetchRealtimePrices = async (symbols: string[]) => {
@@ -52,6 +58,7 @@ export default function StockPage() {
 
         setCurrentPrices(priceMap);
         setIsPricingLoading(false);
+        showToast("Cập nhật giá mới nhất thành công", "info");
     };
 
     const loadTransactions = async (code: string) => {
@@ -66,6 +73,7 @@ export default function StockPage() {
             if (data.ok) {
                 const list = data.data || [];
                 setTransactions(list);
+                showToast("Tải dữ liệu từ Google Sheets xong");
                 const symbols = list.map((tx: Transaction) => tx.symbol);
                 if (symbols.length > 0) {
                     fetchRealtimePrices(symbols);
@@ -401,6 +409,18 @@ export default function StockPage() {
                     )}
                 </div>
             </div>
+
+            {/* Toast Notification */}
+            {notification && (
+                <div className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 animate-bounce">
+                    <div className={`flex items-center gap-3 rounded-full border px-6 py-3 shadow-2xl backdrop-blur-xl ${notification.type === "success"
+                            ? "border-emerald-500/50 bg-emerald-950/80 text-emerald-300"
+                            : "border-cyan-500/50 bg-cyan-950/80 text-cyan-300"
+                        }`}>
+                        <span className="text-xs font-bold uppercase tracking-widest leading-none">{notification.msg}</span>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }
