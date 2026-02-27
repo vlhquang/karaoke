@@ -120,8 +120,8 @@ export default function StockPage() {
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
         setAddError("");
-        const priceValue = parseFloat(priceInput.replace(/,/g, ""));
-        const quantityValue = parseInt(quantityInput.replace(/,/g, ""));
+        const priceValue = parseFloat(priceInput.replace(/\D/g, ""));
+        const quantityValue = parseInt(quantityInput.replace(/\D/g, ""));
 
         if (!symbolInput || !dateInput || isNaN(priceValue) || isNaN(quantityValue)) {
             setAddError("Vui lòng nhập đầy đủ thông tin");
@@ -267,23 +267,23 @@ export default function StockPage() {
                 <section className="mb-6">
                     <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 backdrop-blur-md">
                         <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
-                            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Danh mục tổng quát</h2>
-                            <div className={`text-sm font-black ${totals.percent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Danh mục tổng quát</h2>
+                            <div className={`text-lg font-black ${totals.percent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                                 {totals.percent >= 0 ? "+" : ""}{totals.percent.toFixed(2)}%
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <p className="text-[9px] uppercase tracking-wider text-slate-500">Đầu tư</p>
-                                <p className="text-lg font-bold">{formatMoney(totals.totalInvested)}</p>
+                                <p className="text-xs uppercase tracking-wider text-slate-500">Đầu tư</p>
+                                <p className="text-xl font-bold">{formatMoney(totals.totalInvested)}</p>
                             </div>
                             <div>
-                                <p className="text-[9px] uppercase tracking-wider text-slate-500">Hiện tại</p>
-                                <p className="text-lg font-bold text-cyan-400">{formatMoney(totals.totalCurrentValue)}</p>
+                                <p className="text-xs uppercase tracking-wider text-slate-500">Hiện tại</p>
+                                <p className="text-xl font-bold text-cyan-400">{formatMoney(totals.totalCurrentValue)}</p>
                             </div>
                             <div className="col-span-2 rounded-xl bg-slate-800/30 p-3 mt-1 flex items-center justify-between">
-                                <p className="text-[9px] uppercase tracking-wider text-slate-500">Lãi / Lỗ</p>
-                                <p className={`text-xl font-black ${totals.profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                <p className="text-xs uppercase tracking-wider text-slate-500">Lãi / Lỗ</p>
+                                <p className={`text-2xl font-black ${totals.profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                                     {totals.profit >= 0 ? "+" : ""}{formatMoney(totals.profit)}
                                 </p>
                             </div>
@@ -298,39 +298,39 @@ export default function StockPage() {
                             placeholder="Mã CP"
                             value={symbolInput}
                             onChange={(e) => setSymbolInput(e.target.value.toUpperCase())}
-                            className="flex-1 min-w-[70px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-xs outline-none focus:border-cyan-500"
+                            className="flex-1 min-w-[70px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-cyan-500"
                             required
                         />
                         <input
                             type="date"
                             value={dateInput}
                             onChange={(e) => setDateInput(e.target.value)}
-                            className="flex-[1.5] min-w-[110px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-xs outline-none focus:border-cyan-500"
+                            className="flex-[1.5] min-w-[110px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-cyan-500"
                             required
                         />
                         <input
                             placeholder="Giá mua"
                             value={priceInput}
                             onChange={(e) => setPriceInput(formatInputNumber(e.target.value))}
-                            className="flex-1 min-w-[90px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-xs outline-none focus:border-cyan-500"
+                            className="flex-1 min-w-[90px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-cyan-500"
                             required
                         />
                         <input
                             placeholder="SL"
                             value={quantityInput}
                             onChange={(e) => setQuantityInput(formatInputNumber(e.target.value))}
-                            className="flex-[0.5] min-w-[60px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-xs outline-none focus:border-cyan-500"
+                            className="flex-[0.5] min-w-[60px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-cyan-500"
                             required
                         />
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-950 transition hover:bg-white disabled:opacity-50"
+                            className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-950 transition hover:bg-white disabled:opacity-50"
                         >
                             Thêm
                         </button>
                     </form>
-                    {addError && <p className="mt-2 text-[9px] text-red-400 text-center">{addError}</p>}
+                    {addError && <p className="mt-2 text-[11px] text-red-400 text-center">{addError}</p>}
                 </section>
 
                 {/* Danh sách Grouped */}
@@ -353,13 +353,13 @@ export default function StockPage() {
                                     <div className="bg-slate-800/40 px-4 py-3 flex items-center justify-between border-b border-slate-800">
                                         <div className="flex items-center gap-2">
                                             <span className="text-lg font-black">{symbol}</span>
-                                            <span className="text-[10px] text-slate-500 font-mono">({gQty})</span>
+                                            <span className="text-xs text-slate-500 font-mono">({gQty})</span>
                                         </div>
                                         <div className="text-right">
-                                            <p className={`text-xs font-bold ${currentPrice > 0 ? "text-cyan-400" : "text-slate-600"}`}>
+                                            <p className={`text-sm font-bold ${currentPrice > 0 ? "text-cyan-400" : "text-slate-600"}`}>
                                                 {currentPrice > 0 ? formatMoney(currentPrice) : "..."}
                                             </p>
-                                            <p className={`text-[10px] font-bold ${gProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                            <p className={`text-xs font-bold ${gProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                                                 {gProfit !== 0 ? (gProfit > 0 ? "+" : "") + formatMoney(gProfit) : ""}
                                                 {gProfit !== 0 && <span className="ml-1 opacity-70">{gPerc.toFixed(1)}%</span>}
                                             </p>
@@ -368,7 +368,7 @@ export default function StockPage() {
 
                                     {/* Desktop Table */}
                                     <div className="hidden md:block overflow-x-auto">
-                                        <table className="w-full text-[11px] text-left">
+                                        <table className="w-full text-sm text-left">
                                             <tbody className="divide-y divide-slate-800/30">
                                                 {txs.map((tx) => {
                                                     const p = currentPrice > 0 ? (currentPrice - tx.price) * tx.quantity : 0;
@@ -380,7 +380,7 @@ export default function StockPage() {
                                                             <td className={`px-4 py-2 text-right font-bold ${p >= 0 ? "text-emerald-500/60" : "text-red-500/60"}`}>
                                                                 {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
                                                                 {p !== 0 && tx.price > 0 && (
-                                                                    <span className="ml-1 text-[9px] opacity-60">
+                                                                    <span className="ml-1 text-[11px] opacity-60">
                                                                         ({(((currentPrice - tx.price) / tx.price) * 100).toFixed(1)}%)
                                                                     </span>
                                                                 )}
@@ -408,7 +408,7 @@ export default function StockPage() {
                                         {txs.map((tx) => {
                                             const p = currentPrice > 0 ? (currentPrice - tx.price) * tx.quantity : 0;
                                             return (
-                                                <div key={tx.id} className="px-4 py-2 flex items-center justify-between text-[11px]">
+                                                <div key={tx.id} className="px-4 py-2 flex items-center justify-between text-[13px]">
                                                     <div className="flex-1 opacity-60">{new Date(tx.date).toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' })}</div>
                                                     <div className="flex-[1.5] text-center">
                                                         <span className="opacity-40">Giá:</span> {formatMoney(tx.price)}
@@ -417,7 +417,7 @@ export default function StockPage() {
                                                     <div className={`flex-[1.5] text-right font-bold ${p >= 0 ? "text-emerald-500/80" : "text-red-500/80"}`}>
                                                         {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
                                                         {p !== 0 && tx.price > 0 && (
-                                                            <div className="text-[9px] font-normal opacity-60 leading-none">
+                                                            <div className="text-[11px] font-normal opacity-60 leading-none">
                                                                 {(((currentPrice - tx.price) / tx.price) * 100).toFixed(1)}%
                                                             </div>
                                                         )}
