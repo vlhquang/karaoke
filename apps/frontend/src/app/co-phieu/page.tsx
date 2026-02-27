@@ -379,6 +379,11 @@ export default function StockPage() {
                                                             <td className="px-4 py-2 text-right">SL: <span className="text-slate-200">{tx.quantity}</span></td>
                                                             <td className={`px-4 py-2 text-right font-bold ${p >= 0 ? "text-emerald-500/60" : "text-red-500/60"}`}>
                                                                 {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
+                                                                {p !== 0 && tx.price > 0 && (
+                                                                    <span className="ml-1 text-[9px] opacity-60">
+                                                                        ({(((currentPrice - tx.price) / tx.price) * 100).toFixed(1)}%)
+                                                                    </span>
+                                                                )}
                                                             </td>
                                                             <td className="px-4 py-2 text-right">
                                                                 <button
@@ -404,12 +409,18 @@ export default function StockPage() {
                                             const p = currentPrice > 0 ? (currentPrice - tx.price) * tx.quantity : 0;
                                             return (
                                                 <div key={tx.id} className="px-4 py-2 flex items-center justify-between text-[11px]">
-                                                    <div className="flex-1 opacity-60">{new Date(tx.date).toLocaleDateString("vi-VN")}</div>
-                                                    <div className="flex-1 text-center">
-                                                        <span className="opacity-50">Giá:</span> {formatMoney(tx.price)}
+                                                    <div className="flex-1 opacity-60">{new Date(tx.date).toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' })}</div>
+                                                    <div className="flex-[1.5] text-center">
+                                                        <span className="opacity-40">Giá:</span> {formatMoney(tx.price)}
+                                                        <span className="ml-1 text-slate-500">({tx.quantity})</span>
                                                     </div>
-                                                    <div className={`flex-1 text-right font-bold ${p >= 0 ? "text-emerald-500/80" : "text-red-500/80"}`}>
+                                                    <div className={`flex-[1.5] text-right font-bold ${p >= 0 ? "text-emerald-500/80" : "text-red-500/80"}`}>
                                                         {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
+                                                        {p !== 0 && tx.price > 0 && (
+                                                            <div className="text-[9px] font-normal opacity-60 leading-none">
+                                                                {(((currentPrice - tx.price) / tx.price) * 100).toFixed(1)}%
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <button
                                                         onClick={() => handleSell(tx.id)}
