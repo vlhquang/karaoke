@@ -32,6 +32,11 @@ export default function StockPage() {
         return Math.round(value).toLocaleString("vi-VN");
     };
 
+    const formatInputNumber = (val: string) => {
+        const num = val.replace(/\D/g, "");
+        return num ? parseInt(num).toLocaleString("vi-VN") : "";
+    };
+
     const showToast = (msg: string, type: "success" | "info" = "success") => {
         setNotification({ msg, type });
         setTimeout(() => setNotification(null), 3000);
@@ -306,14 +311,14 @@ export default function StockPage() {
                         <input
                             placeholder="Giá mua"
                             value={priceInput}
-                            onChange={(e) => setPriceInput(e.target.value)}
+                            onChange={(e) => setPriceInput(formatInputNumber(e.target.value))}
                             className="flex-1 min-w-[90px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-xs outline-none focus:border-cyan-500"
                             required
                         />
                         <input
                             placeholder="SL"
                             value={quantityInput}
-                            onChange={(e) => setQuantityInput(e.target.value)}
+                            onChange={(e) => setQuantityInput(formatInputNumber(e.target.value))}
                             className="flex-[0.5] min-w-[60px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-xs outline-none focus:border-cyan-500"
                             required
                         />
@@ -376,7 +381,15 @@ export default function StockPage() {
                                                                 {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
                                                             </td>
                                                             <td className="px-4 py-2 text-right">
-                                                                <button onClick={() => handleSell(tx.id)} className="text-[10px] text-slate-600 hover:text-amber-500">Gỡ</button>
+                                                                <button
+                                                                    onClick={() => handleSell(tx.id)}
+                                                                    className="p-2 text-slate-600 hover:text-red-500 transition-colors"
+                                                                    title="Gỡ giao dịch"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                    </svg>
+                                                                </button>
                                                             </td>
                                                         </tr>
                                                     );
@@ -398,7 +411,14 @@ export default function StockPage() {
                                                     <div className={`flex-1 text-right font-bold ${p >= 0 ? "text-emerald-500/80" : "text-red-500/80"}`}>
                                                         {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
                                                     </div>
-                                                    <button onClick={() => handleSell(tx.id)} className="ml-3 text-slate-700">✕</button>
+                                                    <button
+                                                        onClick={() => handleSell(tx.id)}
+                                                        className="ml-2 p-3 text-slate-700 active:text-red-500"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
                                                 </div>
                                             );
                                         })}
@@ -414,8 +434,8 @@ export default function StockPage() {
             {notification && (
                 <div className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 animate-bounce">
                     <div className={`flex items-center gap-3 rounded-full border px-6 py-3 shadow-2xl backdrop-blur-xl ${notification.type === "success"
-                            ? "border-emerald-500/50 bg-emerald-950/80 text-emerald-300"
-                            : "border-cyan-500/50 bg-cyan-950/80 text-cyan-300"
+                        ? "border-emerald-500/50 bg-emerald-950/80 text-emerald-300"
+                        : "border-cyan-500/50 bg-cyan-950/80 text-cyan-300"
                         }`}>
                         <span className="text-xs font-bold uppercase tracking-widest leading-none">{notification.msg}</span>
                     </div>
