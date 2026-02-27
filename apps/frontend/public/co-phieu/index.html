@@ -1,255 +1,262 @@
 <!doctype html>
 <html lang="vi">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Quản lý Cổ phiếu</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-  </head>
-  <body class="min-h-screen bg-slate-100 text-slate-900">
-    <main class="mx-auto max-w-6xl p-4 md:p-6">
-      <section id="loginCard" class="mx-auto mt-10 max-w-md rounded-2xl bg-white p-6 shadow">
-        <h1 class="text-2xl font-bold">Quản lý Cổ phiếu</h1>
-        <p class="mt-2 text-sm text-slate-500">Nhập mã truy cập để sử dụng.</p>
-        <form id="loginForm" class="mt-4 space-y-3">
-          <input
-            id="accessCode"
-            type="password"
-            class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-cyan-500"
-            placeholder="Mã truy cập"
-            required
-          />
-          <button class="w-full rounded-lg bg-cyan-600 px-4 py-2 font-semibold text-white" type="submit">Đăng nhập</button>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quản lý Cổ phiếu</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="min-h-screen bg-slate-100 text-slate-900">
+  <main class="mx-auto max-w-6xl p-4 md:p-6">
+    <div class="mb-3">
+      <a href="/" class="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-cyan-600 transition">
+        ← Quay lại Portal
+      </a>
+    </div>
+    <section id="loginCard" class="mx-auto mt-10 max-w-md rounded-2xl bg-white p-6 shadow">
+      <h1 class="text-2xl font-bold">Quản lý Cổ phiếu</h1>
+      <p class="mt-2 text-sm text-slate-500">Nhập mã truy cập để sử dụng.</p>
+      <form id="loginForm" class="mt-4 space-y-3">
+        <input id="accessCode" type="password"
+          class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-cyan-500"
+          placeholder="Mã truy cập" required />
+        <button class="w-full rounded-lg bg-cyan-600 px-4 py-2 font-semibold text-white" type="submit">Đăng
+          nhập</button>
+      </form>
+      <p id="loginError" class="mt-3 hidden rounded-md bg-red-50 px-3 py-2 text-sm text-red-600"></p>
+    </section>
+
+    <section id="appCard" class="hidden space-y-4">
+      <header class="rounded-2xl bg-white p-4 shadow">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-xl font-bold">Giao dịch đang HOLD</h2>
+          <button id="refreshBtn" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">Làm mới</button>
+        </div>
+      </header>
+
+      <section class="rounded-2xl bg-white p-4 shadow">
+        <h3 class="text-lg font-semibold">Thêm lệnh mua</h3>
+        <form id="addForm" class="mt-3 grid gap-3 md:grid-cols-5">
+          <input id="symbolInput" class="rounded-lg border border-slate-300 px-3 py-2 uppercase"
+            placeholder="Mã CP (VD: FPT)" maxlength="10" required />
+          <input id="dateInput" type="date" class="rounded-lg border border-slate-300 px-3 py-2" required />
+          <input id="priceInput" type="text" inputmode="numeric" class="rounded-lg border border-slate-300 px-3 py-2"
+            placeholder="Giá mua" required />
+          <input id="quantityInput" type="text" inputmode="numeric" class="rounded-lg border border-slate-300 px-3 py-2"
+            placeholder="Số lượng" required />
+          <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 font-semibold text-white">Thêm</button>
         </form>
-        <p id="loginError" class="mt-3 hidden rounded-md bg-red-50 px-3 py-2 text-sm text-red-600"></p>
+        <p id="addError" class="mt-3 hidden rounded-md bg-red-50 px-3 py-2 text-sm text-red-600"></p>
       </section>
 
-      <section id="appCard" class="hidden space-y-4">
-        <header class="rounded-2xl bg-white p-4 shadow">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <h2 class="text-xl font-bold">Giao dịch đang HOLD</h2>
-            <button id="refreshBtn" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">Làm mới</button>
-          </div>
-        </header>
-
-        <section class="rounded-2xl bg-white p-4 shadow">
-          <h3 class="text-lg font-semibold">Thêm lệnh mua</h3>
-          <form id="addForm" class="mt-3 grid gap-3 md:grid-cols-5">
-            <input id="symbolInput" class="rounded-lg border border-slate-300 px-3 py-2 uppercase" placeholder="Mã CP (VD: FPT)" maxlength="10" required />
-            <input id="dateInput" type="date" class="rounded-lg border border-slate-300 px-3 py-2" required />
-            <input id="priceInput" type="text" inputmode="numeric" class="rounded-lg border border-slate-300 px-3 py-2" placeholder="Giá mua" required />
-            <input id="quantityInput" type="text" inputmode="numeric" class="rounded-lg border border-slate-300 px-3 py-2" placeholder="Số lượng" required />
-            <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 font-semibold text-white">Thêm</button>
-          </form>
-          <p id="addError" class="mt-3 hidden rounded-md bg-red-50 px-3 py-2 text-sm text-red-600"></p>
-        </section>
-
-        <section id="listLoading" class="hidden rounded-2xl bg-white p-4 shadow">
-          <div class="flex items-center gap-3 text-sm text-slate-600">
-            <span class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-cyan-600"></span>
-            <span>Đang tải dữ liệu từ Google Sheet...</span>
-          </div>
-        </section>
-
-        <section id="cardsBody" class="space-y-3 md:hidden"></section>
-
-        <section class="hidden overflow-hidden rounded-2xl bg-white shadow md:block">
-          <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
-              <thead class="bg-slate-100 text-left">
-                <tr>
-                  <th class="px-3 py-3">Mã CP</th>
-                  <th class="px-3 py-3">Ngày mua</th>
-                  <th class="px-3 py-3">Giá mua</th>
-                  <th class="px-3 py-3">Số lượng</th>
-                  <th class="px-3 py-3">Giá hiện tại</th>
-                  <th class="px-3 py-3">Lãi/Lỗ</th>
-                  <th class="px-3 py-3">%</th>
-                  <th class="px-3 py-3">Hành động</th>
-                </tr>
-              </thead>
-              <tbody id="rowsBody"></tbody>
-            </table>
-          </div>
-        </section>
+      <section id="listLoading" class="hidden rounded-2xl bg-white p-4 shadow">
+        <div class="flex items-center gap-3 text-sm text-slate-600">
+          <span class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-cyan-600"></span>
+          <span>Đang tải dữ liệu từ Google Sheet...</span>
+        </div>
       </section>
-    </main>
 
-    <script>
-      const APPS_SCRIPT_URL = "/api/stocks";
+      <section id="cardsBody" class="space-y-3 md:hidden"></section>
 
-      const state = {
-        accessCode: "",
-        transactions: [],
-        currentPrices: {}
-      };
+      <section class="hidden overflow-hidden rounded-2xl bg-white shadow md:block">
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="bg-slate-100 text-left">
+              <tr>
+                <th class="px-3 py-3">Mã CP</th>
+                <th class="px-3 py-3">Ngày mua</th>
+                <th class="px-3 py-3">Giá mua</th>
+                <th class="px-3 py-3">Số lượng</th>
+                <th class="px-3 py-3">Giá hiện tại</th>
+                <th class="px-3 py-3">Lãi/Lỗ</th>
+                <th class="px-3 py-3">%</th>
+                <th class="px-3 py-3">Hành động</th>
+              </tr>
+            </thead>
+            <tbody id="rowsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
 
-      const loginCard = document.getElementById("loginCard");
-      const appCard = document.getElementById("appCard");
-      const loginError = document.getElementById("loginError");
-      const addError = document.getElementById("addError");
-      const rowsBody = document.getElementById("rowsBody");
-      const cardsBody = document.getElementById("cardsBody");
-      const listLoading = document.getElementById("listLoading");
+  <script>
+    const APPS_SCRIPT_URL = "/api/stocks";
 
-      const postAction = async (action, payload = {}) => {
-        const response = await fetch(APPS_SCRIPT_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action, ...payload })
-        });
-        let body = null;
-        try {
-          body = await response.json();
-        } catch {
-          body = null;
+    const state = {
+      accessCode: "",
+      transactions: [],
+      currentPrices: {}
+    };
+
+    const loginCard = document.getElementById("loginCard");
+    const appCard = document.getElementById("appCard");
+    const loginError = document.getElementById("loginError");
+    const addError = document.getElementById("addError");
+    const rowsBody = document.getElementById("rowsBody");
+    const cardsBody = document.getElementById("cardsBody");
+    const listLoading = document.getElementById("listLoading");
+
+    const postAction = async (action, payload = {}) => {
+      const response = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action, ...payload })
+      });
+      let body = null;
+      try {
+        body = await response.json();
+      } catch {
+        body = null;
+      }
+      if (!response.ok) {
+        const message = body && body.message ? body.message : "Không gọi được API";
+        const details = body && body.details ? ` - ${body.details}` : "";
+        throw new Error(`${message}${details}`);
+      }
+      return body;
+    };
+
+    const formatMoney = (value) => {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "";
+      return Math.round(number).toLocaleString("en-US", { maximumFractionDigits: 0 });
+    };
+
+    const parseMoney = (raw) => {
+      const cleaned = String(raw || "").replace(/[^\d]/g, "");
+      if (!cleaned) return NaN;
+      return Number(cleaned);
+    };
+    const formatDateVi = (value) => {
+      if (value === null || value === undefined) return "";
+
+      if (typeof value === "number" && Number.isFinite(value)) {
+        const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+        const date = new Date(excelEpoch.getTime() + value * 86400000);
+        if (!Number.isNaN(date.getTime())) {
+          return date.toLocaleDateString("vi-VN");
         }
-        if (!response.ok) {
-          const message = body && body.message ? body.message : "Không gọi được API";
-          const details = body && body.details ? ` - ${body.details}` : "";
-          throw new Error(`${message}${details}`);
-        }
-        return body;
-      };
+      }
 
-      const formatMoney = (value) => {
-        const number = Number(value);
-        if (!Number.isFinite(number)) return "";
-        return Math.round(number).toLocaleString("en-US", { maximumFractionDigits: 0 });
-      };
+      const raw = String(value).trim();
+      if (!raw) return "";
 
-      const parseMoney = (raw) => {
-        const cleaned = String(raw || "").replace(/[^\d]/g, "");
-        if (!cleaned) return NaN;
-        return Number(cleaned);
-      };
-      const formatDateVi = (value) => {
-        if (value === null || value === undefined) return "";
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        const [year, month, day] = raw.split("-");
+        return `${day}/${month}/${year}`;
+      }
 
-        if (typeof value === "number" && Number.isFinite(value)) {
-          const excelEpoch = new Date(Date.UTC(1899, 11, 30));
-          const date = new Date(excelEpoch.getTime() + value * 86400000);
-          if (!Number.isNaN(date.getTime())) {
-            return date.toLocaleDateString("vi-VN");
-          }
-        }
-
-        const raw = String(value).trim();
-        if (!raw) return "";
-
-        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-          const [year, month, day] = raw.split("-");
-          return `${day}/${month}/${year}`;
-        }
-
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-          return raw;
-        }
-
-        const parsed = new Date(raw);
-        if (!Number.isNaN(parsed.getTime())) {
-          return parsed.toLocaleDateString("vi-VN");
-        }
-
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
         return raw;
-      };
+      }
 
-      const setButtonLoading = (button, loading, loadingText = "Đang xử lý...") => {
-        if (!button) return;
-        if (loading) {
-          button.dataset.originalText = button.textContent || "";
-          button.textContent = loadingText;
-          button.disabled = true;
-          button.classList.add("opacity-70", "cursor-not-allowed");
-          return;
+      const parsed = new Date(raw);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toLocaleDateString("vi-VN");
+      }
+
+      return raw;
+    };
+
+    const setButtonLoading = (button, loading, loadingText = "Đang xử lý...") => {
+      if (!button) return;
+      if (loading) {
+        button.dataset.originalText = button.textContent || "";
+        button.textContent = loadingText;
+        button.disabled = true;
+        button.classList.add("opacity-70", "cursor-not-allowed");
+        return;
+      }
+      button.textContent = button.dataset.originalText || button.textContent;
+      button.disabled = false;
+      button.classList.remove("opacity-70", "cursor-not-allowed");
+    };
+
+    const setListLoading = (loading) => {
+      if (!listLoading) return;
+      if (loading) {
+        listLoading.classList.remove("hidden");
+        return;
+      }
+      listLoading.classList.add("hidden");
+    };
+
+    const updateRowMetrics = (row, tx) => {
+      const currentPriceRaw = state.currentPrices[tx.symbol];
+      const currentPrice = Number(currentPriceRaw);
+      const hasCurrentPrice = Number.isFinite(currentPrice) && currentPrice >= 0;
+      const profit = hasCurrentPrice ? (currentPrice - tx.price) * tx.quantity : null;
+      const percent = hasCurrentPrice ? ((currentPrice - tx.price) / tx.price) * 100 : null;
+      const isProfit = profit !== null && profit >= 0;
+
+      const profitCell = row.querySelector("[data-profit-cell]");
+      const percentCell = row.querySelector("[data-percent-cell]");
+      if (profitCell) {
+        profitCell.textContent = profit === null ? "-" : formatMoney(profit);
+        profitCell.classList.remove("text-slate-500", "text-emerald-600", "text-red-600");
+        profitCell.classList.add(profit === null ? "text-slate-500" : isProfit ? "text-emerald-600" : "text-red-600");
+      }
+      if (percentCell) {
+        percentCell.textContent = percent === null ? "-" : `${percent.toFixed(2)}%`;
+        percentCell.classList.remove("text-slate-500", "text-emerald-600", "text-red-600");
+        percentCell.classList.add(percent === null ? "text-slate-500" : isProfit ? "text-emerald-600" : "text-red-600");
+      }
+    };
+
+    const syncSymbolViews = (symbol, sourceInput) => {
+      const currentPriceRaw = state.currentPrices[symbol];
+      const currentPrice = Number(currentPriceRaw);
+      const formattedValue = Number.isFinite(currentPrice) ? formatMoney(currentPrice) : "";
+
+      document.querySelectorAll(`input[data-symbol="${symbol}"]`).forEach((input) => {
+        if (sourceInput && input === sourceInput) return;
+        input.value = formattedValue;
+      });
+
+      state.transactions
+        .filter((tx) => tx.symbol === symbol)
+        .forEach((tx) => {
+          document.querySelectorAll(`[data-tx-id="${tx.id}"]`).forEach((container) => {
+            updateRowMetrics(container, tx);
+          });
+        });
+    };
+
+    const renderRows = () => {
+      rowsBody.innerHTML = "";
+      cardsBody.innerHTML = "";
+      const sortedTransactions = [...state.transactions].sort((a, b) => {
+        const symbolCompare = String(a.symbol || "").localeCompare(String(b.symbol || ""), "vi", { sensitivity: "base" });
+        if (symbolCompare !== 0) return symbolCompare;
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        if (Number.isFinite(dateA) && Number.isFinite(dateB) && dateA !== dateB) {
+          return dateA - dateB;
         }
-        button.textContent = button.dataset.originalText || button.textContent;
-        button.disabled = false;
-        button.classList.remove("opacity-70", "cursor-not-allowed");
-      };
+        return a.id - b.id;
+      });
 
-      const setListLoading = (loading) => {
-        if (!listLoading) return;
-        if (loading) {
-          listLoading.classList.remove("hidden");
-          return;
-        }
-        listLoading.classList.add("hidden");
-      };
+      if (sortedTransactions.length === 0) {
+        rowsBody.innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-center text-slate-500">Không có lệnh HOLD.</td></tr>';
+        cardsBody.innerHTML = '<div class="rounded-2xl bg-white p-4 text-center text-sm text-slate-500 shadow">Không có lệnh HOLD.</div>';
+        return;
+      }
 
-      const updateRowMetrics = (row, tx) => {
+      sortedTransactions.forEach((tx) => {
         const currentPriceRaw = state.currentPrices[tx.symbol];
         const currentPrice = Number(currentPriceRaw);
         const hasCurrentPrice = Number.isFinite(currentPrice) && currentPrice >= 0;
         const profit = hasCurrentPrice ? (currentPrice - tx.price) * tx.quantity : null;
         const percent = hasCurrentPrice ? ((currentPrice - tx.price) / tx.price) * 100 : null;
-        const isProfit = profit !== null && profit >= 0;
+        const profitClass = profit === null ? "text-slate-500" : profit >= 0 ? "text-emerald-600" : "text-red-600";
 
-        const profitCell = row.querySelector("[data-profit-cell]");
-        const percentCell = row.querySelector("[data-percent-cell]");
-        if (profitCell) {
-          profitCell.textContent = profit === null ? "-" : formatMoney(profit);
-          profitCell.classList.remove("text-slate-500", "text-emerald-600", "text-red-600");
-          profitCell.classList.add(profit === null ? "text-slate-500" : isProfit ? "text-emerald-600" : "text-red-600");
-        }
-        if (percentCell) {
-          percentCell.textContent = percent === null ? "-" : `${percent.toFixed(2)}%`;
-          percentCell.classList.remove("text-slate-500", "text-emerald-600", "text-red-600");
-          percentCell.classList.add(percent === null ? "text-slate-500" : isProfit ? "text-emerald-600" : "text-red-600");
-        }
-      };
-
-      const syncSymbolViews = (symbol, sourceInput) => {
-        const currentPriceRaw = state.currentPrices[symbol];
-        const currentPrice = Number(currentPriceRaw);
-        const formattedValue = Number.isFinite(currentPrice) ? formatMoney(currentPrice) : "";
-
-        document.querySelectorAll(`input[data-symbol="${symbol}"]`).forEach((input) => {
-          if (sourceInput && input === sourceInput) return;
-          input.value = formattedValue;
-        });
-
-        state.transactions
-          .filter((tx) => tx.symbol === symbol)
-          .forEach((tx) => {
-            document.querySelectorAll(`[data-tx-id="${tx.id}"]`).forEach((container) => {
-              updateRowMetrics(container, tx);
-            });
-          });
-      };
-
-      const renderRows = () => {
-        rowsBody.innerHTML = "";
-        cardsBody.innerHTML = "";
-        const sortedTransactions = [...state.transactions].sort((a, b) => {
-          const symbolCompare = String(a.symbol || "").localeCompare(String(b.symbol || ""), "vi", { sensitivity: "base" });
-          if (symbolCompare !== 0) return symbolCompare;
-          const dateA = new Date(a.date).getTime();
-          const dateB = new Date(b.date).getTime();
-          if (Number.isFinite(dateA) && Number.isFinite(dateB) && dateA !== dateB) {
-            return dateA - dateB;
-          }
-          return a.id - b.id;
-        });
-
-        if (sortedTransactions.length === 0) {
-          rowsBody.innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-center text-slate-500">Không có lệnh HOLD.</td></tr>';
-          cardsBody.innerHTML = '<div class="rounded-2xl bg-white p-4 text-center text-sm text-slate-500 shadow">Không có lệnh HOLD.</div>';
-          return;
-        }
-
-        sortedTransactions.forEach((tx) => {
-          const currentPriceRaw = state.currentPrices[tx.symbol];
-          const currentPrice = Number(currentPriceRaw);
-          const hasCurrentPrice = Number.isFinite(currentPrice) && currentPrice >= 0;
-          const profit = hasCurrentPrice ? (currentPrice - tx.price) * tx.quantity : null;
-          const percent = hasCurrentPrice ? ((currentPrice - tx.price) / tx.price) * 100 : null;
-          const profitClass = profit === null ? "text-slate-500" : profit >= 0 ? "text-emerald-600" : "text-red-600";
-
-          const tr = document.createElement("tr");
-          tr.dataset.txId = String(tx.id);
-          tr.className = "border-t border-slate-200";
-          tr.innerHTML = `
+        const tr = document.createElement("tr");
+        tr.dataset.txId = String(tx.id);
+        tr.className = "border-t border-slate-200";
+        tr.innerHTML = `
             <td class="px-3 py-3 font-semibold">${tx.symbol}</td>
             <td class="px-3 py-3">${formatDateVi(tx.date)}</td>
             <td class="px-3 py-3">${formatMoney(tx.price)}</td>
@@ -266,12 +273,12 @@
               </button>
             </td>
           `;
-          rowsBody.appendChild(tr);
+        rowsBody.appendChild(tr);
 
-          const card = document.createElement("article");
-          card.dataset.txId = String(tx.id);
-          card.className = "rounded-2xl bg-white p-4 shadow";
-          card.innerHTML = `
+        const card = document.createElement("article");
+        card.dataset.txId = String(tx.id);
+        card.className = "rounded-2xl bg-white p-4 shadow";
+        card.innerHTML = `
             <div class="mb-2 flex items-start justify-between gap-2">
               <div>
                 <p class="text-lg font-bold">${tx.symbol}</p>
@@ -307,176 +314,177 @@
               </div>
             </div>
           `;
-          cardsBody.appendChild(card);
+        cardsBody.appendChild(card);
+      });
+
+      document.querySelectorAll("input[data-symbol]").forEach((input) => {
+        input.addEventListener("input", (event) => {
+          const symbol = event.target.dataset.symbol;
+          const value = parseMoney(event.target.value);
+          if (!symbol) return;
+          state.currentPrices[symbol] = Number.isFinite(value) ? value : "";
+          event.target.value = Number.isFinite(value) ? formatMoney(value) : "";
+          syncSymbolViews(symbol, event.target);
         });
 
-        document.querySelectorAll("input[data-symbol]").forEach((input) => {
-          input.addEventListener("input", (event) => {
-            const symbol = event.target.dataset.symbol;
-            const value = parseMoney(event.target.value);
-            if (!symbol) return;
-            state.currentPrices[symbol] = Number.isFinite(value) ? value : "";
-            event.target.value = Number.isFinite(value) ? formatMoney(value) : "";
-            syncSymbolViews(symbol, event.target);
-          });
-
-          input.addEventListener("blur", (event) => {
-            const symbol = event.target.dataset.symbol;
-            const value = parseMoney(event.target.value);
-            event.target.value = Number.isFinite(value) ? formatMoney(value) : "";
-            if (!symbol) return;
-            state.currentPrices[symbol] = Number.isFinite(value) ? value : "";
-            syncSymbolViews(symbol, event.target);
-          });
+        input.addEventListener("blur", (event) => {
+          const symbol = event.target.dataset.symbol;
+          const value = parseMoney(event.target.value);
+          event.target.value = Number.isFinite(value) ? formatMoney(value) : "";
+          if (!symbol) return;
+          state.currentPrices[symbol] = Number.isFinite(value) ? value : "";
+          syncSymbolViews(symbol, event.target);
         });
+      });
 
-        document.querySelectorAll("button[data-sell-id]").forEach((button) => {
-          button.addEventListener("click", async (event) => {
-            const id = Number(event.target.dataset.sellId);
-            if (!Number.isFinite(id)) return;
-            setButtonLoading(button, true, "Đang bán...");
-            try {
-              const result = await postAction("sell", { accessCode: state.accessCode, id });
-              if (!result.ok) {
-                throw new Error(result.message || "Bán thất bại");
-              }
-              removeTransactionFromState(id);
-            } catch (error) {
-              alert(error.message || "Có lỗi xảy ra");
-            } finally {
-              setButtonLoading(button, false);
+      document.querySelectorAll("button[data-sell-id]").forEach((button) => {
+        button.addEventListener("click", async (event) => {
+          const id = Number(event.target.dataset.sellId);
+          if (!Number.isFinite(id)) return;
+          setButtonLoading(button, true, "Đang bán...");
+          try {
+            const result = await postAction("sell", { accessCode: state.accessCode, id });
+            if (!result.ok) {
+              throw new Error(result.message || "Bán thất bại");
             }
-          });
+            removeTransactionFromState(id);
+          } catch (error) {
+            alert(error.message || "Có lỗi xảy ra");
+          } finally {
+            setButtonLoading(button, false);
+          }
         });
-      };
+      });
+    };
 
-      const loadTransactions = async () => {
-        setListLoading(true);
-        try {
-          const result = await postAction("list", { accessCode: state.accessCode });
-          if (!result.ok) {
-            throw new Error(result.message || "Không tải dữ liệu");
-          }
-          state.transactions = result.data || [];
-          renderRows();
-        } finally {
-          setListLoading(false);
+    const loadTransactions = async () => {
+      setListLoading(true);
+      try {
+        const result = await postAction("list", { accessCode: state.accessCode });
+        if (!result.ok) {
+          throw new Error(result.message || "Không tải dữ liệu");
         }
-      };
-
-      const addTransactionToState = (tx) => {
-        state.transactions = [tx, ...state.transactions];
+        state.transactions = result.data || [];
         renderRows();
-      };
+      } finally {
+        setListLoading(false);
+      }
+    };
 
-      const removeTransactionFromState = (id) => {
-        const before = state.transactions.length;
-        state.transactions = state.transactions.filter((tx) => tx.id !== id);
-        if (state.transactions.length !== before) {
-          renderRows();
+    const addTransactionToState = (tx) => {
+      state.transactions = [tx, ...state.transactions];
+      renderRows();
+    };
+
+    const removeTransactionFromState = (id) => {
+      const before = state.transactions.length;
+      state.transactions = state.transactions.filter((tx) => tx.id !== id);
+      if (state.transactions.length !== before) {
+        renderRows();
+      }
+    };
+
+    const loginForm = document.getElementById("loginForm");
+    const addForm = document.getElementById("addForm");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const priceInput = document.getElementById("priceInput");
+    const quantityInput = document.getElementById("quantityInput");
+
+    priceInput.addEventListener("input", (event) => {
+      const value = parseMoney(event.target.value);
+      event.target.value = Number.isFinite(value) ? formatMoney(value) : "";
+    });
+    quantityInput.addEventListener("input", (event) => {
+      const value = parseMoney(event.target.value);
+      event.target.value = Number.isFinite(value) ? formatMoney(value) : "";
+    });
+
+    loginForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      loginError.classList.add("hidden");
+      const loginSubmitButton = event.currentTarget.querySelector('button[type="submit"]');
+
+      const accessCode = document.getElementById("accessCode").value.trim();
+      if (!accessCode) {
+        loginError.textContent = "Vui lòng nhập mã truy cập.";
+        loginError.classList.remove("hidden");
+        return;
+      }
+
+      try {
+        setButtonLoading(loginSubmitButton, true, "Đang đăng nhập...");
+        const result = await postAction("login", { accessCode });
+        if (!result.ok) {
+          throw new Error(result.message || "Sai mã truy cập");
         }
-      };
+        state.accessCode = accessCode;
+        loginCard.classList.add("hidden");
+        appCard.classList.remove("hidden");
+        await loadTransactions();
+      } catch (error) {
+        loginError.textContent = error.message || "Đăng nhập thất bại.";
+        loginError.classList.remove("hidden");
+      } finally {
+        setButtonLoading(loginSubmitButton, false);
+      }
+    });
 
-      const loginForm = document.getElementById("loginForm");
-      const addForm = document.getElementById("addForm");
-      const refreshBtn = document.getElementById("refreshBtn");
-      const priceInput = document.getElementById("priceInput");
-      const quantityInput = document.getElementById("quantityInput");
+    addForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      addError.classList.add("hidden");
+      const addSubmitButton = event.currentTarget.querySelector('button[type="submit"]');
+      const symbol = document.getElementById("symbolInput").value.trim().toUpperCase();
+      const date = document.getElementById("dateInput").value;
+      const price = parseMoney(document.getElementById("priceInput").value);
+      const quantity = parseMoney(document.getElementById("quantityInput").value);
 
-      priceInput.addEventListener("input", (event) => {
-        const value = parseMoney(event.target.value);
-        event.target.value = Number.isFinite(value) ? formatMoney(value) : "";
-      });
-      quantityInput.addEventListener("input", (event) => {
-        const value = parseMoney(event.target.value);
-        event.target.value = Number.isFinite(value) ? formatMoney(value) : "";
-      });
+      if (!symbol || !date || !Number.isFinite(price) || price <= 0 || !Number.isInteger(quantity) || quantity <= 0) {
+        addError.textContent = "Dữ liệu không hợp lệ.";
+        addError.classList.remove("hidden");
+        return;
+      }
 
-      loginForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        loginError.classList.add("hidden");
-        const loginSubmitButton = event.currentTarget.querySelector('button[type="submit"]');
-
-        const accessCode = document.getElementById("accessCode").value.trim();
-        if (!accessCode) {
-          loginError.textContent = "Vui lòng nhập mã truy cập.";
-          loginError.classList.remove("hidden");
-          return;
+      try {
+        setButtonLoading(addSubmitButton, true, "Đang thêm...");
+        const result = await postAction("add", {
+          accessCode: state.accessCode,
+          symbol,
+          date,
+          price,
+          quantity
+        });
+        if (!result.ok) {
+          throw new Error(result.message || "Thêm giao dịch thất bại");
         }
+        const createdId = Number(result?.data?.id);
+        addTransactionToState({
+          id: Number.isFinite(createdId) ? createdId : Date.now(),
+          symbol,
+          date,
+          price,
+          quantity,
+          status: "HOLD"
+        });
+        event.target.reset();
+      } catch (error) {
+        addError.textContent = error.message || "Thêm giao dịch thất bại";
+        addError.classList.remove("hidden");
+      } finally {
+        setButtonLoading(addSubmitButton, false);
+      }
+    });
 
-        try {
-          setButtonLoading(loginSubmitButton, true, "Đang đăng nhập...");
-          const result = await postAction("login", { accessCode });
-          if (!result.ok) {
-            throw new Error(result.message || "Sai mã truy cập");
-          }
-          state.accessCode = accessCode;
-          loginCard.classList.add("hidden");
-          appCard.classList.remove("hidden");
-          await loadTransactions();
-        } catch (error) {
-          loginError.textContent = error.message || "Đăng nhập thất bại.";
-          loginError.classList.remove("hidden");
-        } finally {
-          setButtonLoading(loginSubmitButton, false);
-        }
-      });
+    refreshBtn.addEventListener("click", async () => {
+      try {
+        setButtonLoading(refreshBtn, true, "Đang tải...");
+        await loadTransactions();
+      } catch (error) {
+        alert(error.message || "Làm mới thất bại");
+      } finally {
+        setButtonLoading(refreshBtn, false);
+      }
+    });
+  </script>
+</body>
 
-      addForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        addError.classList.add("hidden");
-        const addSubmitButton = event.currentTarget.querySelector('button[type="submit"]');
-        const symbol = document.getElementById("symbolInput").value.trim().toUpperCase();
-        const date = document.getElementById("dateInput").value;
-        const price = parseMoney(document.getElementById("priceInput").value);
-        const quantity = parseMoney(document.getElementById("quantityInput").value);
-
-        if (!symbol || !date || !Number.isFinite(price) || price <= 0 || !Number.isInteger(quantity) || quantity <= 0) {
-          addError.textContent = "Dữ liệu không hợp lệ.";
-          addError.classList.remove("hidden");
-          return;
-        }
-
-        try {
-          setButtonLoading(addSubmitButton, true, "Đang thêm...");
-          const result = await postAction("add", {
-            accessCode: state.accessCode,
-            symbol,
-            date,
-            price,
-            quantity
-          });
-          if (!result.ok) {
-            throw new Error(result.message || "Thêm giao dịch thất bại");
-          }
-          const createdId = Number(result?.data?.id);
-          addTransactionToState({
-            id: Number.isFinite(createdId) ? createdId : Date.now(),
-            symbol,
-            date,
-            price,
-            quantity,
-            status: "HOLD"
-          });
-          event.target.reset();
-        } catch (error) {
-          addError.textContent = error.message || "Thêm giao dịch thất bại";
-          addError.classList.remove("hidden");
-        } finally {
-          setButtonLoading(addSubmitButton, false);
-        }
-      });
-
-      refreshBtn.addEventListener("click", async () => {
-        try {
-          setButtonLoading(refreshBtn, true, "Đang tải...");
-          await loadTransactions();
-        } catch (error) {
-          alert(error.message || "Làm mới thất bại");
-        } finally {
-          setButtonLoading(refreshBtn, false);
-        }
-      });
-    </script>
-  </body>
 </html>
