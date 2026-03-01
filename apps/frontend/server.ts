@@ -7,6 +7,9 @@ import { Server } from "socket.io";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import dotenv from "dotenv";
+import { createLiXiExpressApp } from "./src/li-xi-nang-cao/app";
+import { RoomService as LiXiRoomService } from "./src/li-xi-nang-cao/services/room.service";
+import { registerLiXiNamespace } from "./src/li-xi-nang-cao/socket";
 import type {
   AddSongPayload,
   ClientToServerEvents,
@@ -226,13 +229,18 @@ const pickNextNumber = (room: LotoInternalRoom): number | null => {
 
 const app = next({ dev, hostname: host, port });
 const handle = app.getRequestHandler();
+const liXiRoomService = new LiXiRoomService();
 
 app.prepare().then(() => {
-  const httpServer = createServer((req, res) => handle(req, res));
+  const expressApp = createLiXiExpressApp(liXiRoomService);
+  expressApp.all("*", (req, res) => handle(req, res));
+  const httpServer = createServer(expressApp);
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     cors: { origin: true, methods: ["GET", "POST"] },
     transports: ["websocket", "polling"]
   });
+  registerLiXiNamespace(io.of("/lixi"), liXiRoomService);
+  setInterval(() => liXiRoomService.cleanupExpiredRooms(Date.now()), 5 * 60 * 1000);
 
   const emitRoomState = (roomCode: string): void => {
     const room = rooms.get(roomCode);
