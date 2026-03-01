@@ -25,6 +25,12 @@ export default function HomePage() {
       title: "Cổ Phiếu",
       description: "Quản lý giao dịch mua cổ phiếu cá nhân với Google Sheets.",
       badge: "New"
+    },
+    {
+      href: "/li-xi-nang-cao",
+      title: "Lì Xì Nâng Cao",
+      description: "Bộ mini game realtime (reaction, memory, rps, number, shake, color).",
+      badge: "New"
     }
   ];
 
