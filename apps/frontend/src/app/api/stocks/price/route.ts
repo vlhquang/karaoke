@@ -30,22 +30,33 @@ export async function GET(request: Request) {
 
         const html = await response.text();
 
-        // Better regex to extract price
-        const priceMatch = html.match(/class="[^"]*price[^"]*"[^>]*>\s*([\d,.]+)\s*<\/span>/i);
-        // Better regex to extract reference price (openprice)
-        const refMatch = html.match(/id="openprice"[^>]*>\s*([\d,.]+)\s*<\/b>/i);
-        // Better regex to extract trade date
+        // Target specific IDs for better accuracy
+        // Current Price: inside <h2 id="stockprice">...<span class="price">VALUE</span></h2>
+        const priceMatch = html.match(/id="stockprice"[^>]*>.*?class="[^"]*price[^"]*"[^>]*>\s*([\d,.]+)\s*<\/span>/is);
+
+        // Opening Price: <b id="openprice">VALUE</b>
+        const openMatch = html.match(/id="openprice"[^>]*>\s*([\d,.]+)\s*<\/b>/i);
+
+        // Price Change: <div id="stockchange">VALUE (...)</div>
+        const changeMatch = html.match(/id="stockchange"[^>]*>\s*([+-]?[\d,.]+)\s*\(/i);
+
+        // Trade Date: <div id="tradedate">VALUE</div>
         const dateMatch = html.match(/id="tradedate"[^>]*>\s*([^<]+)\s*<\/div>/i);
 
         if (!priceMatch || !priceMatch[1]) {
             return NextResponse.json(
-                { ok: false, message: "Could not find price in HTML" },
+                { ok: false, message: "Could not find stock price in HTML" },
                 { status: 502 }
             );
         }
 
         const price = parseFloat(priceMatch[1].replace(/,/g, ""));
-        const referencePrice = refMatch ? parseFloat(refMatch[1].replace(/,/g, "")) : null;
+        const openingPrice = openMatch ? parseFloat(openMatch[1].replace(/,/g, "")) : null;
+        const changeAmount = changeMatch ? parseFloat(changeMatch[1].replace(/,/g, "")) : 0;
+
+        // Calculate Reference Price (Previous Close)
+        // Reference = Current - Change
+        const referencePrice = price - changeAmount;
 
         if (isNaN(price)) {
             return NextResponse.json(
@@ -58,6 +69,7 @@ export async function GET(request: Request) {
             ok: true,
             symbol,
             price,
+            openingPrice,
             referencePrice,
             timestamp: dateMatch ? dateMatch[1].trim() : new Date().toLocaleString("vi-VN")
         });
