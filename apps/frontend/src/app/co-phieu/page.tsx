@@ -14,6 +14,7 @@ interface Transaction {
 interface PriceInfo {
     current: number;
     previous: number | null;
+    opening: number | null;
     reference: number | null;
     timestamp: string | null;
 }
@@ -72,10 +73,10 @@ export default function StockPage() {
     };
 
     const fetchRealtimePrices = async (symbols: string[]) => {
+        if (symbols.length === 0) return;
         setIsRefreshingPrices(true);
         const uniqueSymbols = Array.from(new Set(symbols));
         const newPriceMap: Record<string, PriceInfo> = { ...currentPrices };
-        const now = formatDateTime(new Date());
 
         await Promise.all(
             uniqueSymbols.map(async (symbol) => {
@@ -83,12 +84,12 @@ export default function StockPage() {
                     const res = await fetch(`/api/stocks/price?symbol=${symbol}`);
                     const data = await res.json();
                     if (data.ok) {
-                        const oldPrice = currentPrices[symbol]?.current ?? null;
                         newPriceMap[symbol] = {
                             current: data.price,
-                            previous: oldPrice,
-                            reference: (data.referencePrice !== undefined && data.referencePrice !== null) ? data.referencePrice : null,
-                            timestamp: data.timestamp || now
+                            opening: data.openingPrice,
+                            reference: data.referencePrice,
+                            previous: currentPrices[symbol]?.current || null,
+                            timestamp: data.timestamp
                         };
                     }
                 } catch (err) {
@@ -115,7 +116,7 @@ export default function StockPage() {
             if (data.ok) {
                 const list = data.data || [];
                 setTransactions(list);
-                showToast("Tải dữ liệu từ Google Sheets xong");
+                if (!isSilent) showToast("Tải dữ liệu từ Google Sheets xong");
                 const symbols = list.map((tx: Transaction) => tx.symbol);
                 if (symbols.length > 0) {
                     fetchRealtimePrices(symbols);
@@ -193,9 +194,7 @@ export default function StockPage() {
                 setSymbolInput("");
                 setPriceInput("");
                 setQuantityInput("");
-                if (!currentPrices[symbol]) {
-                    fetchRealtimePrices([symbol]);
-                }
+                fetchRealtimePrices([symbol]);
             } else {
                 setAddError(data.message || "Thêm giao dịch thất bại");
             }
@@ -257,6 +256,8 @@ export default function StockPage() {
         return groups;
     }, [transactions]);
 
+    if (!isInitialized) return null;
+
     if (!isLoggedIn) {
         return (
             <main className="flex min-h-screen items-center justify-center bg-slate-950 p-4 font-sans text-slate-100">
@@ -295,8 +296,6 @@ export default function StockPage() {
             </main>
         );
     }
-
-    if (!isInitialized) return null;
 
     return (
         <main className="min-h-screen bg-slate-950 p-4 font-sans text-slate-100 md:p-8">
@@ -428,10 +427,10 @@ export default function StockPage() {
                                                     Thời gian lấy giá hiện tại: {priceInfo?.timestamp || "--/--/---- --:--:--"}
                                                 </span>
 
-                                                {priceInfo?.reference !== undefined && priceInfo?.reference !== null && (
+                                                {priceInfo?.opening !== undefined && priceInfo?.opening !== null && (
                                                     <div className="flex items-center md:justify-end gap-1 mb-1">
-                                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Giá tham chiếu:</span>
-                                                        <span className="text-[11px] font-mono text-slate-400">{formatMoney(priceInfo.reference)}</span>
+                                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Giá mở cửa:</span>
+                                                        <span className="text-[11px] font-mono text-slate-400">{formatMoney(priceInfo.opening)}</span>
                                                     </div>
                                                 )}
 
