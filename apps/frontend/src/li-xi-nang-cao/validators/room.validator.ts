@@ -17,6 +17,9 @@ export const startGameSchema = z.object({
     memory: z.object({
       boardLength: z.number().int().min(4).max(64).refine((value) => value % 2 === 0, "boardLength must be even"),
       theme: z.enum(["sports", "animals", "fruits", "vehicles"]).optional()
+    }).optional(),
+    rps: z.object({
+      mode: z.enum(["BO1", "BO3", "BO5", "BO7", "BO11"]).optional()
     }).optional()
   }).optional()
 });
@@ -28,6 +31,9 @@ export const selectGameSchema = z.object({
     memory: z.object({
       boardLength: z.number().int().min(4).max(64).refine((value) => value % 2 === 0, "boardLength must be even"),
       theme: z.enum(["sports", "animals", "fruits", "vehicles"]).optional()
+    }).optional(),
+    rps: z.object({
+      mode: z.enum(["BO1", "BO3", "BO5", "BO7", "BO11"]).optional()
     }).optional()
   }).optional()
 });

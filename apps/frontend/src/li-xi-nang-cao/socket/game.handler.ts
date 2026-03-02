@@ -14,6 +14,58 @@ const emitError = (socket: Socket, error: unknown): void => {
   socket.emit("error", { message });
 };
 
+export const processGameStep = (
+  nsp: any,
+  roomService: RoomService,
+  room: any
+): void => {
+  if (!room.currentGame) return;
+  const engine = (gameEngines as any)[room.currentGame];
+  if (!engine) return;
+
+  const result = engine.calculateResult(room);
+
+  if (room.currentGame === "memory") {
+    const winnerId = (result as { winnerId?: string | null }).winnerId ?? null;
+    const winner = winnerId ? roomService.getWinnerAnnouncement(room, winnerId) : null;
+    nsp.to(`lixi:${room.roomId}`).emit("game:result", {
+      roomId: room.roomId,
+      game: room.currentGame,
+      result,
+      winner
+    });
+    const done = Boolean((result as { done?: boolean }).done);
+    if (done) {
+      roomService.endGame(room);
+    }
+    return;
+  }
+
+  // Common result emission for RPS and others
+  const winnerId = (result as { winnerId?: string | null }).winnerId ?? null;
+  const isDone = Boolean((result as { done?: boolean }).done);
+
+  // For RPS, we might want to emit update even if not done, if the state was updated (e.g. revealed)
+  if (room.currentGame === "rps") {
+    nsp.to(`lixi:${room.roomId}`).emit("game:update", {
+      roomId: room.roomId,
+      game: room.currentGame,
+      gameState: result
+    });
+  }
+
+  if (winnerId || isDone) {
+    const winner = winnerId ? roomService.getWinnerAnnouncement(room, winnerId) : null;
+    roomService.endGame(room);
+    nsp.to(`lixi:${room.roomId}`).emit("game:result", {
+      roomId: room.roomId,
+      game: room.currentGame,
+      result,
+      winner
+    });
+  }
+};
+
 const handleGameAction = (
   socket: AuthedSocket,
   roomService: RoomService,
@@ -39,37 +91,7 @@ const handleGameAction = (
       gameState: nextState
     });
 
-    const result = engine.calculateResult(room);
-
-    if (room.currentGame === "memory") {
-      const winnerId = (result as { winnerId?: string | null }).winnerId ?? null;
-      const winner = winnerId ? roomService.getWinnerAnnouncement(room, winnerId) : null;
-      socket.nsp.to(`lixi:${auth.roomId}`).emit("game:result", {
-        roomId: auth.roomId,
-        game: room.currentGame,
-        result,
-        winner
-      });
-      const done = Boolean((result as { done?: boolean }).done);
-      if (done) {
-        roomService.endGame(room);
-        roomService.resetToWaiting(room);
-      }
-      return;
-    }
-
-    const winnerId = (result as { winnerId?: string | null }).winnerId ?? null;
-    if (winnerId) {
-      const winner = roomService.getWinnerAnnouncement(room, winnerId);
-      roomService.endGame(room);
-      socket.nsp.to(`lixi:${auth.roomId}`).emit("game:result", {
-        roomId: auth.roomId,
-        game: room.currentGame,
-        result,
-        winner
-      });
-      roomService.resetToWaiting(room);
-    }
+    processGameStep(socket.nsp, roomService, room);
   } catch (error) {
     emitError(socket, error);
   }

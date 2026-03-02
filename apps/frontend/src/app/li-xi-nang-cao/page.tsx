@@ -348,6 +348,7 @@ export default function LiXiNangCaoPage() {
   const [role, setRole] = useState<"host" | "player" | null>(null);
   const [memoryBoardLength, setMemoryBoardLength] = useState(12);
   const [memoryTheme, setMemoryTheme] = useState<"sports" | "animals" | "fruits" | "vehicles">("animals");
+  const [rpsMode, setRpsMode] = useState<"BO1" | "BO3" | "BO5" | "BO7" | "BO11">("BO1");
 
   const [gameState, setGameState] = useState<unknown>(null);
   const [resultState, setResultState] = useState<unknown>(null);
@@ -701,7 +702,11 @@ export default function LiXiNangCaoPage() {
       return;
     }
     setSelectedGame(gameType);
-    const options = gameType === "memory" ? { memory: { boardLength: memoryBoardLength, theme: memoryTheme } } : undefined;
+    const options = gameType === "memory"
+      ? { memory: { boardLength: memoryBoardLength, theme: memoryTheme } }
+      : gameType === "rps"
+        ? { rps: { mode: rpsMode } }
+        : undefined;
     const res = await emitWithAck("host:selectGame", { roomId, gameType, options });
     if (!res.ok) setErrorText(res.message ?? "Không thể chọn trò chơi");
   };
@@ -709,7 +714,11 @@ export default function LiXiNangCaoPage() {
   const startGame = async (): Promise<void> => {
     if (!roomId) return;
     setErrorText("");
-    const options = selectedGame === "memory" ? { memory: { boardLength: memoryBoardLength, theme: memoryTheme } } : undefined;
+    const options = selectedGame === "memory"
+      ? { memory: { boardLength: memoryBoardLength, theme: memoryTheme } }
+      : selectedGame === "rps"
+        ? { rps: { mode: rpsMode } }
+        : undefined;
     const res = await emitWithAck("host:startGame", { roomId, options });
     if (!res.ok) setErrorText(res.message ?? "Không thể bắt đầu trò chơi");
   };
@@ -719,6 +728,13 @@ export default function LiXiNangCaoPage() {
     setErrorText("");
     const res = await emitWithAck("host:endGame", { roomId });
     if (!res.ok) setErrorText(res.message ?? "Không thể kết thúc trò chơi");
+  };
+
+  const restartGame = async (): Promise<void> => {
+    if (!roomId) return;
+    setErrorText("");
+    const res = await emitWithAck("host:restartGame", { roomId });
+    if (!res.ok) setErrorText(res.message ?? "Không thể chơi lại");
   };
 
   const setReady = async (ready: boolean): Promise<void> => {
@@ -783,55 +799,59 @@ export default function LiXiNangCaoPage() {
           <p className="text-sm text-slate-300">Trạng thái kết nối: {connected ? "Đang kết nối" : "Mất kết nối"}</p>
 
           <div className="mt-4 space-y-3">
-            <input className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên của bạn" />
-            <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-3">
-              <p className="text-sm font-semibold text-slate-100">Ảnh chọc vui khi chiến thắng</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button onClick={() => void openCamera()} className="rounded-lg bg-cyan-500 px-3 py-2 text-sm font-semibold text-slate-900">
-                  Mở camera + filter
-                </button>
-                <label className="cursor-pointer rounded-lg bg-violet-500 px-3 py-2 text-sm font-semibold text-white">
-                  Chụp/Chọn ảnh
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] ?? null;
-                      void handleImageCapture(file);
-                      event.currentTarget.value = "";
-                    }}
-                  />
-                </label>
-                <button
-                  onClick={() => setVictoryImageDataUrl("")}
-                  disabled={!victoryImageDataUrl}
-                  className="rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50"
-                >
-                  Xóa ảnh
-                </button>
-              </div>
-              {victoryImageDataUrl && (
-                <img className="mt-3 w-full max-w-xs rounded-lg border border-slate-700 object-cover" src={victoryImageDataUrl} alt="Anh choc vui cua ban" />
-              )}
-              {cameraError && <p className="mt-2 text-xs text-red-300">{cameraError}</p>}
-            </div>
-            {role === "host" ? (
-              <button onClick={() => void createRoom()} className="rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-900">
-                Tạo phòng
-              </button>
-            ) : (
-              <div className="flex gap-2">
-                <input
-                  className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 uppercase"
-                  value={roomIdInput}
-                  onChange={(e) => setRoomIdInput(e.target.value.toUpperCase())}
-                  placeholder="Mã phòng"
-                />
-                <button onClick={() => void joinRoom()} className="rounded-lg border border-cyan-300/60 px-4 py-2 font-semibold text-cyan-200">
-                  Vào
-                </button>
+            {!roomId && (
+              <div className="mt-4 space-y-3">
+                <input className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên của bạn" />
+                <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-3">
+                  <p className="text-sm font-semibold text-slate-100">Ảnh chọc vui khi chiến thắng</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button onClick={() => void openCamera()} className="rounded-lg bg-cyan-500 px-3 py-2 text-sm font-semibold text-slate-900">
+                      Mở camera + filter
+                    </button>
+                    <label className="cursor-pointer rounded-lg bg-violet-500 px-3 py-2 text-sm font-semibold text-white">
+                      Chụp/Chọn ảnh
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          void handleImageCapture(file);
+                          event.currentTarget.value = "";
+                        }}
+                      />
+                    </label>
+                    <button
+                      onClick={() => setVictoryImageDataUrl("")}
+                      disabled={!victoryImageDataUrl}
+                      className="rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50"
+                    >
+                      Xóa ảnh
+                    </button>
+                  </div>
+                  {victoryImageDataUrl && (
+                    <img className="mt-3 w-full max-w-xs rounded-lg border border-slate-700 object-cover" src={victoryImageDataUrl} alt="Anh choc vui cua ban" />
+                  )}
+                  {cameraError && <p className="mt-2 text-xs text-red-300">{cameraError}</p>}
+                </div>
+                {role === "host" ? (
+                  <button onClick={() => void createRoom()} className="rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-900">
+                    Tạo phòng
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 uppercase"
+                      value={roomIdInput}
+                      onChange={(e) => setRoomIdInput(e.target.value.toUpperCase())}
+                      placeholder="Mã phòng"
+                    />
+                    <button onClick={() => void joinRoom()} className="rounded-lg border border-cyan-300/60 px-4 py-2 font-semibold text-cyan-200">
+                      Vào
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -843,13 +863,6 @@ export default function LiXiNangCaoPage() {
             <p>Game đã chọn: <span className="font-semibold">{room?.selectedGame ?? "-"}</span></p>
             <p>Sẵn sàng: <span className="font-semibold">{readyCount}/{onlineCount}</span></p>
             {room?.status === "countdown" && <p>Game bắt đầu sau: <span className="font-semibold text-amber-300">{countdownLeft}s</span></p>}
-            <button
-              onClick={() => void setReady(!myReady)}
-              disabled={!canPlay || room?.status !== "waiting"}
-              className={`mt-2 rounded-lg px-3 py-1.5 text-sm font-semibold ${myReady ? "bg-emerald-500 text-slate-900" : "border border-emerald-300/60 text-emerald-200"} disabled:opacity-50`}
-            >
-              {myReady ? "Đã sẵn sàng" : "Bấm để sẵn sàng"}
-            </button>
             {joinUrl && (
               <div className="mt-3 flex items-center gap-3 rounded-lg border border-cyan-400/30 bg-cyan-500/10 p-2">
                 <QRCodeSVG value={joinUrl} size={84} includeMargin />
@@ -863,31 +876,32 @@ export default function LiXiNangCaoPage() {
 
           {errorText && <div className="mt-3 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-2 text-sm text-red-200">{errorText}</div>}
 
-          <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-950/40 p-3">
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-slate-400">Danh sách người chơi</h2>
-            <div className="space-y-2">
-              {room?.players?.length ? room.players.map((p) => (
-                <div key={p.playerId} className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-100">{p.name}</p>
-                    <p className="text-xs text-slate-400">Độ trễ: {p.latency}ms • {p.ready ? "Sẵn sàng" : "Chưa sẵn sàng"}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-1 text-xs ${p.isOnline ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-700 text-slate-300"}`}>
-                      {p.isOnline ? "Trực tuyến" : "Ngoại tuyến"}
-                    </span>
-                    {isHost && !p.ready && p.playerId !== playerId && room?.status === "waiting" && (
-                      <button
-                        onClick={() => void kickPlayer(p.playerId)}
-                        className="rounded-lg border border-red-300/60 px-2 py-1 text-xs font-semibold text-red-200"
-                      >
-                        Kick
-                      </button>
-                    )}
-                  </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-slate-400">Danh sách người chơi</h2>
+          <div className="space-y-2">
+            {room?.players?.length ? room.players.map((p) => (
+              <div key={p.playerId} className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
+                <div>
+                  <p className="text-sm font-semibold text-slate-100">{p.name}</p>
+                  <p className="text-xs text-slate-400">Độ trễ: {p.latency}ms • {p.ready ? "Sẵn sàng" : "Chưa sẵn sàng"}</p>
                 </div>
-              )) : <p className="text-sm text-slate-400">Chưa có người chơi.</p>}
-            </div>
+                <div className="flex items-center gap-2">
+                  <span className={`rounded-full px-2 py-1 text-xs ${p.isOnline ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-700 text-slate-300"}`}>
+                    {p.isOnline ? "Trực tuyến" : "Ngoại tuyến"}
+                  </span>
+                  {isHost && !p.ready && p.playerId !== playerId && room?.status === "waiting" && (
+                    <button
+                      onClick={() => void kickPlayer(p.playerId)}
+                      className="rounded-lg border border-red-300/60 px-2 py-1 text-xs font-semibold text-red-200"
+                    >
+                      Kick
+                    </button>
+                  )}
+                </div>
+              </div>
+            )) : <p className="text-sm text-slate-400">Chưa có người chơi.</p>}
           </div>
         </section>
 
@@ -913,21 +927,36 @@ export default function LiXiNangCaoPage() {
             </div>
           )}
 
-          <div className="mt-4 flex gap-2">
-            <button
-              onClick={() => void startGame()}
-              disabled={!isHost || !canPlay || !allReady || !room?.selectedGame || room.status !== "waiting"}
-              className="rounded-lg bg-emerald-500 px-4 py-2 font-semibold text-slate-900 disabled:opacity-50"
-            >
-              Bắt đầu (đếm ngược 5s)
-            </button>
-            <button onClick={() => void endGame()} disabled={!isHost || !canPlay} className="rounded-lg border border-amber-400/60 px-4 py-2 font-semibold text-amber-200 disabled:opacity-50">
-              Kết thúc
-            </button>
-          </div>
+          {isHost && selectedGame === "rps" && (
+            <div className="mt-4 rounded-xl border border-rose-400/30 bg-rose-500/10 p-3">
+              <p className="text-sm font-semibold text-rose-200">Cấu hình Oẳn Tù Tì</p>
+              <div className="mt-2 flex items-center gap-2">
+                <label htmlFor="rps-mode" className="text-sm text-slate-200">Chế độ chơi</label>
+                <select
+                  id="rps-mode"
+                  value={rpsMode}
+                  onChange={(e) => setRpsMode(e.target.value as "BO1" | "BO3" | "BO5" | "BO7" | "BO11")}
+                  className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-1.5 text-sm text-slate-100"
+                >
+                  <option value="BO1">BO1 (Đấu 1 ván)</option>
+                  <option value="BO3">BO3 (Thắng 2/3 ván)</option>
+                  <option value="BO5">BO5 (Thắng 3/5 ván)</option>
+                  <option value="BO7">BO7 (Thắng 4/7 ván)</option>
+                  <option value="BO11">BO11 (Thắng 6/11 ván)</option>
+                </select>
+              </div>
+              <button
+                onClick={() => void selectGame("rps")}
+                disabled={!canHostSelectGame}
+                className="mt-2 rounded-lg border border-rose-300/60 px-3 py-1.5 text-sm font-semibold text-rose-200 disabled:opacity-50"
+              >
+                Áp dụng cấu hình Oẳn Tù Tì
+              </button>
+            </div>
+          )}
 
           {isHost && selectedGame === "memory" && (
-            <div className="mt-3 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
+            <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
               <p className="text-sm font-semibold text-emerald-200">Cấu hình board nhớ</p>
               <div className="mt-2 flex items-center gap-2">
                 <label htmlFor="memory-board-length" className="text-sm text-slate-200">Số ô trên board</label>
@@ -963,11 +992,10 @@ export default function LiXiNangCaoPage() {
               >
                 Áp dụng cấu hình ghi nhớ
               </button>
-              <p className="mt-2 text-xs text-slate-300">Mặc định 12 ô (6 cặp). Chỉ nhận số chẵn.</p>
             </div>
           )}
 
-          <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-950/40 p-3">
+          <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-950/40 p-3">
             <h3 className="mb-2 text-sm font-semibold uppercase tracking-widest text-slate-400">Bảng điều khiển trò chơi</h3>
             <GamePanelSwitch
               game={currentGame}
@@ -976,6 +1004,37 @@ export default function LiXiNangCaoPage() {
               gameState={gameState}
               playerId={playerId}
             />
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button
+              onClick={() => void setReady(!myReady)}
+              disabled={!canPlay || room?.status !== "waiting"}
+              className={`rounded-lg px-6 py-3 font-bold transition shadow-lg ${myReady ? "bg-emerald-500 text-slate-900" : "bg-emerald-500/20 border border-emerald-400/50 text-emerald-400 hover:bg-emerald-500/30"} disabled:opacity-30`}
+            >
+              {myReady ? "ĐÃ SẴN SÀNG" : "BẤM SẴN SÀNG"}
+            </button>
+            <button
+              onClick={() => void startGame()}
+              disabled={!isHost || !canPlay || !allReady || !room?.selectedGame || room.status !== "waiting" || !myReady}
+              className="rounded-lg bg-cyan-100/10 border border-cyan-500/50 px-6 py-3 font-bold text-cyan-400 disabled:opacity-30 disabled:border-slate-700 disabled:text-slate-500"
+            >
+              BẮT ĐẦU (5S)
+            </button>
+            <button
+              onClick={() => void restartGame()}
+              disabled={!isHost || !room || (room.status !== "finished" && room.status !== "playing") || !myReady}
+              className="rounded-lg bg-sky-100/10 border border-sky-500/50 px-6 py-3 font-bold text-sky-400 disabled:opacity-30 disabled:border-slate-700 disabled:text-slate-500"
+            >
+              CHƠI LẠI
+            </button>
+            <button
+              onClick={() => void endGame()}
+              disabled={!isHost || !canPlay || !myReady}
+              className="rounded-lg border border-amber-400/60 px-6 py-3 font-bold text-amber-200 disabled:opacity-50"
+            >
+              KẾT THÚC
+            </button>
           </div>
         </section>
 
@@ -1056,7 +1115,7 @@ export default function LiXiNangCaoPage() {
               >
                 Chụp ảnh
               </button>
-              <button onClick={stopCamera} className="rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-200">
+              <button onClick={stopCamera} className="rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-100">
                 Đóng camera
               </button>
             </div>
@@ -1069,13 +1128,13 @@ export default function LiXiNangCaoPage() {
           <div className="w-full max-w-md rounded-2xl border border-amber-300/50 bg-slate-900 p-5 text-center">
             <p className="text-xs uppercase tracking-[0.2em] text-amber-200">Chuẩn bị bắt đầu</p>
             <p className="mt-2 text-xl font-bold text-slate-100">
-              {room.selectedGame ? `Game: ${room.selectedGame}` : "Game"}
+              {room?.selectedGame ? `Game: ${room.selectedGame}` : "Game"}
             </p>
             <p className="mt-4 text-6xl font-black text-amber-300">{countdownLeft}</p>
             <p className="mt-2 text-sm text-slate-300">Popup đã mở, game sẽ bắt đầu sau khi đếm ngược về 0.</p>
           </div>
         </div>
       )}
-    </main>
+    </main >
   );
 }
