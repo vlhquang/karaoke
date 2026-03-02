@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LiXiActionProps } from "./types";
 
-interface ReactionPanelProps extends LiXiActionProps {
-  signalText?: string;
-}
-
 type Side = "left" | "right";
 type Phase = "idle" | "ready" | "go" | "finished";
 
+interface ReactionPanelProps extends LiXiActionProps {
+  gameState?: unknown;
+  playerId?: string;
+}
+
 interface RoundResult {
-  winner: Side;
+  winner: Side | "draw";
   reason: "reaction" | "early";
   leftDeltaMs: number | null;
   rightDeltaMs: number | null;
@@ -17,13 +18,13 @@ interface RoundResult {
 
 const MIN_DELAY_MS = 3000;
 const MAX_DELAY_MS = 10000;
+const DRAW_THRESHOLD_MS = 40;
 
 export function ReactionPanel({ disabled }: ReactionPanelProps) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [message, setMessage] = useState("Nhấn Bắt đầu lượt mới để chơi");
   const [result, setResult] = useState<RoundResult | null>(null);
-
   const [leftTappedAt, setLeftTappedAt] = useState<number | null>(null);
   const [rightTappedAt, setRightTappedAt] = useState<number | null>(null);
 
@@ -86,19 +87,27 @@ export function ReactionPanel({ disabled }: ReactionPanelProps) {
     setMessage(earlySide === "left" ? "Bên Trái bấm sớm, Bên Phải thắng!" : "Bên Phải bấm sớm, Bên Trái thắng!");
   };
 
-  const finishByReaction = (winner: Side, leftAt: number | null, rightAt: number | null): void => {
+  const evaluateWinner = (leftAt: number, rightAt: number): RoundResult => {
     const goTime = goTimeRef.current;
-    const leftDelta = leftAt !== null ? Math.max(0, Math.round(leftAt - goTime)) : null;
-    const rightDelta = rightAt !== null ? Math.max(0, Math.round(rightAt - goTime)) : null;
+    const leftDelta = Math.max(0, Math.round(leftAt - goTime));
+    const rightDelta = Math.max(0, Math.round(rightAt - goTime));
+    const diff = Math.abs(leftDelta - rightDelta);
 
-    setPhase("finished");
-    setResult({
-      winner,
+    if (diff < DRAW_THRESHOLD_MS) {
+      return {
+        winner: "draw",
+        reason: "reaction",
+        leftDeltaMs: leftDelta,
+        rightDeltaMs: rightDelta
+      };
+    }
+
+    return {
+      winner: leftDelta < rightDelta ? "left" : "right",
       reason: "reaction",
       leftDeltaMs: leftDelta,
       rightDeltaMs: rightDelta
-    });
-    setMessage(winner === "left" ? "Bên Trái thắng!" : "Bên Phải thắng!");
+    };
   };
 
   const registerTap = (side: Side): void => {
@@ -110,34 +119,70 @@ export function ReactionPanel({ disabled }: ReactionPanelProps) {
       return;
     }
 
-    if (phase !== "go") {
-      return;
-    }
+    if (phase !== "go") return;
 
     if (side === "left" && leftTappedAt === null) {
       setLeftTappedAt(now);
-      finishByReaction("left", now, rightTappedAt);
+      if (rightTappedAt !== null) {
+        const finalResult = evaluateWinner(now, rightTappedAt);
+        setResult(finalResult);
+        setPhase("finished");
+        setMessage(finalResult.winner === "draw" ? "Hòa!" : finalResult.winner === "left" ? "Bên Trái thắng!" : "Bên Phải thắng!");
+      }
       return;
     }
 
     if (side === "right" && rightTappedAt === null) {
       setRightTappedAt(now);
-      finishByReaction("right", leftTappedAt, now);
+      if (leftTappedAt !== null) {
+        const finalResult = evaluateWinner(leftTappedAt, now);
+        setResult(finalResult);
+        setPhase("finished");
+        setMessage(finalResult.winner === "draw" ? "Hòa!" : finalResult.winner === "left" ? "Bên Trái thắng!" : "Bên Phải thắng!");
+      }
     }
   };
 
+  useEffect(() => {
+    if (phase !== "go") return;
+    if (leftTappedAt !== null && rightTappedAt === null) {
+      const t = window.setTimeout(() => {
+        setPhase("finished");
+        setResult({
+          winner: "left",
+          reason: "reaction",
+          leftDeltaMs: Math.max(0, Math.round(leftTappedAt - goTimeRef.current)),
+          rightDeltaMs: null
+        });
+        setMessage("Bên Trái thắng!");
+      }, 220);
+      return () => window.clearTimeout(t);
+    }
+    if (rightTappedAt !== null && leftTappedAt === null) {
+      const t = window.setTimeout(() => {
+        setPhase("finished");
+        setResult({
+          winner: "right",
+          reason: "reaction",
+          leftDeltaMs: null,
+          rightDeltaMs: Math.max(0, Math.round(rightTappedAt - goTimeRef.current))
+        });
+        setMessage("Bên Phải thắng!");
+      }, 220);
+      return () => window.clearTimeout(t);
+    }
+  }, [leftTappedAt, phase, rightTappedAt]);
+
   const resultText = useMemo(() => {
     if (!result) return "Chưa có kết quả.";
-    if (result.reason === "early") {
-      return "Kết quả: bấm sớm bị xử thua ngay.";
-    }
-    return `Kết quả: Trái ${result.leftDeltaMs ?? "-"}ms • Phải ${result.rightDeltaMs ?? "-"}ms`;
+    if (result.reason === "early") return "Kết quả: bấm sớm bị xử thua ngay.";
+    return `Trái ${result.leftDeltaMs ?? "-"}ms • Phải ${result.rightDeltaMs ?? "-"}ms`;
   }, [result]);
 
   return (
     <div className="space-y-3">
       <div className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200">
-        Delay ngẫu nhiên 3-10 giây. Khi hiện <b>BẤM NGAY!</b> thì chạm. Bấm sớm sẽ thua ngay.
+        2 người chơi cùng chạm trên màn hình host. Delay ngẫu nhiên 3-10 giây, bấm sớm sẽ thua.
       </div>
 
       <button
@@ -153,10 +198,7 @@ export function ReactionPanel({ disabled }: ReactionPanelProps) {
           <div className="mb-3 flex items-center justify-between">
             <p className="text-lg font-bold text-amber-200 md:text-2xl">{message}</p>
             {phase !== "finished" && (
-              <button
-                onClick={closeOverlay}
-                className="rounded-lg border border-slate-500 px-3 py-1.5 text-sm text-slate-200"
-              >
+              <button onClick={closeOverlay} className="rounded-lg border border-slate-500 px-3 py-1.5 text-sm text-slate-200">
                 Đóng
               </button>
             )}
@@ -184,16 +226,10 @@ export function ReactionPanel({ disabled }: ReactionPanelProps) {
               <p className="text-center text-lg font-bold text-emerald-300 md:text-2xl">{message}</p>
               <p className="text-center text-sm text-slate-200">{resultText}</p>
               <div className="grid gap-2 sm:grid-cols-2">
-                <button
-                  onClick={startRound}
-                  className="rounded-xl bg-emerald-500 px-4 py-3 text-base font-bold text-slate-900 hover:bg-emerald-400"
-                >
+                <button onClick={startRound} className="rounded-xl bg-emerald-500 px-4 py-3 text-base font-bold text-slate-900 hover:bg-emerald-400">
                   Chơi lại
                 </button>
-                <button
-                  onClick={closeOverlay}
-                  className="rounded-xl border border-slate-500 px-4 py-3 text-base font-semibold text-slate-200 hover:bg-slate-800"
-                >
+                <button onClick={closeOverlay} className="rounded-xl border border-slate-500 px-4 py-3 text-base font-semibold text-slate-200 hover:bg-slate-800">
                   Đóng
                 </button>
               </div>

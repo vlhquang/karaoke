@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import type { GameType, Player, Room } from "../types";
+import type { GameType, Player, Room, StartGameOptions } from "../types";
 import { AppError } from "../utils/errors";
 import { liXiConfig } from "../config/env";
 
@@ -8,7 +8,7 @@ const toRoomId = (): string => uuidv4().slice(0, 6).toUpperCase();
 export class RoomService {
   private readonly rooms = new Map<string, Room>();
 
-  createRoom(hostName: string, hostSocketId: string): { room: Room; hostPlayer: Player } {
+  createRoom(hostName: string, hostSocketId: string, victoryImageDataUrl?: string): { room: Room; hostPlayer: Player } {
     const roomId = toRoomId();
     const hostPlayer: Player = {
       playerId: uuidv4(),
@@ -17,13 +17,18 @@ export class RoomService {
       score: 0,
       latency: 0,
       isOnline: true,
-      lastActionAt: 0
+      lastActionAt: 0,
+      ready: false,
+      victoryImageDataUrl
     };
 
     const room: Room = {
       roomId,
       hostId: hostPlayer.playerId,
       players: new Map([[hostPlayer.playerId, hostPlayer]]),
+      selectedGame: null,
+      selectedGameOptions: null,
+      countdownEndsAt: null,
       currentGame: null,
       gameState: null,
       status: "waiting",
@@ -34,7 +39,7 @@ export class RoomService {
     return { room, hostPlayer };
   }
 
-  joinRoom(roomId: string, name: string, socketId: string): { room: Room; player: Player } {
+  joinRoom(roomId: string, name: string, socketId: string, victoryImageDataUrl?: string): { room: Room; player: Player } {
     const room = this.getRoom(roomId);
     const player: Player = {
       playerId: uuidv4(),
@@ -43,7 +48,9 @@ export class RoomService {
       score: 0,
       latency: 0,
       isOnline: true,
-      lastActionAt: 0
+      lastActionAt: 0,
+      ready: false,
+      victoryImageDataUrl
     };
     room.players.set(player.playerId, player);
     return { room, player };
@@ -63,6 +70,15 @@ export class RoomService {
       throw new AppError("Player not in room", 403);
     }
     return player;
+  }
+
+  getWinnerAnnouncement(room: Room, winnerId: string): { playerId: string; name: string; victoryImageDataUrl?: string } {
+    const winner = this.getPlayer(room, winnerId);
+    return {
+      playerId: winner.playerId,
+      name: winner.name,
+      victoryImageDataUrl: winner.victoryImageDataUrl
+    };
   }
 
   ensureHost(room: Room, playerId: string): void {
@@ -93,6 +109,31 @@ export class RoomService {
     player.latency = latency;
   }
 
+  setPlayerReady(room: Room, playerId: string, ready: boolean): void {
+    const player = this.getPlayer(room, playerId);
+    player.ready = ready;
+  }
+
+  setSelectedGame(room: Room, gameType: GameType, options?: StartGameOptions): void {
+    room.selectedGame = gameType;
+    room.selectedGameOptions = options ?? null;
+  }
+
+  areAllOnlinePlayersReady(room: Room): boolean {
+    const onlinePlayers = [...room.players.values()].filter((player) => player.isOnline);
+    if (onlinePlayers.length === 0) {
+      return false;
+    }
+    return onlinePlayers.every((player) => player.ready);
+  }
+
+  removePlayer(room: Room, playerId: string): void {
+    if (room.hostId === playerId) {
+      throw new AppError("Cannot kick host", 400);
+    }
+    room.players.delete(playerId);
+  }
+
   validateAction(room: Room, player: Player, now: number): void {
     if (player.latency > liXiConfig.maxLatencyMs) {
       throw new AppError("Latency too high", 429);
@@ -107,16 +148,22 @@ export class RoomService {
     room.currentGame = gameType;
     room.status = "playing";
     room.gameState = initialState;
+    room.countdownEndsAt = null;
   }
 
   endGame(room: Room): void {
     room.status = "finished";
+    room.countdownEndsAt = null;
   }
 
   resetToWaiting(room: Room): void {
     room.status = "waiting";
+    room.countdownEndsAt = null;
     room.currentGame = null;
     room.gameState = null;
+    for (const player of room.players.values()) {
+      player.ready = false;
+    }
   }
 
   listRooms(): Array<{ roomId: string; status: string; players: number; createdAt: number }> {

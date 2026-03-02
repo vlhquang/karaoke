@@ -42,10 +42,13 @@ const handleGameAction = (
     const result = engine.calculateResult(room);
 
     if (room.currentGame === "memory") {
+      const winnerId = (result as { winnerId?: string | null }).winnerId ?? null;
+      const winner = winnerId ? roomService.getWinnerAnnouncement(room, winnerId) : null;
       socket.nsp.to(`lixi:${auth.roomId}`).emit("game:result", {
         roomId: auth.roomId,
         game: room.currentGame,
-        result
+        result,
+        winner
       });
       const done = Boolean((result as { done?: boolean }).done);
       if (done) {
@@ -57,11 +60,13 @@ const handleGameAction = (
 
     const winnerId = (result as { winnerId?: string | null }).winnerId ?? null;
     if (winnerId) {
+      const winner = roomService.getWinnerAnnouncement(room, winnerId);
       roomService.endGame(room);
       socket.nsp.to(`lixi:${auth.roomId}`).emit("game:result", {
         roomId: auth.roomId,
         game: room.currentGame,
-        result
+        result,
+        winner
       });
       roomService.resetToWaiting(room);
     }

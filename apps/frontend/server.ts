@@ -243,7 +243,8 @@ app.prepare().then(() => {
 
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     cors: { origin: true, methods: ["GET", "POST"] },
-    transports: ["websocket", "polling"]
+    transports: ["websocket", "polling"],
+    maxHttpBufferSize: Number(process.env.SOCKET_MAX_HTTP_BUFFER_SIZE ?? 20 * 1024 * 1024)
   });
   registerLiXiNamespace(io.of("/lixi"), liXiRoomService);
   setInterval(() => liXiRoomService.cleanupExpiredRooms(Date.now()), 5 * 60 * 1000);
