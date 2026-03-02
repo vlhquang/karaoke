@@ -1,14 +1,16 @@
-import type { GameEngine, Room, StartGameOptions } from "../types";
+import type { GameEngine, MemoryTheme, Room, StartGameOptions } from "../types";
 
 interface MemoryState {
   seed: number;
   board: number[];
+  theme: MemoryTheme;
   startTime: number | null;
   pairCount: number;
   requiredPlayers: number;
   phase: "syncing" | "running" | "finished";
   readyPlayers: Record<string, true>;
   completes: Record<string, { durationMs: number; moves: number }>;
+  winnerId: string | null;
 }
 
 const createSeededRng = (seed: number): (() => number) => {
@@ -38,6 +40,11 @@ export const memoryGame: GameEngine = {
         ? requestedLength
         : 12;
     const pairCount = normalizedLength / 2;
+    const requestedTheme = options?.memory?.theme;
+    const theme: MemoryTheme =
+      requestedTheme === "sports" || requestedTheme === "animals" || requestedTheme === "fruits" || requestedTheme === "vehicles"
+        ? requestedTheme
+        : "animals";
     const base = Array.from({ length: pairCount * 2 }, (_, i) => i % pairCount);
     const board = seededShuffle(base, seed);
     const onlinePlayers = [...room.players.values()].filter((player) => player.isOnline).length;
@@ -45,12 +52,14 @@ export const memoryGame: GameEngine = {
     return {
       seed,
       board,
+      theme,
       startTime: null,
       pairCount,
       requiredPlayers,
       phase: "syncing",
       readyPlayers: {},
-      completes: {}
+      completes: {},
+      winnerId: null
     };
   },
 
@@ -84,11 +93,13 @@ export const memoryGame: GameEngine = {
     if (state.completes[playerId] || !Number.isFinite(moves) || moves <= 0) {
       return state;
     }
+    const durationMs = Math.max(0, now - state.startTime);
     state.completes[playerId] = {
-      durationMs: Math.max(0, now - state.startTime),
+      durationMs,
       moves
     };
-    if (Object.keys(state.completes).length >= state.requiredPlayers) {
+    if (!state.winnerId) {
+      state.winnerId = playerId;
       state.phase = "finished";
     }
     room.gameState = state;
@@ -101,10 +112,10 @@ export const memoryGame: GameEngine = {
       if (a[1].durationMs !== b[1].durationMs) return a[1].durationMs - b[1].durationMs;
       return a[1].moves - b[1].moves;
     });
-    const winnerId = ranking.length >= state.requiredPlayers ? ranking[0]?.[0] ?? null : null;
     return {
       seed: state.seed,
       board: state.board,
+      theme: state.theme,
       pairCount: state.pairCount,
       startTime: state.startTime,
       phase: state.phase,
@@ -112,8 +123,8 @@ export const memoryGame: GameEngine = {
       readyCount: Object.keys(state.readyPlayers).length,
       completes: state.completes,
       ranking,
-      winnerId,
-      done: state.phase === "finished" && ranking.length >= state.requiredPlayers
+      winnerId: state.winnerId,
+      done: Boolean(state.winnerId)
     };
   }
 };

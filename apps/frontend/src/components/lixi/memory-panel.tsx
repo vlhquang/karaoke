@@ -10,6 +10,7 @@ interface MemoryStatePayload {
   board: number[];
   pairCount: number;
   seed: number;
+  theme: "sports" | "animals" | "fruits" | "vehicles";
   startTime: number | null;
   phase: "syncing" | "running" | "finished";
   requiredPlayers: number;
@@ -31,6 +32,8 @@ const parseMemoryState = (payload: unknown): MemoryStatePayload | null => {
   if (!Array.isArray(board) || !board.every((v) => Number.isInteger(v))) return null;
   if (typeof source.pairCount !== "number" || !Number.isInteger(source.pairCount) || source.pairCount <= 0) return null;
   if (typeof source.seed !== "number" || !Number.isInteger(source.seed)) return null;
+  const theme = source.theme;
+  if (theme !== "sports" && theme !== "animals" && theme !== "fruits" && theme !== "vehicles") return null;
 
   const phase = source.phase;
   if (phase !== "syncing" && phase !== "running" && phase !== "finished") return null;
@@ -45,6 +48,7 @@ const parseMemoryState = (payload: unknown): MemoryStatePayload | null => {
     board,
     pairCount: source.pairCount,
     seed: source.seed,
+    theme,
     startTime,
     phase,
     requiredPlayers,
@@ -52,6 +56,45 @@ const parseMemoryState = (payload: unknown): MemoryStatePayload | null => {
     completes,
     ranking
   };
+};
+
+const THEME_LABELS: Record<MemoryStatePayload["theme"], string> = {
+  sports: "Thể thao",
+  animals: "Động vật",
+  fruits: "Trái cây",
+  vehicles: "Xe cộ"
+};
+
+const THEME_ICONS: Record<MemoryStatePayload["theme"], string[]> = {
+  sports: [
+    "⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🏐", "🏉",
+    "🥏", "🎱", "🏓", "🏸", "🏒", "🏑", "🥍", "🏏",
+    "🥅", "⛳", "🥊", "🥋", "🎽", "🛹", "⛸️", "🥌",
+    "🎯", "🪃", "🏹", "🤿", "🏊", "🚴", "🏇", "🏋️"
+  ],
+  animals: [
+    "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼",
+    "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🐔",
+    "🐧", "🐦", "🦆", "🦉", "🦄", "🐝", "🦋", "🐢",
+    "🐬", "🐳", "🦖", "🦕", "🦓", "🦒", "🦘", "🦥"
+  ],
+  fruits: [
+    "🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓",
+    "🫐", "🍒", "🥝", "🍍", "🥭", "🍑", "🍈", "🍅",
+    "🥥", "🥑", "🍏", "🍆", "🥕", "🌽", "🫛", "🥔",
+    "🍠", "🧄", "🧅", "🥬", "🥦", "🍄", "🌶️", "🥒"
+  ],
+  vehicles: [
+    "🚗", "🚕", "🚙", "🚌", "🚎", "🏎️", "🚓", "🚑",
+    "🚒", "🚐", "🛻", "🚚", "🚜", "🛵", "🏍️", "🚲",
+    "🛴", "🚂", "🚆", "🚇", "🚊", "🚞", "🚁", "✈️",
+    "🛩️", "🚀", "🛸", "⛵", "🚤", "🛥️", "🛳️", "🚢"
+  ]
+};
+
+const iconForCard = (theme: MemoryStatePayload["theme"], value: number): string => {
+  const icons = THEME_ICONS[theme];
+  return icons[value % icons.length] ?? "🎴";
 };
 
 export function MemoryPanel({ disabled, onEmit, gameState, playerId }: MemoryPanelProps) {
@@ -210,7 +253,7 @@ export function MemoryPanel({ disabled, onEmit, gameState, playerId }: MemoryPan
           </div>
 
           <div className="mb-2 shrink-0 rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-200">
-            Cặp đúng: <b>{matchedPairs}/{memory.pairCount}</b> • Lượt lật: <b>{moves}</b>
+            Chủ đề: <b>{THEME_LABELS[memory.theme]}</b> • Cặp đúng: <b>{matchedPairs}/{memory.pairCount}</b> • Lượt lật: <b>{moves}</b>
             {myResult && (
               <span> • Thời gian hoàn thành của bạn: <b>{(myResult.durationMs / 1000).toFixed(2)}s</b></span>
             )}
@@ -234,20 +277,37 @@ export function MemoryPanel({ disabled, onEmit, gameState, playerId }: MemoryPan
               const isMatched = matched.includes(index);
               const isRevealed = revealed.includes(index);
               const show = isMatched || isRevealed;
+              const cardIcon = iconForCard(memory.theme, value);
               return (
                 <button
                   key={`${memory.seed}-${index}`}
                   onClick={() => onCardClick(index)}
                   disabled={disabled || submitted || isMatched || memory.phase !== "running"}
                   aria-label={isMatched ? `Ô ${index + 1} đã khớp` : `Ô ${index + 1}`}
-                  className={`aspect-square rounded-lg border text-xl font-bold transition md:text-2xl ${isMatched
+                  className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border font-bold transition ${isMatched
                     ? "border-emerald-300/60 bg-emerald-500/10 text-transparent"
                     : isRevealed
                       ? "border-amber-300 bg-amber-400/20 text-amber-100 shadow-[0_0_0_1px_rgba(252,211,77,0.3)]"
                       : "border-cyan-300/90 bg-slate-950 text-cyan-100 hover:border-cyan-200 hover:bg-slate-900"} disabled:cursor-not-allowed disabled:opacity-70`}
                   style={{ width: `${boardLayout.cell}px`, height: `${boardLayout.cell}px`, fontSize: `${boardLayout.fontSize}px`, lineHeight: 1 }}
                 >
-                  {isMatched ? "" : show ? value + 1 : "?"}
+                  {isMatched ? (
+                    ""
+                  ) : show ? (
+                    <span
+                      className="flex items-center justify-center rounded-md"
+                      style={{
+                        width: "90%",
+                        height: "90%",
+                        fontSize: `${Math.max(18, Math.floor(boardLayout.cell * 0.82))}px`,
+                        lineHeight: 1
+                      }}
+                    >
+                      {cardIcon}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: `${Math.max(18, Math.floor(boardLayout.cell * 0.5))}px`, lineHeight: 1 }}>❓</span>
+                  )}
                 </button>
               );
             })}

@@ -6,7 +6,7 @@ interface SocketLike {
   connected: boolean;
   connect: () => void;
   on: (event: string, handler: (...args: unknown[]) => void) => void;
-  off: (event: string) => void;
+  off: (event: string, handler?: (...args: unknown[]) => void) => void;
   emit: (event: string, payload: unknown, ack?: (response: unknown) => void) => void;
 }
 

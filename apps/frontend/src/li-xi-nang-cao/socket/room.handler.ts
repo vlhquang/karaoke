@@ -1,6 +1,6 @@
 import type { Socket } from "socket.io";
 import type { RoomService } from "../services/room.service";
-import { createRoomSchema, joinRoomSchema, roomIdSchema, startGameSchema } from "../validators/room.validator";
+import { createRoomSchema, joinRoomSchema, roomIdSchema, startGameSchema, selectGameSchema, setReadySchema, kickPlayerSchema } from "../validators/room.validator";
 import { gameEngines } from "../games";
 import type { GameType } from "../types";
 import { AppError } from "../utils/errors";
@@ -23,45 +23,135 @@ const toRoomPayload = (room: ReturnType<RoomService["getRoom"]>): Record<string,
   roomId: room.roomId,
   hostId: room.hostId,
   status: room.status,
+  selectedGame: room.selectedGame,
+  countdownEndsAt: room.countdownEndsAt,
   currentGame: room.currentGame,
   players: [...room.players.values()].map((p) => ({
     playerId: p.playerId,
     name: p.name,
     score: p.score,
     latency: p.latency,
-    isOnline: p.isOnline
+    isOnline: p.isOnline,
+    ready: p.ready
   }))
 });
+
+const countdownTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 const emitError = (socket: Socket, error: unknown): void => {
   const message = error instanceof AppError ? error.message : error instanceof Error ? error.message : "Unexpected error";
   socket.emit("error", { message });
 };
 
+const clearCountdownTimer = (roomId: string): void => {
+  const existing = countdownTimers.get(roomId);
+  if (existing) {
+    clearTimeout(existing);
+    countdownTimers.delete(roomId);
+  }
+};
+
 export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomService): void => {
   socket.on("host:createRoom", (payload: unknown, ack?: (res: unknown) => void) => {
     try {
       const parsed = createRoomSchema.parse(payload);
-      const { room, hostPlayer } = roomService.createRoom(parsed.name, socket.id);
+      const { room, hostPlayer } = roomService.createRoom(parsed.name, socket.id, parsed.victoryImageDataUrl);
       socket.data.lixi = { roomId: room.roomId, playerId: hostPlayer.playerId, isHost: true };
       socket.join(`lixi:${room.roomId}`);
       socket.emit("room:created", { room: toRoomPayload(room), playerId: hostPlayer.playerId });
       if (ack) ack({ ok: true, roomId: room.roomId, playerId: hostPlayer.playerId });
     } catch (error) {
       emitError(socket, error);
-      if (ack) ack({ ok: false });
+      if (ack) {
+        const message = error instanceof AppError ? error.message : error instanceof Error ? error.message : "Create room failed";
+        ack({ ok: false, message });
+      }
     }
   });
 
   socket.on("player:joinRoom", (payload: unknown, ack?: (res: unknown) => void) => {
     try {
       const parsed = joinRoomSchema.parse(payload);
-      const { room, player } = roomService.joinRoom(parsed.roomId, parsed.name, socket.id);
+      const { room, player } = roomService.joinRoom(parsed.roomId, parsed.name, socket.id, parsed.victoryImageDataUrl);
       socket.data.lixi = { roomId: room.roomId, playerId: player.playerId, isHost: false };
       socket.join(`lixi:${room.roomId}`);
       socket.emit("room:joined", { room: toRoomPayload(room), playerId: player.playerId });
       socket.to(`lixi:${room.roomId}`).emit("game:update", { room: toRoomPayload(room) });
       if (ack) ack({ ok: true, roomId: room.roomId, playerId: player.playerId });
+    } catch (error) {
+      emitError(socket, error);
+      if (ack) {
+        const message = error instanceof AppError ? error.message : error instanceof Error ? error.message : "Join room failed";
+        ack({ ok: false, message });
+      }
+    }
+  });
+
+  socket.on("host:selectGame", (payload: unknown, ack?: (res: unknown) => void) => {
+    try {
+      const parsed = selectGameSchema.parse(payload);
+      const auth = socket.data.lixi;
+      if (!auth || auth.roomId !== parsed.roomId) {
+        throw new AppError("Unauthorized", 403);
+      }
+      const room = roomService.getRoom(parsed.roomId);
+      roomService.ensureHost(room, auth.playerId);
+      if (room.status !== "waiting") {
+        throw new AppError("Only waiting room can select game", 400);
+      }
+      const hostPlayer = roomService.getPlayer(room, auth.playerId);
+      if (hostPlayer.ready) {
+        throw new AppError("Host must unready before changing game", 400);
+      }
+      roomService.setSelectedGame(room, parsed.gameType as GameType, parsed.options);
+      socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:update", { room: toRoomPayload(room) });
+      if (ack) ack({ ok: true });
+    } catch (error) {
+      emitError(socket, error);
+      if (ack) ack({ ok: false });
+    }
+  });
+
+  socket.on("player:setReady", (payload: unknown, ack?: (res: unknown) => void) => {
+    try {
+      const parsed = setReadySchema.parse(payload);
+      const auth = socket.data.lixi;
+      if (!auth || auth.roomId !== parsed.roomId) {
+        throw new AppError("Unauthorized", 403);
+      }
+      const room = roomService.getRoom(parsed.roomId);
+      if (room.status !== "waiting") {
+        throw new AppError("Cannot change ready status right now", 400);
+      }
+      roomService.setPlayerReady(room, auth.playerId, parsed.ready);
+      socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:update", { room: toRoomPayload(room) });
+      if (ack) ack({ ok: true });
+    } catch (error) {
+      emitError(socket, error);
+      if (ack) ack({ ok: false });
+    }
+  });
+
+  socket.on("host:kickPlayer", (payload: unknown, ack?: (res: unknown) => void) => {
+    try {
+      const parsed = kickPlayerSchema.parse(payload);
+      const auth = socket.data.lixi;
+      if (!auth || auth.roomId !== parsed.roomId) {
+        throw new AppError("Unauthorized", 403);
+      }
+      const room = roomService.getRoom(parsed.roomId);
+      roomService.ensureHost(room, auth.playerId);
+      if (room.status !== "waiting") {
+        throw new AppError("Cannot kick during active game", 400);
+      }
+      const target = roomService.getPlayer(room, parsed.playerId);
+      if (target.ready) {
+        throw new AppError("Only unready players can be kicked", 400);
+      }
+      roomService.removePlayer(room, parsed.playerId);
+      socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:update", { room: toRoomPayload(room) });
+      socket.nsp.to(target.socketId).emit("error", { message: "Bạn đã bị host mời ra khỏi phòng." });
+      if (ack) ack({ ok: true });
     } catch (error) {
       emitError(socket, error);
       if (ack) ack({ ok: false });
@@ -77,15 +167,49 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
       }
       const room = roomService.getRoom(parsed.roomId);
       roomService.ensureHost(room, auth.playerId);
+      if (room.status !== "waiting") {
+        throw new AppError("Room is not in waiting status", 400);
+      }
+      if (!room.selectedGame) {
+        throw new AppError("Host has not selected a game", 400);
+      }
+      if (room.selectedGame === "memory" && parsed.options?.memory) {
+        room.selectedGameOptions = {
+          ...(room.selectedGameOptions ?? {}),
+          memory: {
+            ...(room.selectedGameOptions?.memory ?? {}),
+            ...parsed.options.memory
+          }
+        };
+      }
+      if (!roomService.areAllOnlinePlayersReady(room)) {
+        throw new AppError("All online players must be ready", 400);
+      }
 
-      const engine = gameEngines[parsed.gameType as GameType];
-      const initialState = engine.initGame(room, parsed.options);
-      roomService.startGame(room, parsed.gameType as GameType, initialState);
+      clearCountdownTimer(parsed.roomId);
+      room.status = "countdown";
+      room.countdownEndsAt = Date.now() + 5000;
+      socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:update", { room: toRoomPayload(room) });
 
-      socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:started", {
-        room: toRoomPayload(room),
-        gameState: room.gameState
-      });
+      const timeout = setTimeout(() => {
+        try {
+          const latestRoom = roomService.getRoom(parsed.roomId);
+          if (latestRoom.status !== "countdown" || !latestRoom.selectedGame) {
+            return;
+          }
+          const selectedGame = latestRoom.selectedGame;
+          const engine = gameEngines[selectedGame];
+          const initialState = engine.initGame(latestRoom, latestRoom.selectedGameOptions ?? undefined);
+          roomService.startGame(latestRoom, selectedGame, initialState);
+          socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:started", {
+            room: toRoomPayload(latestRoom),
+            gameState: latestRoom.gameState
+          });
+        } finally {
+          clearCountdownTimer(parsed.roomId);
+        }
+      }, 5000);
+      countdownTimers.set(parsed.roomId, timeout);
       if (ack) ack({ ok: true });
     } catch (error) {
       emitError(socket, error);
@@ -102,6 +226,7 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
       }
       const room = roomService.getRoom(parsed.roomId);
       roomService.ensureHost(room, auth.playerId);
+      clearCountdownTimer(parsed.roomId);
 
       roomService.endGame(room);
       socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:result", {
@@ -109,6 +234,10 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
         result: room.gameState
       });
       roomService.resetToWaiting(room);
+      socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:update", {
+        room: toRoomPayload(room),
+        gameState: null
+      });
       if (ack) ack({ ok: true });
     } catch (error) {
       emitError(socket, error);
