@@ -375,10 +375,11 @@ export default function StockPage() {
                     ) : (
                         Object.keys(groupedData).sort().map((symbol) => {
                             const txs = groupedData[symbol]!;
-                            const currentPrice = currentPrices[symbol] || 0;
+                            const priceInfo = currentPrices[symbol];
+                            const currentPriceValue = priceInfo?.current || 0;
                             let gInv = 0, gQty = 0;
                             txs.forEach(t => { gInv += t.price * t.quantity; gQty += t.quantity; });
-                            const gProfit = currentPrice > 0 ? (currentPrice * gQty) - gInv : 0;
+                            const gProfit = currentPriceValue > 0 ? (currentPriceValue * gQty) - gInv : 0;
                             const gPerc = gInv > 0 ? (gProfit / gInv) * 100 : 0;
 
                             return (
@@ -396,15 +397,15 @@ export default function StockPage() {
                                                     {currentPrices[symbol]?.timestamp || "--/--/---- --:--:--"}
                                                 </span>
                                                 <div className="flex items-baseline md:justify-end gap-2">
-                                                    <span className={`text-xl font-black ${currentPrice > 0 ? "text-cyan-400" : "text-slate-600"}`}>
-                                                        {currentPrice > 0 ? formatMoney(currentPrice) : "..."}
+                                                    <span className={`text-xl font-black ${currentPriceValue > 0 ? "text-cyan-400" : "text-slate-600"}`}>
+                                                        {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "..."}
                                                     </span>
-                                                    {currentPrice > 0 && currentPrices[symbol]?.previous && (
-                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${currentPrice >= currentPrices[symbol]!.previous! ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
-                                                            {currentPrice >= currentPrices[symbol]!.previous! ? "↑" : "↓"}
-                                                            {formatMoney(Math.abs(currentPrice - currentPrices[symbol]!.previous!))}
+                                                    {currentPriceValue > 0 && priceInfo?.previous && (
+                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${currentPriceValue >= priceInfo.previous ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+                                                            {currentPriceValue >= priceInfo.previous ? "↑" : "↓"}
+                                                            {formatMoney(Math.abs(currentPriceValue - priceInfo.previous))}
                                                             <span className="ml-1 opacity-70">
-                                                                ({(((currentPrice - currentPrices[symbol]!.previous!) / currentPrices[symbol]!.previous!) * 100).toFixed(2)}%)
+                                                                ({(((currentPriceValue - priceInfo.previous) / priceInfo.previous) * 100).toFixed(2)}%)
                                                             </span>
                                                         </span>
                                                     )}
@@ -428,7 +429,7 @@ export default function StockPage() {
                                         <table className="w-full text-sm text-left">
                                             <tbody className="divide-y divide-slate-800/30">
                                                 {txs.map((tx) => {
-                                                    const p = currentPrice > 0 ? (currentPrice - tx.price) * tx.quantity : 0;
+                                                    const p = currentPriceValue > 0 ? (currentPriceValue - tx.price) * tx.quantity : 0;
                                                     return (
                                                         <tr key={tx.id} className="hover:bg-slate-800/20">
                                                             <td className="px-4 py-2 text-slate-500">{new Date(tx.date).toLocaleDateString("vi-VN")}</td>
@@ -463,7 +464,7 @@ export default function StockPage() {
                                     {/* Mobile Compact View (No scroll) */}
                                     <div className="md:hidden divide-y divide-slate-800/30">
                                         {txs.map((tx) => {
-                                            const p = currentPrice > 0 ? (currentPrice - tx.price) * tx.quantity : 0;
+                                            const p = currentPriceValue > 0 ? (currentPriceValue - tx.price) * tx.quantity : 0;
                                             return (
                                                 <div key={tx.id} className="px-4 py-2 flex items-center justify-between text-[13px]">
                                                     <div className="flex-1 opacity-60">{new Date(tx.date).toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' })}</div>
