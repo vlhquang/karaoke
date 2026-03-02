@@ -46,9 +46,10 @@ export async function GET(request: Request) {
 
             if (tradeMatch) {
                 const tradeJson = tradeMatch[1];
-                const p = tradeJson.match(/"LastPrice":"[^"]*?([\d,.]+)\s*(?:\\u003c|<)\//);
+                // Handle escaped quotes in JSON (common in some symbols like HDB)
+                const p = tradeJson.match(/"LastPrice":"(?:\\"|[^"])*?([\d,.]+)\s*(?:\\u003c|<)/);
                 const o = tradeJson.match(/"OpenPrice":"([\d,.]+)"/);
-                const c = tradeJson.match(/"Change":"[^"]*?([+-]?[\d,.]+)\s*(?:\\u003c|<)\//);
+                const c = tradeJson.match(/"Change":"(?:\\"|[^"])*?([+-]?[\d,.]+)\s*(?:\\u003c|<)/);
                 const d = tradeJson.match(/"TradingDate":"([^"]+)"/);
 
                 if (p) priceValue = p[1];
@@ -81,11 +82,10 @@ export async function GET(request: Request) {
                 const m = html.match(/class="[^"]*stock-info[^"]*"[^>]*>\s*<span[^>]*class="[^"]*price[^"]*"[^>]*>\s*([\d,.]+)\s*<\/span>/is);
                 if (m) priceValue = m[1];
             }
-            // Open: div.stock-price-info -> b#openprice (Already covered by id="openprice")
 
-            // Extraction strategy 4: Meta Description (Last Resort)
+            // Extraction strategy 4: Meta Description (Last Resort, refined for unquoted name)
             if (!priceValue) {
-                const m = html.match(/<meta\s+name=["']description["']\s+content=["'][^"']*?-\s*([\d,.]+)\s*đồng/i);
+                const m = html.match(/<meta\s+name=["']?description["']?\s+content=["'][^"']*?-\s*([\d,.]+)\s*đồng/i);
                 if (m) priceValue = m[1];
             }
 
