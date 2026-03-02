@@ -14,6 +14,7 @@ interface Transaction {
 interface PriceInfo {
     current: number;
     previous: number | null;
+    reference: number | null;
     timestamp: string | null;
 }
 
@@ -75,6 +76,7 @@ export default function StockPage() {
                         newPriceMap[symbol] = {
                             current: data.price,
                             previous: oldPrice,
+                            reference: data.referencePrice || null,
                             timestamp: now
                         };
                     }
@@ -400,16 +402,17 @@ export default function StockPage() {
                                                     <span className={`text-xl font-black ${currentPriceValue > 0 ? "text-cyan-400" : "text-slate-600"}`}>
                                                         {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "..."}
                                                     </span>
-                                                    {currentPriceValue > 0 && priceInfo?.previous && (
-                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${currentPriceValue >= priceInfo.previous ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
-                                                            {currentPriceValue >= priceInfo.previous ? "↑" : "↓"}
-                                                            {formatMoney(Math.abs(currentPriceValue - priceInfo.previous))}
-                                                            <span className="ml-1 opacity-70">
-                                                                ({(((currentPriceValue - priceInfo.previous) / priceInfo.previous) * 100).toFixed(2)}%)
-                                                            </span>
-                                                        </span>
-                                                    )}
                                                 </div>
+                                                {currentPriceValue > 0 && priceInfo?.reference && (
+                                                    <div className="flex items-center md:justify-end gap-1.5 mt-1 scale-95 origin-right">
+                                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Tham chiếu:</span>
+                                                        <span className="text-[11px] font-mono text-slate-400">{formatMoney(priceInfo.reference)}</span>
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${currentPriceValue >= priceInfo.reference ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+                                                            {currentPriceValue >= priceInfo.reference ? "↑" : "↓"}
+                                                            {(((currentPriceValue - priceInfo.reference) / priceInfo.reference) * 100).toFixed(2)}%
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
