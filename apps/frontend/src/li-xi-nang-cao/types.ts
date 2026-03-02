@@ -39,6 +39,9 @@ export interface StartGameOptions {
     boardLength?: number;
     theme?: MemoryTheme;
   };
+  rps?: {
+    mode?: "BO1" | "BO3" | "BO5" | "BO7" | "BO11";
+  };
 }
 
 export interface GameEngine {

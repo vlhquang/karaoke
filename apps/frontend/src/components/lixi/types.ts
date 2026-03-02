@@ -3,4 +3,6 @@ export type LiXiGameType = "reaction" | "memory" | "rps" | "number" | "shake" | 
 export interface LiXiActionProps {
   disabled: boolean;
   onEmit: (event: string, payload: Record<string, unknown>) => void;
+  gameState?: any;
+  playerId?: string;
 }

@@ -166,6 +166,10 @@ export class RoomService {
     }
   }
 
+  getActiveRooms(): Room[] {
+    return Array.from(this.rooms.values()).filter((r) => r.status === "playing");
+  }
+
   listRooms(): Array<{ roomId: string; status: string; players: number; createdAt: number }> {
     return [...this.rooms.values()].map((room) => ({
       roomId: room.roomId,

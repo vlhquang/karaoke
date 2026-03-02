@@ -173,13 +173,18 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
       if (!room.selectedGame) {
         throw new AppError("Host has not selected a game", 400);
       }
-      if (room.selectedGame === "memory" && parsed.options?.memory) {
+      if (parsed.options) {
         room.selectedGameOptions = {
           ...(room.selectedGameOptions ?? {}),
-          memory: {
+          ...parsed.options,
+          memory: parsed.options.memory ? {
             ...(room.selectedGameOptions?.memory ?? {}),
             ...parsed.options.memory
-          }
+          } : room.selectedGameOptions?.memory,
+          rps: parsed.options.rps ? {
+            ...(room.selectedGameOptions?.rps ?? {}),
+            ...parsed.options.rps
+          } : room.selectedGameOptions?.rps
         };
       }
       if (!roomService.areAllOnlinePlayersReady(room)) {
@@ -242,6 +247,45 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
     } catch (error) {
       emitError(socket, error);
       if (ack) ack({ ok: false });
+    }
+  });
+
+  socket.on("host:restartGame", (payload: unknown, ack?: (res: unknown) => void) => {
+    try {
+      const parsed = roomIdSchema.parse(payload);
+      const auth = socket.data.lixi;
+      if (!auth || auth.roomId !== parsed.roomId) {
+        throw new AppError("Unauthorized", 403);
+      }
+      const room = roomService.getRoom(parsed.roomId);
+      roomService.ensureHost(room, auth.playerId);
+
+      if (room.status !== "finished" && room.status !== "playing") {
+        throw new AppError("Game cannot be restarted from current state", 400);
+      }
+
+      const gameType = room.currentGame || room.selectedGame;
+      if (!gameType) {
+        throw new AppError("No game to restart", 400);
+      }
+
+      const engine = gameEngines[gameType];
+      const initialState = engine.initGame(room, room.selectedGameOptions ?? undefined);
+      roomService.startGame(room, gameType, initialState);
+
+      socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:started", {
+        room: toRoomPayload(room),
+        gameState: room.gameState
+      });
+      socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:update", {
+        room: toRoomPayload(room),
+        gameState: room.gameState
+      });
+
+      if (ack) ack({ ok: true });
+    } catch (error) {
+      emitError(socket, error);
+      if (ack) ack({ ok: false, message: error instanceof Error ? error.message : "Restart failed" });
     }
   });
 
