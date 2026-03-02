@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 
 interface Transaction {
@@ -29,12 +29,23 @@ export default function StockPage() {
     const [loginError, setLoginError] = useState("");
     const [addError, setAddError] = useState("");
     const [notification, setNotification] = useState<{ msg: string; type: "success" | "info" } | null>(null);
+    const [isInitialized, setIsInitialized] = useState(false);
 
     // Form states
     const [symbolInput, setSymbolInput] = useState("");
     const [dateInput, setDateInput] = useState(new Date().toISOString().split("T")[0]);
     const [priceInput, setPriceInput] = useState("");
     const [quantityInput, setQuantityInput] = useState("");
+
+    useEffect(() => {
+        const savedCode = localStorage.getItem("stock_access_code");
+        if (savedCode) {
+            setAccessCode(savedCode);
+            setIsLoggedIn(true);
+            loadTransactions(savedCode, true);
+        }
+        setIsInitialized(true);
+    }, []);
 
     const formatMoney = (value: number) => {
         return Math.round(value).toLocaleString("vi-VN");
@@ -76,8 +87,8 @@ export default function StockPage() {
                         newPriceMap[symbol] = {
                             current: data.price,
                             previous: oldPrice,
-                            reference: data.referencePrice || null,
-                            timestamp: now
+                            reference: (data.referencePrice !== undefined && data.referencePrice !== null) ? data.referencePrice : null,
+                            timestamp: data.timestamp || now
                         };
                     }
                 } catch (err) {
@@ -133,6 +144,7 @@ export default function StockPage() {
             const data = await res.json();
             if (data.ok) {
                 setIsLoggedIn(true);
+                localStorage.setItem("stock_access_code", accessCode);
                 loadTransactions(accessCode, true);
             } else {
                 setLoginError(data.message || "Mã truy cập không hợp lệ");
@@ -142,6 +154,11 @@ export default function StockPage() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleBackToPortal = () => {
+        localStorage.removeItem("stock_access_code");
+        window.location.href = "/";
     };
 
     const handleAdd = async (e: React.FormEvent) => {
@@ -267,12 +284,19 @@ export default function StockPage() {
                     </form>
                     {loginError && <p className="mt-4 text-center text-sm text-red-400">{loginError}</p>}
                     <div className="mt-8 text-center">
-                        <Link href="/" className="text-sm text-slate-500 hover:text-cyan-400">← Quay lại Portal</Link>
+                        <button
+                            onClick={() => window.location.href = "/"}
+                            className="text-sm text-slate-500 hover:text-cyan-400"
+                        >
+                            ← Quay lại Portal
+                        </button>
                     </div>
                 </div>
             </main>
         );
     }
+
+    if (!isInitialized) return null;
 
     return (
         <main className="min-h-screen bg-slate-950 p-4 font-sans text-slate-100 md:p-8">
@@ -294,7 +318,12 @@ export default function StockPage() {
                         >
                             {isRefreshingPrices ? "Đang cập nhật..." : "Làm mới giá"}
                         </button>
-                        <Link href="/" className="ml-2 text-xs text-slate-500 hover:text-cyan-400">← Portal</Link>
+                        <button
+                            onClick={handleBackToPortal}
+                            className="ml-2 text-xs text-slate-500 hover:text-cyan-400"
+                        >
+                            ← Portal
+                        </button>
                     </div>
                 </header>
 
@@ -403,8 +432,8 @@ export default function StockPage() {
                                                         {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "..."}
                                                     </span>
                                                 </div>
-                                                {currentPriceValue > 0 && priceInfo?.reference && (
-                                                    <div className="flex items-center md:justify-end gap-1.5 mt-1 scale-95 origin-right">
+                                                {currentPriceValue > 0 && priceInfo?.reference !== undefined && priceInfo?.reference !== null && (
+                                                    <div className="flex items-center md:justify-end gap-1.5 mt-1 scale-95 origin-left md:origin-right">
                                                         <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Tham chiếu:</span>
                                                         <span className="text-[11px] font-mono text-slate-400">{formatMoney(priceInfo.reference)}</span>
                                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${currentPriceValue >= priceInfo.reference ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
