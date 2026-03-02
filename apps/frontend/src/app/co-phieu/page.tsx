@@ -11,15 +11,22 @@ interface Transaction {
     quantity: number;
 }
 
+interface PriceInfo {
+    current: number;
+    previous: number | null;
+    timestamp: string | null;
+}
+
 export default function StockPage() {
     const [accessCode, setAccessCode] = useState("");
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [currentPrices, setCurrentPrices] = useState<Record<string, number>>({});
+    const [currentPrices, setCurrentPrices] = useState<Record<string, PriceInfo>>({});
     const [isLoading, setIsLoading] = useState(false);
+    const [isRefreshingSheet, setIsRefreshingSheet] = useState(false);
+    const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
     const [loginError, setLoginError] = useState("");
     const [addError, setAddError] = useState("");
-    const [isPricingLoading, setIsPricingLoading] = useState(false);
     const [notification, setNotification] = useState<{ msg: string; type: "success" | "info" } | null>(null);
 
     // Form states
@@ -42,10 +49,21 @@ export default function StockPage() {
         setTimeout(() => setNotification(null), 3000);
     };
 
+    const formatDateTime = (date: Date) => {
+        const d = date.getDate().toString().padStart(2, "0");
+        const m = (date.getMonth() + 1).toString().padStart(2, "0");
+        const y = date.getFullYear();
+        const hh = date.getHours().toString().padStart(2, "0");
+        const mm = date.getMinutes().toString().padStart(2, "0");
+        const ss = date.getSeconds().toString().padStart(2, "0");
+        return `${d}/${m}/${y} ${hh}:${mm}:${ss}`;
+    };
+
     const fetchRealtimePrices = async (symbols: string[]) => {
-        setIsPricingLoading(true);
+        setIsRefreshingPrices(true);
         const uniqueSymbols = Array.from(new Set(symbols));
-        const priceMap: Record<string, number> = { ...currentPrices };
+        const newPriceMap: Record<string, PriceInfo> = { ...currentPrices };
+        const now = formatDateTime(new Date());
 
         await Promise.all(
             uniqueSymbols.map(async (symbol) => {
@@ -53,7 +71,12 @@ export default function StockPage() {
                     const res = await fetch(`/api/stocks/price?symbol=${symbol}`);
                     const data = await res.json();
                     if (data.ok) {
-                        priceMap[symbol] = data.price;
+                        const oldPrice = currentPrices[symbol]?.current ?? null;
+                        newPriceMap[symbol] = {
+                            current: data.price,
+                            previous: oldPrice,
+                            timestamp: now
+                        };
                     }
                 } catch (err) {
                     console.error(`Failed to fetch price for ${symbol}`, err);
@@ -61,12 +84,13 @@ export default function StockPage() {
             })
         );
 
-        setCurrentPrices(priceMap);
-        setIsPricingLoading(false);
+        setCurrentPrices(newPriceMap);
+        setIsRefreshingPrices(false);
         showToast("Cập nhật giá mới nhất thành công", "info");
     };
 
-    const loadTransactions = async (code: string) => {
+    const loadTransactions = async (code: string, isSilent = false) => {
+        if (!isSilent) setIsRefreshingSheet(true);
         setIsLoading(true);
         try {
             const res = await fetch("/api/stocks", {
@@ -90,6 +114,7 @@ export default function StockPage() {
             alert(err.message);
         } finally {
             setIsLoading(false);
+            if (!isSilent) setIsRefreshingSheet(false);
         }
     };
 
@@ -106,7 +131,7 @@ export default function StockPage() {
             const data = await res.json();
             if (data.ok) {
                 setIsLoggedIn(true);
-                loadTransactions(accessCode);
+                loadTransactions(accessCode, true);
             } else {
                 setLoginError(data.message || "Mã truy cập không hợp lệ");
             }
@@ -189,7 +214,7 @@ export default function StockPage() {
         let totalCurrentValue = 0;
         transactions.forEach((tx) => {
             totalInvested += tx.price * tx.quantity;
-            const currentPrice = currentPrices[tx.symbol] || 0;
+            const currentPrice = currentPrices[tx.symbol]?.current || 0;
             if (currentPrice > 0) {
                 totalCurrentValue += currentPrice * tx.quantity;
             } else {
@@ -252,14 +277,22 @@ export default function StockPage() {
             <div className="mx-auto max-w-6xl">
                 <header className="mb-6 flex items-center justify-between gap-4">
                     <h1 className="text-2xl font-bold md:text-3xl uppercase tracking-tight">HOLDING</h1>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={() => loadTransactions(accessCode)}
-                            className="rounded-xl border border-slate-700 bg-slate-900/50 px-3 py-2 text-xs font-medium transition hover:bg-slate-800"
+                            disabled={isRefreshingSheet}
+                            className="rounded-xl border border-slate-700 bg-slate-900/50 px-3 py-2 text-[10px] md:text-xs font-medium transition hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
-                            Làm mới
+                            {isRefreshingSheet ? "Đang tải..." : "Làm mới"}
                         </button>
-                        <Link href="/" className="text-xs text-slate-500 hover:text-cyan-400">← Portal</Link>
+                        <button
+                            onClick={() => fetchRealtimePrices(transactions.map(t => t.symbol))}
+                            disabled={isRefreshingPrices || transactions.length === 0}
+                            className="rounded-xl border border-emerald-900/30 bg-emerald-950/20 px-3 py-2 text-[10px] md:text-xs font-medium text-emerald-400 transition hover:bg-emerald-900/30 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                            {isRefreshingPrices ? "Đang cập nhật..." : "Làm mới giá"}
+                        </button>
+                        <Link href="/" className="ml-2 text-xs text-slate-500 hover:text-cyan-400">← Portal</Link>
                     </div>
                 </header>
 
@@ -350,18 +383,42 @@ export default function StockPage() {
 
                             return (
                                 <div key={symbol} className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden">
-                                    <div className="bg-slate-800/40 px-4 py-3 flex items-center justify-between border-b border-slate-800">
+                                    <div className="bg-slate-800/40 px-4 py-3 flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 gap-3">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-lg font-black">{symbol}</span>
-                                            <span className="text-xs text-slate-500 font-mono">({gQty})</span>
+                                            <span className="text-xl font-black">{symbol}</span>
+                                            <span className="text-sm text-slate-500 font-mono">({gQty})</span>
                                         </div>
-                                        <div className="text-right">
-                                            <p className={`text-sm font-bold ${currentPrice > 0 ? "text-cyan-400" : "text-slate-600"}`}>
-                                                {currentPrice > 0 ? formatMoney(currentPrice) : "..."}
+
+                                        <div className="flex-1 md:text-right">
+                                            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Giá hiện tại</p>
+                                            <div className="flex flex-col">
+                                                <span className="text-[11px] font-mono text-slate-500 leading-none mb-1">
+                                                    {currentPrices[symbol]?.timestamp || "--/--/---- --:--:--"}
+                                                </span>
+                                                <div className="flex items-baseline md:justify-end gap-2">
+                                                    <span className={`text-xl font-black ${currentPrice > 0 ? "text-cyan-400" : "text-slate-600"}`}>
+                                                        {currentPrice > 0 ? formatMoney(currentPrice) : "..."}
+                                                    </span>
+                                                    {currentPrice > 0 && currentPrices[symbol]?.previous && (
+                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${currentPrice >= currentPrices[symbol]!.previous! ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+                                                            {currentPrice >= currentPrices[symbol]!.previous! ? "↑" : "↓"}
+                                                            {formatMoney(Math.abs(currentPrice - currentPrices[symbol]!.previous!))}
+                                                            <span className="ml-1 opacity-70">
+                                                                ({(((currentPrice - currentPrices[symbol]!.previous!) / currentPrices[symbol]!.previous!) * 100).toFixed(2)}%)
+                                                            </span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="md:ml-4 flex flex-col items-end justify-center border-l border-slate-800/50 pl-4">
+                                            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Lãi / Lỗ</p>
+                                            <p className={`text-lg font-black leading-none ${gProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                {gProfit !== 0 ? (gProfit > 0 ? "+" : "") + formatMoney(gProfit) : "0"}
                                             </p>
-                                            <p className={`text-xs font-bold ${gProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                                {gProfit !== 0 ? (gProfit > 0 ? "+" : "") + formatMoney(gProfit) : ""}
-                                                {gProfit !== 0 && <span className="ml-1 opacity-70">{gPerc.toFixed(1)}%</span>}
+                                            <p className={`text-[11px] font-bold ${gProfit >= 0 ? "text-emerald-500/60" : "text-red-500/60"}`}>
+                                                {gPerc.toFixed(1)}%
                                             </p>
                                         </div>
                                     </div>
