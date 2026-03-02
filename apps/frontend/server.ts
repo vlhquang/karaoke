@@ -10,6 +10,7 @@ import dotenv from "dotenv";
 import { createLiXiExpressApp } from "./src/li-xi-nang-cao/app";
 import { RoomService as LiXiRoomService } from "./src/li-xi-nang-cao/services/room.service";
 import { registerLiXiNamespace } from "./src/li-xi-nang-cao/socket";
+import { startKeepAlive } from "./src/lib/keep-alive";
 import type {
   AddSongPayload,
   ClientToServerEvents,
@@ -233,8 +234,13 @@ const liXiRoomService = new LiXiRoomService();
 
 app.prepare().then(() => {
   const expressApp = createLiXiExpressApp(liXiRoomService);
+  expressApp.get("/health", (req, res) => res.send("OK"));
   expressApp.all("*", (req, res) => handle(req, res));
   const httpServer = createServer(expressApp);
+
+  // Start Render Keep-Alive cron (14 mins)
+  startKeepAlive();
+
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     cors: { origin: true, methods: ["GET", "POST"] },
     transports: ["websocket", "polling"]
