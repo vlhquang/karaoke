@@ -11,25 +11,33 @@ async function testScraping() {
         });
         const html = await response.text();
 
-        // 1. Current Price: inside <h2 id="stockprice">...<span class="price">VALUE</span></h2>
-        const priceMatch = html.match(/id="stockprice"[^>]*>.*?class="[^"]*price[^"]*"[^>]*>\s*([\d,.]+)\s*<\/span>/is);
-        console.log("Price Match Raw:", priceMatch ? priceMatch[0] : "Not found");
-        console.log("Price Value:", priceMatch ? priceMatch[1] : "N/A");
+        // New Method: Extract from _stockTrade JSON object in script tag
+        const tradeMatch = html.match(/const\s+_stockTrade\s*=\s*({.*?});/s);
+        if (tradeMatch) {
+            console.log("Found _stockTrade object!");
+            const tradeJson = tradeMatch[1];
 
-        // 2. Opening Price: <b id="openprice">VALUE</b>
-        const openMatch = html.match(/id="openprice"[^>]*>\s*([\d,.]+)\s*<\/b>/i);
-        console.log("Open Match Raw:", openMatch ? openMatch[0] : "Not found");
-        console.log("Open Value:", openMatch ? openMatch[1] : "N/A");
+            // Current Price
+            const priceMatch = tradeJson.match(/"LastPrice":"(?:[^"]*?>)?\s*([\d,.]+)\s*(?:<\/span>)?/);
+            console.log("Price Value:", priceMatch ? priceMatch[1] : "N/A");
 
-        // 3. Price Change: <div id="stockchange">VALUE (...)</div>
-        const changeMatch = html.match(/id="stockchange"[^>]*>\s*([+-]?[\d,.]+)\s*\(/i);
-        console.log("Change Match Raw:", changeMatch ? changeMatch[0] : "Not found");
-        console.log("Change Value:", changeMatch ? changeMatch[1] : "N/A");
+            // Opening Price
+            const openMatch = tradeJson.match(/"OpenPrice":"([\d,.]+)"/);
+            console.log("Open Value:", openMatch ? openMatch[1] : "N/A");
 
-        // 4. Trade Date: <div id="tradedate">VALUE</div>
-        const dateMatch = html.match(/id="tradedate"[^>]*>\s*([^<]+)\s*<\/div>/i);
-        console.log("Date Match Raw:", dateMatch ? dateMatch[0] : "Not found");
-        console.log("Date Value:", dateMatch ? dateMatch[1] : "N/A");
+            // Change
+            const changeMatch = tradeJson.match(/"Change":"(?:[^"]*?>)?\s*([+-]?[\d,.]+)\s*(?:<\/span>)?/);
+            console.log("Change Value:", changeMatch ? changeMatch[1] : "N/A");
+
+            // Trade Date
+            const dateMatch = tradeJson.match(/"TradingDate":"([^"]+)"/);
+            console.log("Date Value:", dateMatch ? dateMatch[1] : "N/A");
+        } else {
+            console.log("_stockTrade object not found!");
+
+            // Fallback for debugging
+            console.log("HTML Start:", html.substring(0, 500));
+        }
 
     } catch (e) {
         console.error("Error:", e);
