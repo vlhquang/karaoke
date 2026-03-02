@@ -1,4 +1,4 @@
-const symbols = ["VNM", "MBB", "DGC"];
+const symbols = ["HDB", "VNM", "MBB", "DGC"];
 
 async function testScraping() {
     const headers = {
@@ -19,11 +19,11 @@ async function testScraping() {
                 const response = await fetch(url, { headers });
                 const html = await response.text();
 
-                // 1. JSON Method
+                // 1. JSON Method (Refined for escaped quotes)
                 const tradeMatch = html.match(/const\s+_stockTrade\s*=\s*({.*?});/s);
                 if (tradeMatch) {
                     const tradeJson = tradeMatch[1];
-                    const p = tradeJson.match(/"LastPrice":"[^"]*?([\d,.]+)\s*(?:\\u003c|<)\//);
+                    const p = tradeJson.match(/"LastPrice":"(?:\\"|[^"])*?([\d,.]+)\s*(?:\\u003c|<)/);
                     const o = tradeJson.match(/"OpenPrice":"([\d,.]+)"/);
                     if (p) {
                         console.log(`[JSON Success] Price: ${p[1]}, Open: ${o ? o[1] : 'N/A'}`);
@@ -44,8 +44,8 @@ async function testScraping() {
                     break;
                 }
 
-                // 3. Meta Fallback
-                const metaMatch = html.match(/<meta\s+name=["']description["']\s+content=["'][^"']*?-\s*([\d,.]+)\s*đồng/i);
+                // 3. Meta Fallback (Refined for unquoted name)
+                const metaMatch = html.match(/<meta\s+name=["']?description["']?\s+content=["'][^"']*?-\s*([\d,.]+)\s*đồng/i);
                 if (metaMatch) {
                     console.log(`[Meta Success] Price: ${metaMatch[1]}`);
                     found = true;
