@@ -439,7 +439,7 @@ export default function StockPage() {
                                                                 {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
                                                                 {p !== 0 && tx.price > 0 && (
                                                                     <span className="ml-1 text-[11px] opacity-60">
-                                                                        ({(((currentPrice - tx.price) / tx.price) * 100).toFixed(1)}%)
+                                                                        ({(((currentPriceValue - tx.price) / tx.price) * 100).toFixed(1)}%)
                                                                     </span>
                                                                 )}
                                                             </td>
@@ -476,7 +476,7 @@ export default function StockPage() {
                                                         {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
                                                         {p !== 0 && tx.price > 0 && (
                                                             <div className="text-[11px] font-normal opacity-60 leading-none">
-                                                                {(((currentPrice - tx.price) / tx.price) * 100).toFixed(1)}%
+                                                                {(((currentPriceValue - tx.price) / tx.price) * 100).toFixed(1)}%
                                                             </div>
                                                         )}
                                                     </div>
