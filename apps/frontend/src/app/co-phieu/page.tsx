@@ -424,8 +424,15 @@ export default function StockPage() {
                                             <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Giá hiện tại</p>
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] font-mono text-slate-500 leading-none mb-1">
-                                                    Thời gian lấy giá hiện tại: {priceInfo?.timestamp || "--/--/---- --:--:--"}
+                                                    Thời gian cập nhật: {priceInfo?.timestamp || "--/--/---- --:--:--"}
                                                 </span>
+
+                                                {priceInfo?.reference !== undefined && priceInfo?.reference !== null && (
+                                                    <div className="flex items-center md:justify-end gap-1 mb-1">
+                                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Giá tham chiếu:</span>
+                                                        <span className="text-[11px] font-mono text-slate-400">{formatMoney(priceInfo.reference)}</span>
+                                                    </div>
+                                                )}
 
                                                 {priceInfo?.opening !== undefined && priceInfo?.opening !== null && (
                                                     <div className="flex items-center md:justify-end gap-1 mb-1">
@@ -436,8 +443,8 @@ export default function StockPage() {
 
                                                 <div className="flex items-baseline md:justify-end gap-2">
                                                     <span className={`text-2xl font-black ${currentPriceValue > 0 && priceInfo?.reference
-                                                            ? (currentPriceValue > priceInfo.reference ? "text-emerald-400" : currentPriceValue < priceInfo.reference ? "text-red-400" : "text-cyan-400")
-                                                            : "text-slate-600"
+                                                        ? (currentPriceValue > priceInfo.reference ? "text-emerald-400" : currentPriceValue < priceInfo.reference ? "text-red-400" : "text-cyan-400")
+                                                        : "text-slate-600"
                                                         }`}>
                                                         {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "..."}
                                                     </span>
