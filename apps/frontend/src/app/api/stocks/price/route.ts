@@ -31,9 +31,11 @@ export async function GET(request: Request) {
         const html = await response.text();
 
         // Regex to extract price from <span class="price ...">...</span>
-        // Examples: <span class="price txt-red">28,000</span> or <span class="txt-green price">120,500</span>
-        // Matches the number inside the span, removing commas
         const priceMatch = html.match(/<span[^>]*class="[^"]*price[^"]*"[^>]*>([\d,.]+)<\/span>/i);
+        // Regex to extract reference price (openprice) from <b id="openprice">...</b>
+        const refMatch = html.match(/<b[^>]*id="openprice"[^>]*>([\d,.]+)<\/b>/i);
+        // Regex to extract trade date from <div id="tradedate">...</div>
+        const dateMatch = html.match(/<div[^>]*id="tradedate"[^>]*>([^<]+)<\/div>/i);
 
         if (!priceMatch || !priceMatch[1]) {
             return NextResponse.json(
@@ -42,8 +44,8 @@ export async function GET(request: Request) {
             );
         }
 
-        const priceStr = priceMatch[1].replace(/,/g, "");
-        const price = parseFloat(priceStr);
+        const price = parseFloat(priceMatch[1].replace(/,/g, ""));
+        const referencePrice = refMatch ? parseFloat(refMatch[1].replace(/,/g, "")) : null;
 
         if (isNaN(price)) {
             return NextResponse.json(
@@ -56,7 +58,8 @@ export async function GET(request: Request) {
             ok: true,
             symbol,
             price,
-            timestamp: new Date().toISOString()
+            referencePrice,
+            timestamp: dateMatch ? dateMatch[1].trim() : new Date().toISOString()
         });
     } catch (error) {
         return NextResponse.json(
