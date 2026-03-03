@@ -80,12 +80,13 @@ export const numberGame: GameEngine = {
     if (!state.done && now >= state.phaseEndsAt) {
       if (state.phase === "PREP") {
         state.phase = "WAIT";
+        // Server chooses targetNumber NOW
+        state.targetNumber = Math.floor(Math.random() * 99) + 1;
         // Server random wait 1-5s
         const randomWait = 1000 + Math.floor(Math.random() * 4000);
         state.phaseEndsAt = now + randomWait;
       } else if (state.phase === "WAIT") {
         state.phase = "HIGHLIGHT";
-        state.targetNumber = Math.floor(Math.random() * 99) + 1;
         state.phaseEndsAt = now + 1000; // 1s Highlight
       } else if (state.phase === "HIGHLIGHT") {
         state.phase = "PLAYING";

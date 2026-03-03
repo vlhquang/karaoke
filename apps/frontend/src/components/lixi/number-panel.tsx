@@ -128,7 +128,7 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room }: LiX
           </div>
         </div>
 
-        {phase === "PLAYING" && (
+        {(phase === "HIGHLIGHT" || phase === "PLAYING") && (
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Tìm số</span>
             <span className="text-3xl font-black text-violet-400 drop-shadow-[0_0_10px_rgba(167,139,250,0.5)]">{state.targetNumber}</span>
