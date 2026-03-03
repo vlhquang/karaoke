@@ -223,12 +223,6 @@ export function RpsPanel({ disabled, onEmit, gameState, playerId }: RpsPanelProp
                 </p>
                 <div className="flex flex-col gap-3">
                   <button
-                    onClick={() => onEmit("host:restartGame", { roomId: (gameState as any)?.roomId })}
-                    className="rounded-2xl bg-emerald-500 px-8 py-4 text-xl font-black text-slate-950 hover:bg-emerald-400"
-                  >
-                    CHƠI LẠI
-                  </button>
-                  <button
                     onClick={() => setOverlayOpen(false)}
                     className="rounded-2xl bg-white/10 px-8 py-4 text-sm font-bold text-white hover:bg-white/20"
                   >

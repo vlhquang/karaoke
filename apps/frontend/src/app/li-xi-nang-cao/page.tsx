@@ -410,7 +410,7 @@ export default function LiXiNangCaoPage() {
   const joinUrl = roomId && origin ? `${origin}/li-xi-nang-cao?room=${roomId}` : "";
   const readyCount = room?.players.filter((player: any) => player.ready).length ?? 0;
   const onlineCount = room?.players.filter((player: any) => player.isOnline).length ?? 0;
-  const allReady = onlineCount >= 2 && readyCount === onlineCount;
+  const allReady = onlineCount > 0 && readyCount === onlineCount;
   const myReady = room?.players.find((player: any) => player.playerId === playerId)?.ready ?? false;
   const countdownLeft = room?.countdownEndsAt ? Math.max(0, Math.ceil((room.countdownEndsAt - countdownNow) / 1000)) : 0;
   const canHostSelectGame = Boolean(isHost && room?.status === "waiting" && !myReady);
@@ -1037,10 +1037,10 @@ export default function LiXiNangCaoPage() {
                 )}
                 {isHost && (room?.status === "playing") && (
                   <button
-                    onClick={() => void restartGame()}
-                    className="h-10 px-4 sm:px-6 rounded-xl bg-sky-500 font-bold text-slate-950 shadow-lg shadow-sky-500/20 transition-all text-xs sm:text-sm"
+                    onClick={() => void endGame()}
+                    className="h-10 px-4 sm:px-6 rounded-xl bg-rose-500 font-bold text-white shadow-lg shadow-rose-500/20 transition-all text-xs sm:text-sm"
                   >
-                    CHƠI LẠI
+                    KẾT THÚC
                   </button>
                 )}
                 <button

@@ -225,11 +225,8 @@ export function ReactionPanel({ disabled }: ReactionPanelProps) {
             <div className="mt-4 space-y-3 rounded-2xl border border-slate-700 bg-slate-900/80 p-4">
               <p className="text-center text-lg font-bold text-emerald-300 md:text-2xl">{message}</p>
               <p className="text-center text-sm text-slate-200">{resultText}</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <button onClick={startRound} className="rounded-xl bg-emerald-500 px-4 py-3 text-base font-bold text-slate-900 hover:bg-emerald-400">
-                  Chơi lại
-                </button>
-                <button onClick={closeOverlay} className="rounded-xl border border-slate-500 px-4 py-3 text-base font-semibold text-slate-200 hover:bg-slate-800">
+              <div className="flex justify-center">
+                <button onClick={closeOverlay} className="rounded-xl border border-slate-500 px-8 py-3 text-base font-semibold text-slate-200 hover:bg-slate-800">
                   Đóng
                 </button>
               </div>
