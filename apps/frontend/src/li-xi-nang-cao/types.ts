@@ -44,6 +44,8 @@ export interface StartGameOptions {
   };
   number?: {
     targetCount?: number;
+    itemLifetimeMs?: number;
+    winCondition?: "unique" | "ranking";
   };
 }
 

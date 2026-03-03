@@ -70,27 +70,18 @@ export const processGameStep = (
   const result = engine.calculateResult(room);
 
   if (room.currentGame === "memory") {
-    const winnerId = (result as { winnerId?: string | null }).winnerId ?? null;
-    const winner = winnerId ? roomService.getWinnerAnnouncement(room, winnerId) : null;
     nsp.to(`lixi:${room.roomId}`).emit("game:result", {
       roomId: room.roomId,
       game: room.currentGame,
       result,
-      winner
+      winner: (result as { winnerId?: string | null }).winnerId ? roomService.getWinnerAnnouncement(room, (result as { winnerId?: string | null }).winnerId!) : null
     });
-    const done = Boolean((result as { done?: boolean }).done);
-    if (done) {
-      roomService.endGame(room);
-    }
-    return;
   }
 
-  // Common result emission for RPS and others
   const winnerId = (result as { winnerId?: string | null }).winnerId ?? null;
   const isDone = Boolean((result as { done?: boolean }).done);
 
-  // For RPS, we might want to emit update even if not done, if the state was updated (e.g. revealed)
-  if (room.currentGame === "rps") {
+  if (room.currentGame === "rps" || room.currentGame === "number" || room.currentGame === "reaction") {
     nsp.to(`lixi:${room.roomId}`).emit("game:update", {
       roomId: room.roomId,
       game: room.currentGame,
@@ -98,7 +89,7 @@ export const processGameStep = (
     });
   }
 
-  if (winnerId || isDone) {
+  if (isDone) {
     const winner = winnerId ? roomService.getWinnerAnnouncement(room, winnerId) : null;
     roomService.endGame(room);
     nsp.to(`lixi:${room.roomId}`).emit("game:result", {
@@ -147,7 +138,7 @@ export const registerGameHandlers = (socket: AuthedSocket, roomService: RoomServ
   socket.on("memory:ready", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "memory:ready", payload));
   socket.on("memory:complete", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "memory:complete", payload));
   socket.on("rps:submit", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "rps:submit", payload));
-  socket.on("number:tap", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "number:tap", payload));
+  socket.on("number:found", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "number:found", payload));
   socket.on("shake:submit", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "shake:submit", payload));
   socket.on("color:tap", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "color:tap", payload));
 };

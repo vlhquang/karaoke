@@ -38,6 +38,32 @@ const toRoomPayload = (room: ReturnType<RoomService["getRoom"]>): Record<string,
 });
 
 const countdownTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const gameTickers = new Map<string, ReturnType<typeof setInterval>>();
+
+const startGameTicker = (nsp: any, roomService: RoomService, roomId: string) => {
+  stopGameTicker(roomId);
+  const ticker = setInterval(() => {
+    try {
+      const room = roomService.getRoom(roomId);
+      if (room.status !== "playing") {
+        stopGameTicker(roomId);
+        return;
+      }
+      processGameStep(nsp, roomService, room);
+    } catch (e) {
+      stopGameTicker(roomId);
+    }
+  }, 1000);
+  gameTickers.set(roomId, ticker);
+};
+
+const stopGameTicker = (roomId: string) => {
+  const existing = gameTickers.get(roomId);
+  if (existing) {
+    clearInterval(existing);
+    gameTickers.delete(roomId);
+  }
+};
 
 const emitError = (socket: Socket, error: unknown): void => {
   const message = error instanceof AppError ? error.message : error instanceof Error ? error.message : "Unexpected error";
@@ -202,7 +228,11 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
           rps: parsed.options.rps ? {
             ...(room.selectedGameOptions?.rps ?? {}),
             ...parsed.options.rps
-          } : room.selectedGameOptions?.rps
+          } : room.selectedGameOptions?.rps,
+          number: parsed.options.number ? {
+            ...(room.selectedGameOptions?.number ?? {}),
+            ...parsed.options.number
+          } : room.selectedGameOptions?.number
         };
       }
       if (!roomService.areAllOnlinePlayersReady(room)) {
@@ -230,6 +260,8 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
           });
           // Trigger bot simulation if solo
           processGameStep(socket.nsp, roomService, latestRoom);
+          // Start periodic ticker for this room
+          startGameTicker(socket.nsp, roomService, parsed.roomId);
         } finally {
           clearCountdownTimer(parsed.roomId);
         }
@@ -252,13 +284,14 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
       const room = roomService.getRoom(parsed.roomId);
       roomService.ensureHost(room, auth.playerId);
       clearCountdownTimer(parsed.roomId);
+      stopGameTicker(parsed.roomId);
 
       roomService.endGame(room);
       socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:result", {
         room: toRoomPayload(room),
         result: room.gameState
       });
-      roomService.resetToWaiting(room);
+      roomService.resetToWaiting(room, true);
       socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:update", {
         room: toRoomPayload(room),
         gameState: null
@@ -293,10 +326,6 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
       const initialState = engine.initGame(room, room.selectedGameOptions ?? undefined);
       roomService.startGame(room, gameType, initialState);
 
-      socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:started", {
-        room: toRoomPayload(room),
-        gameState: room.gameState
-      });
       socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:update", {
         room: toRoomPayload(room),
         gameState: room.gameState
@@ -304,6 +333,8 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
 
       // Trigger bot simulation if solo
       processGameStep(socket.nsp, roomService, room);
+      // Start periodic ticker for this room
+      startGameTicker(socket.nsp, roomService, parsed.roomId);
 
       if (ack) ack({ ok: true });
     } catch (error) {

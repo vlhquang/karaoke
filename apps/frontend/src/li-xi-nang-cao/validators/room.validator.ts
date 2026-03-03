@@ -20,6 +20,11 @@ export const startGameSchema = z.object({
     }).optional(),
     rps: z.object({
       mode: z.enum(["BO1", "BO3", "BO5", "BO7", "BO11"]).optional()
+    }).optional(),
+    number: z.object({
+      targetCount: z.number().int().min(1).max(100).optional(),
+      itemLifetimeMs: z.number().int().min(500).max(10000).optional(),
+      winCondition: z.enum(["unique", "ranking"]).optional()
     }).optional()
   }).optional()
 });
@@ -34,6 +39,11 @@ export const selectGameSchema = z.object({
     }).optional(),
     rps: z.object({
       mode: z.enum(["BO1", "BO3", "BO5", "BO7", "BO11"]).optional()
+    }).optional(),
+    number: z.object({
+      targetCount: z.number().int().min(1).max(100).optional(),
+      itemLifetimeMs: z.number().int().min(500).max(10000).optional(),
+      winCondition: z.enum(["unique", "ranking"]).optional()
     }).optional()
   }).optional()
 });

@@ -11,8 +11,14 @@ interface PopItem {
   expiresAt: number;
 }
 
-export function NumberPanel({ disabled, onEmit, gameState, playerId, room }: LiXiActionProps) {
-  const state = gameState as any;
+const parseNumberState = (payload: unknown): any => {
+  if (!payload || typeof payload !== "object") return null;
+  const root = payload as { gameState?: any; result?: any };
+  return root?.gameState ?? root?.result ?? payload;
+};
+
+export function NumberPanel({ disabled, onEmit, gameState, playerId, room, onClose }: LiXiActionProps) {
+  const state = useMemo(() => parseNumberState(gameState), [gameState]);
   const playerState = state?.playerStates?.[playerId ?? ""];
   const phase = state?.phase as "PREP" | "WAIT" | "HIGHLIGHT" | "PLAYING" | undefined;
 
@@ -61,15 +67,15 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room }: LiX
         x: 10 + Math.random() * 80, // 10% to 90%
         y: 10 + Math.random() * 80,
         scale: 0.8 + Math.random() * 0.4,
-        expiresAt: now + 800 + Math.random() * 1200 // 0.8s to 2s
+        expiresAt: now + (state.itemLifetimeMs ?? 2000) * (0.8 + Math.random() * 0.4)
       };
 
       setItems((prev: PopItem[]) => [...prev.filter((item: PopItem) => item.expiresAt > now), newItem]);
     };
 
     const interval = setInterval(() => {
-      if (items.length < 8) spawnItem();
-    }, 400);
+      if (items.length < 10) spawnItem();
+    }, Math.max(200, (state.itemLifetimeMs ?? 2000) / 5));
 
     return () => clearInterval(interval);
   }, [phase, targetFoundInRound, blinded, items.length, state?.targetNumber]);
@@ -113,10 +119,18 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room }: LiX
     });
   }, [room?.players, state?.playerStates]);
 
-  if (!state) return <div className="p-4 text-center">Đang tải...</div>;
+  if (!state) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 border border-slate-700 rounded-3xl bg-slate-900/40 w-full h-[500px]">
+        <div className="text-4xl mb-4">🎯</div>
+        <p className="text-slate-300 font-bold">Chờ Host nhấn BẮT ĐẦU</p>
+        <p className="text-xs text-slate-500 mt-2">Trò chơi Săn Số sẽ bắt đầu sau countdown</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative flex h-[500px] w-full flex-col items-center justify-center overflow-hidden rounded-3xl bg-slate-950/40 border border-slate-800 shadow-2xl">
+    <div className="relative flex h-[min(85vh,850px)] w-full flex-col items-center justify-center overflow-hidden rounded-3xl bg-slate-950/40 border border-slate-800 shadow-2xl">
 
       {/* HUD Layer */}
       <div className="absolute top-4 left-4 right-4 z-50 flex justify-between items-start pointer-events-none">
@@ -127,6 +141,7 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room }: LiX
             <span className="text-xs font-semibold text-slate-500">/ {state.targetCountToWin}</span>
           </div>
         </div>
+
 
         {(phase === "HIGHLIGHT" || phase === "PLAYING") && (
           <div className="flex flex-col items-center">
@@ -194,7 +209,7 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room }: LiX
 
         {phase === "PLAYING" && (
           <div className="h-full w-full">
-            {targetFoundInRound ? (
+            {targetFoundInRound && !state.done ? (
               <div className="flex h-full w-full items-center justify-center text-center">
                 <div className="animate-in zoom-in duration-500">
                   <span className="text-6xl mb-2 block">✅</span>
@@ -214,10 +229,10 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room }: LiX
                   }}
                   className={`absolute flex h-16 w-16 items-center justify-center rounded-2xl border-2 font-black transition-all active:scale-90
                     ${item.type === "target"
-                      ? "border-amber-400 bg-amber-500 text-white shadow-[0_0_20px_rgba(245,158,11,0.5)] z-30"
+                      ? "border-amber-300 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-[0_0_30px_rgba(251,191,36,0.8)] z-30 animate-pulse scale-110"
                       : item.type === "bomb"
                         ? "border-red-500 bg-slate-900 shadow-lg z-20"
-                        : "border-slate-700 bg-slate-800/80 text-slate-400 z-10"
+                        : "border-slate-800 bg-slate-800/40 text-slate-600 z-10 opacity-60"
                     }
                   `}
                 >
@@ -243,24 +258,6 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room }: LiX
         )}
       </div>
 
-      {state.done && (
-        <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md p-6 animate-in fade-in duration-500">
-          <span className="text-7xl mb-4">🏆</span>
-          <h2 className="text-3xl font-black text-amber-400 mb-2">CHIẾN THẮNG!</h2>
-          <p className="text-lg font-bold text-white mb-6">
-            {room.players.find((p: any) => p.playerId === state.winnerId)?.name ?? "Người chơi"}
-          </p>
-          <div className="w-full max-w-xs space-y-2 p-4 rounded-2xl bg-white/5 border border-white/10">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest text-center mb-2">Tổng kết</p>
-            {sortedPlayers.map((p, i) => (
-              <div key={p.playerId} className="flex justify-between items-center text-sm">
-                <span className="font-semibold text-slate-300">{i + 1}. {p.name}</span>
-                <span className="font-mono text-emerald-400">{(state.playerStates?.[p.playerId]?.totalTimeMs / 1000).toFixed(2)}s</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import type { LiXiActionProps } from "./types";
 interface MemoryPanelProps extends LiXiActionProps {
   gameState?: unknown;
   playerId?: string;
+  room?: any;
 }
 
 interface MemoryStatePayload {
@@ -97,10 +98,9 @@ const iconForCard = (theme: MemoryStatePayload["theme"], value: number): string 
   return icons[value % icons.length] ?? "🎴";
 };
 
-export function MemoryPanel({ disabled, onEmit, gameState, playerId }: MemoryPanelProps) {
+export function MemoryPanel({ disabled, onEmit, gameState, playerId, room, onClose }: MemoryPanelProps) {
   const memory = useMemo(() => parseMemoryState(gameState), [gameState]);
 
-  const [overlayOpen, setOverlayOpen] = useState(false);
   const [revealed, setRevealed] = useState<number[]>([]);
   const [matched, setMatched] = useState<number[]>([]);
   const [moves, setMoves] = useState(0);
@@ -111,7 +111,6 @@ export function MemoryPanel({ disabled, onEmit, gameState, playerId }: MemoryPan
 
   useEffect(() => {
     if (!memory) return;
-    setOverlayOpen(true);
     setRevealed([]);
     setMatched([]);
     setMoves(0);
@@ -132,19 +131,6 @@ export function MemoryPanel({ disabled, onEmit, gameState, playerId }: MemoryPan
     return () => window.clearInterval(t);
   }, [memory, submitted]);
 
-  useEffect(() => {
-    if (!overlayOpen) return;
-    const updateViewport = (): void => {
-      setViewport({ width: window.innerWidth, height: window.innerHeight });
-    };
-    updateViewport();
-    window.addEventListener("resize", updateViewport);
-    window.addEventListener("orientationchange", updateViewport);
-    return () => {
-      window.removeEventListener("resize", updateViewport);
-      window.removeEventListener("orientationchange", updateViewport);
-    };
-  }, [overlayOpen]);
 
   useEffect(() => {
     if (!memory || memory.phase !== "running") return;
@@ -192,7 +178,13 @@ export function MemoryPanel({ disabled, onEmit, gameState, playerId }: MemoryPan
   }, [totalCards, viewport.height, viewport.width]);
 
   if (!memory) {
-    return <p className="text-sm text-slate-400">Đang chờ host bắt đầu game Ghi nhớ.</p>;
+    return (
+      <div className="flex flex-col items-center justify-center p-8 border border-slate-700 rounded-3xl bg-slate-900/40 w-full">
+        <div className="text-4xl mb-4">🧠</div>
+        <p className="text-slate-300 font-bold">Chờ Host nhấn BẮT ĐẦU</p>
+        <p className="text-xs text-slate-500 mt-2">Trò chơi Ghi nhớ sẽ bắt đầu sau countdown</p>
+      </div>
+    );
   }
 
   const onCardClick = (index: number): void => {
@@ -225,115 +217,108 @@ export function MemoryPanel({ disabled, onEmit, gameState, playerId }: MemoryPan
   const matchedPairs = matched.length / 2;
 
   const myResult = playerId ? memory.completes[playerId] : undefined;
-  const rankingPreview = memory.ranking.slice(0, 4);
-  const hiddenRankingCount = Math.max(0, memory.ranking.length - rankingPreview.length);
 
   return (
-    <>
-      <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-        Trò chơi đã mở toàn màn hình. Seed <b>{memory.seed}</b>. Khi đủ người nhận seed, server mới bắt đầu bấm giờ.
-      </div>
-
-      {overlayOpen && (
-        <div className="flex flex-col w-full min-h-[500px] bg-slate-950/20 rounded-3xl">
-          <div className="mb-2 flex shrink-0 items-center justify-between gap-3">
-            <div>
-              <p className="text-lg font-bold text-emerald-200 md:text-2xl">Game Trí Nhớ Nhanh</p>
-              <p className="text-sm text-slate-300">
-                {memory.phase === "syncing"
-                  ? `Đang đồng bộ seed (${memory.readyCount}/${memory.requiredPlayers})`
-                  : memory.phase === "running"
-                    ? `Đang chơi • Thời gian server: ${elapsedText}`
-                    : "Đã kết thúc"}
-              </p>
-            </div>
-            <button onClick={() => setOverlayOpen(false)} className="rounded-lg border border-slate-500 px-3 py-1.5 text-sm text-slate-200">
-              Đóng
-            </button>
-          </div>
-
-          <div className="mb-2 shrink-0 rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-200">
-            Chủ đề: <b>{THEME_LABELS[memory.theme]}</b> • Cặp đúng: <b>{matchedPairs}/{memory.pairCount}</b> • Lượt lật: <b>{moves}</b>
-            {myResult && (
-              <span> • Thời gian hoàn thành của bạn: <b>{(myResult.durationMs / 1000).toFixed(2)}s</b></span>
-            )}
-          </div>
-          <p className="mb-2 shrink-0 text-xs text-slate-300">
-            Màu ô: <span className="font-semibold text-cyan-200">Chưa lật</span> •{" "}
-            <span className="font-semibold text-amber-200">Đang lật</span> •{" "}
-            <span className="font-semibold text-emerald-200">Đã khớp (ẩn số)</span>
-          </p>
-
-          <div className="flex min-h-0 flex-1 items-center justify-center">
-            <div
-              className="grid"
-              style={{
-                gridTemplateColumns: `repeat(${boardLayout.cols}, ${boardLayout.cell}px)`,
-                gap: `${boardLayout.gap}px`,
-                width: `${boardLayout.gridWidth}px`
-              }}
-            >
-              {memory.board.map((value, index) => {
-                const isMatched = matched.includes(index);
-                const isRevealed = revealed.includes(index);
-                const show = isMatched || isRevealed;
-                const cardIcon = iconForCard(memory.theme, value);
-                return (
-                  <button
-                    key={`${memory.seed}-${index}`}
-                    onClick={() => onCardClick(index)}
-                    disabled={disabled || submitted || isMatched || memory.phase !== "running"}
-                    aria-label={isMatched ? `Ô ${index + 1} đã khớp` : `Ô ${index + 1}`}
-                    className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border font-bold transition ${isMatched
-                      ? "border-emerald-300/60 bg-emerald-500/10 text-transparent"
-                      : isRevealed
-                        ? "border-amber-300 bg-amber-400/20 text-amber-100 shadow-[0_0_0_1px_rgba(252,211,77,0.3)]"
-                        : "border-cyan-300/90 bg-slate-950 text-cyan-100 hover:border-cyan-200 hover:bg-slate-900"} disabled:cursor-not-allowed disabled:opacity-70`}
-                    style={{ width: `${boardLayout.cell}px`, height: `${boardLayout.cell}px`, fontSize: `${boardLayout.fontSize}px`, lineHeight: 1 }}
-                  >
-                    {isMatched ? (
-                      ""
-                    ) : show ? (
-                      <span
-                        className="flex items-center justify-center rounded-md"
-                        style={{
-                          width: "90%",
-                          height: "90%",
-                          fontSize: `${Math.max(18, Math.floor(boardLayout.cell * 0.82))}px`,
-                          lineHeight: 1
-                        }}
-                      >
-                        {cardIcon}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: `${Math.max(18, Math.floor(boardLayout.cell * 0.5))}px`, lineHeight: 1 }}>❓</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="mt-2 shrink-0 rounded-xl border border-slate-700 bg-slate-900/70 p-2.5">
-            <p className="mb-1 text-sm font-semibold text-slate-200">Xếp hạng tạm thời</p>
-            {memory.ranking.length === 0 ? (
-              <p className="text-xs text-slate-400">Chưa có người hoàn thành.</p>
-            ) : (
-              <div className="space-y-0.5 text-xs text-slate-200 md:text-sm">
-                {rankingPreview.map(([pid, data], idx) => (
-                  <p key={`${pid}-${idx}`}>
-                    {idx + 1}. {pid === playerId ? "Bạn" : pid.slice(0, 8)} • {(data.durationMs / 1000).toFixed(2)}s • {data.moves} lượt
-                  </p>
-                ))}
-                {hiddenRankingCount > 0 && <p className="text-slate-400">+{hiddenRankingCount} người chơi khác</p>}
-              </div>
-            )}
-            {submitted && (
-              <p className="mt-1 text-xs text-cyan-200 md:text-sm">Bạn đã hoàn thành. Server đang tổng hợp kết quả cho tất cả người chơi.</p>
-            )}
+    <div className="relative flex h-[min(85vh,850px)] w-full flex-col items-center justify-center overflow-hidden rounded-3xl bg-slate-950/40 border border-slate-800 shadow-2xl">
+      {/* HUD Layer */}
+      <div className="absolute top-4 left-4 right-4 z-50 flex justify-between items-start pointer-events-none">
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Ghi Nhớ</span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-black text-white">{THEME_LABELS[memory.theme]}</span>
           </div>
         </div>
-      )}
-    </>
+
+
+        <div className="text-right">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Tiến độ</span>
+          <p className="font-mono text-sm font-bold text-white leading-tight">
+            {matchedPairs}/{memory.pairCount}
+          </p>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="relative h-full w-full flex flex-col pt-16 px-4">
+        {/* Stats Row */}
+        <div className="mb-4 flex justify-between items-center shrink-0">
+          <div className="flex gap-4">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Thời gian</span>
+              <span className="text-sm font-mono font-bold text-cyan-300">{elapsedText}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Lượt lật</span>
+              <span className="text-sm font-mono font-bold text-amber-300">{moves}</span>
+            </div>
+          </div>
+          {myResult && (
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2 py-1">
+              <span className="text-[10px] font-bold text-emerald-400 uppercase">HOÀN THÀNH</span>
+            </div>
+          )}
+        </div>
+
+        {/* Board */}
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          <div
+            className="grid"
+            style={{
+              gridTemplateColumns: `repeat(${boardLayout.cols}, ${boardLayout.cell}px)`,
+              gap: `${boardLayout.gap}px`,
+              width: `${boardLayout.gridWidth}px`
+            }}
+          >
+            {memory.board.map((value, index) => {
+              const isMatched = matched.includes(index);
+              const isRevealed = revealed.includes(index);
+              const show = isMatched || isRevealed;
+              const cardIcon = iconForCard(memory.theme, value);
+              return (
+                <button
+                  key={`${memory.seed}-${index}`}
+                  onClick={() => onCardClick(index)}
+                  disabled={disabled || submitted || isMatched || memory.phase !== "running"}
+                  className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-xl border-2 font-bold transition-all
+                    ${isMatched
+                      ? "border-emerald-500/30 bg-emerald-500/10 opacity-30 shadow-none"
+                      : isRevealed
+                        ? "border-amber-400 bg-amber-400/20 text-amber-100 shadow-[0_0_15px_rgba(251,191,36,0.3)] scale-105 z-10"
+                        : "border-slate-800 bg-slate-900/50 text-cyan-100 hover:border-slate-600 hover:bg-slate-800"
+                    } disabled:cursor-not-allowed`}
+                  style={{ width: `${boardLayout.cell}px`, height: `${boardLayout.cell}px`, fontSize: `${boardLayout.fontSize}px` }}
+                >
+                  {isMatched ? (
+                    ""
+                  ) : show ? (
+                    <span style={{ fontSize: `${Math.max(20, Math.floor(boardLayout.cell * 0.7))}px` }}>{cardIcon}</span>
+                  ) : (
+                    <span className="text-slate-700 opacity-50" style={{ fontSize: `${Math.max(16, Math.floor(boardLayout.cell * 0.4))}px` }}>?</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Ranking Mini */}
+        <div className="mt-4 mb-4 shrink-0 rounded-2xl border border-slate-800 bg-slate-900/40 p-3">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">Xếp hạng</p>
+          <div className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
+            {memory.ranking.map(([pid, data], idx) => (
+              <div key={pid} className={`flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-lg border ${pid === playerId ? "bg-cyan-500/10 border-cyan-500/30" : "bg-slate-900 border-slate-800"}`}>
+                <span className="text-[10px] font-black text-slate-500">{idx + 1}</span>
+                <span className={`text-[10px] font-bold ${pid === playerId ? "text-white" : "text-slate-400"}`}>
+                  {pid === playerId ? "BẠN" : pid.slice(0, 4)}
+                </span>
+                <span className="text-[9px] font-mono text-emerald-400">{(data.durationMs / 1000).toFixed(1)}s</span>
+              </div>
+            ))}
+            {memory.ranking.length === 0 && <p className="text-[10px] italic text-slate-600">Chưa có ai hoàn thành...</p>}
+          </div>
+        </div>
+      </div>
+
+    </div>
   );
 }
