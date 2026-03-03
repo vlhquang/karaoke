@@ -20,6 +20,50 @@ export const processGameStep = (
   room: any
 ): void => {
   if (!room.currentGame) return;
+
+  // Bot simulation logic
+  const botId = "bot-player-id";
+  const botMatch = room.players.get(botId);
+  if (botMatch && botMatch.isOnline) {
+    const engine = (gameEngines as any)[room.currentGame];
+    if (engine) {
+      const now = Date.now();
+      if (room.currentGame === "reaction") {
+        const state = room.gameState as any;
+        if (state.signalTime > 0 && now >= state.signalTime && (!state.taps[botId] || state.taps[botId].tappedAt === 0)) {
+          // Bot taps after signal with random delay
+          const delay = Math.floor(Math.random() * 400) + 200;
+          setTimeout(() => {
+            try {
+              const latestRoom = roomService.getRoom(room.roomId);
+              if (latestRoom.status === "playing" && latestRoom.currentGame === "reaction") {
+                engine.handleAction(latestRoom, { playerId: botId }, Date.now());
+                nsp.to(`lixi:${room.roomId}`).emit("game:update", {
+                  roomId: room.roomId,
+                  game: "reaction",
+                  gameState: latestRoom.gameState
+                });
+                processGameStep(nsp, roomService, latestRoom);
+              }
+            } catch (e) { /* ignore */ }
+          }, delay);
+        }
+      }
+      // RPS: engine.calculateResult handles missing choices anyway, so no need for explicit bot submit
+      // except to make it look active. Let's add RPS bot choice injection for better feedback.
+      if (room.currentGame === "rps") {
+        const state = room.gameState as any;
+        const currentRound = state.rounds[state.currentRoundIndex];
+        if (!currentRound.revealed && !currentRound.submissions[botId]) {
+          // Bot submits choice randomly
+          const choices = ["rock", "paper", "scissors"];
+          currentRound.submissions[botId] = choices[Math.floor(Math.random() * choices.length)];
+          // Calculate result will see this
+        }
+      }
+    }
+  }
+
   const engine = (gameEngines as any)[room.currentGame];
   if (!engine) return;
 

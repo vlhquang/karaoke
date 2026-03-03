@@ -157,6 +157,23 @@ export class RoomService {
     room.status = "playing";
     room.gameState = initialState;
     room.countdownEndsAt = null;
+
+    // Bot injection for solo testing
+    const onlinePlayers = [...room.players.values()].filter((p) => p.isOnline);
+    if (onlinePlayers.length === 1) {
+      const botPlayer: Player = {
+        playerId: "bot-player-id",
+        name: "Máy (Bot)",
+        socketId: "bot-socket-id",
+        score: 0,
+        latency: 0,
+        isOnline: true,
+        lastActionAt: 0,
+        ready: true,
+        victoryImageDataUrl: undefined
+      };
+      room.players.set(botPlayer.playerId, botPlayer);
+    }
   }
 
   endGame(room: Room): void {
@@ -169,6 +186,8 @@ export class RoomService {
     room.countdownEndsAt = null;
     room.currentGame = null;
     room.gameState = null;
+    // Remove bot if present
+    room.players.delete("bot-player-id");
     for (const player of room.players.values()) {
       player.ready = false;
     }

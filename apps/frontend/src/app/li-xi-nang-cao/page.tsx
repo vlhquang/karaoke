@@ -645,9 +645,10 @@ export default function LiXiNangCaoPage() {
 
   useEffect(() => {
     if (room?.status !== "countdown") return;
+    setCountdownNow(Date.now()); // Reset to avoid stale countdown glitch
     const timer = window.setInterval(() => setCountdownNow(Date.now()), 250);
     return () => window.clearInterval(timer);
-  }, [room?.status]);
+  }, [room?.status, room?.countdownEndsAt]); // Added countdownEndsAt as dependency
 
   useEffect(() => {
     if (!cameraOpen || !cameraStreamRef.current) return;
@@ -842,9 +843,101 @@ export default function LiXiNangCaoPage() {
     })();
   };
 
+
+  const renderPopups = () => (
+    <>
+      {/* Popups */}
+      {winnerPopup && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="w-full max-w-sm rounded-[40px] border border-white/10 bg-slate-900 p-8 text-center shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
+            <div className="text-6xl mb-4">🏆</div>
+            <h2 className="text-2xl font-black text-white uppercase italic tracking-wider">Chiến thắng!</h2>
+            <p className="mt-2 text-slate-400 font-medium">Chúc mừng <span className="text-emerald-400 font-bold">{winnerPopup.name}</span></p>
+
+            {winnerPopup.victoryImageDataUrl && (
+              <div className="mt-6 aspect-square rounded-3xl overflow-hidden border-2 border-emerald-500/30 shadow-xl">
+                <img className="w-full h-full object-cover" src={winnerPopup.victoryImageDataUrl} alt="Winner" />
+              </div>
+            )}
+
+            <button onClick={() => setWinnerPopup(null)} className="mt-8 w-full h-12 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-all">
+              ĐÓNG
+            </button>
+          </div>
+        </div>
+      )}
+
+      {cameraOpen && (
+        <div className="fixed inset-0 z-[260] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in zoom-in duration-300">
+          <div className="w-full max-w-lg rounded-[40px] border border-cyan-500/30 bg-slate-900 p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-black text-white uppercase italic tracking-wide">Camera Studio</h2>
+              <button onClick={stopCamera} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition-all">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="relative aspect-video rounded-3xl overflow-hidden bg-slate-950 border border-slate-800">
+              <video ref={cameraVideoRef} className="absolute inset-0 w-px h-px opacity-0 pointer-events-none" playsInline muted />
+              <canvas ref={cameraCanvasRef} width={640} height={480} className="w-full h-full object-cover" />
+              {!cameraReady && <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm font-bold uppercase tracking-widest animate-pulse">Khởi tạo camera...</div>}
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <div className="flex gap-2 overflow-auto pb-2 no-scrollbar">
+                {[
+                  { id: "none", label: "Gốc" },
+                  { id: "funny", label: "Hài hước" },
+                  { id: "bigeyes", label: "Mắt to" },
+                  { id: "tinyMouth", label: "Miệng xinh" },
+                  { id: "bigNose", label: "Mũi to" },
+                  { id: "tiltFace", label: "Lệch mặt" }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setCameraFilter(item.id as CameraFilter)}
+                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all ${cameraFilter === item.id ? "bg-cyan-500 text-slate-900" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => void captureFromCamera()}
+                disabled={!cameraReady}
+                className="w-full h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 font-black text-slate-950 shadow-lg shadow-emerald-500/20 disabled:opacity-30 active:scale-95 transition-all uppercase tracking-widest"
+              >
+                Chụp ảnh & Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {room?.status === "countdown" && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-950/95 backdrop-blur-sm p-4 animate-in fade-in duration-500">
+          <div className="text-center">
+            <p className="text-xs font-bold uppercase tracking-[0.4em] text-cyan-500 mb-8 animate-pulse">Chuẩn bị sẵn sàng</p>
+            <div className="relative h-48 w-48 flex items-center justify-center mx-auto">
+              <div className="absolute inset-0 rounded-full border-4 border-cyan-500/20" />
+              <div className="absolute inset-0 rounded-full border-4 border-cyan-500 border-t-transparent animate-spin duration-700" style={{ animationDuration: '2s' }} />
+              <span className="text-9xl font-black text-white italic drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">{countdownLeft}</span>
+            </div>
+            <p className="mt-8 text-xl font-black text-white uppercase italic tracking-wider">
+              {room?.selectedGame === "number" ? "Săn Số V6" : room?.selectedGame === "memory" ? "Board Nhớ" : "Bắt Đầu"}
+            </p>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   if (!roomId) {
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-4 py-8 overflow-x-hidden">
+        {renderPopups()}
         <section className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="text-center">
             <h1 className="text-4xl font-black bg-gradient-to-br from-cyan-300 to-violet-400 bg-clip-text text-transparent">LÌ XÌ NÂNG CAO</h1>
@@ -1069,14 +1162,18 @@ export default function LiXiNangCaoPage() {
             )}
 
             <div className="rounded-3xl border border-slate-800 bg-slate-950/60 p-4 min-h-[500px] flex items-center justify-center relative overflow-hidden">
-              <GamePanelSwitch
-                game={currentGame}
-                disabled={!canPlay || (currentGame === "reaction" && !isHost)}
-                onEmit={emitAction}
-                gameState={gameState}
-                playerId={playerId}
-                room={room}
-              />
+              <div className={room?.status === "playing" ? "fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4 overflow-auto" : ""}>
+                <div className={room?.status === "playing" ? "w-full max-w-4xl" : "w-full"}>
+                  <GamePanelSwitch
+                    game={currentGame}
+                    disabled={!canPlay || (currentGame === "reaction" && !isHost)}
+                    onEmit={emitAction}
+                    gameState={gameState}
+                    playerId={playerId}
+                    room={room}
+                  />
+                </div>
+              </div>
             </div>
           </section>
 
@@ -1096,91 +1193,7 @@ export default function LiXiNangCaoPage() {
         </div>
       </div>
 
-      {/* Popups */}
-      {winnerPopup && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-          <div className="w-full max-w-sm rounded-[40px] border border-white/10 bg-slate-900 p-8 text-center shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
-            <div className="text-6xl mb-4">🏆</div>
-            <h2 className="text-2xl font-black text-white uppercase italic tracking-wider">Chiến thắng!</h2>
-            <p className="mt-2 text-slate-400 font-medium">Chúc mừng <span className="text-emerald-400 font-bold">{winnerPopup.name}</span></p>
-
-            {winnerPopup.victoryImageDataUrl && (
-              <div className="mt-6 aspect-square rounded-3xl overflow-hidden border-2 border-emerald-500/30 shadow-xl">
-                <img className="w-full h-full object-cover" src={winnerPopup.victoryImageDataUrl} alt="Winner" />
-              </div>
-            )}
-
-            <button onClick={() => setWinnerPopup(null)} className="mt-8 w-full h-12 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-all">
-              ĐÓNG
-            </button>
-          </div>
-        </div>
-      )}
-
-      {cameraOpen && (
-        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in zoom-in duration-300">
-          <div className="w-full max-w-lg rounded-[40px] border border-cyan-500/30 bg-slate-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-black text-white uppercase italic tracking-wide">Camera Studio</h2>
-              <button onClick={stopCamera} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition-all">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-
-            <div className="relative aspect-video rounded-3xl overflow-hidden bg-slate-950 border border-slate-800">
-              <video ref={cameraVideoRef} className="absolute inset-0 w-px h-px opacity-0 pointer-events-none" playsInline muted />
-              <canvas ref={cameraCanvasRef} width={640} height={480} className="w-full h-full object-cover" />
-              {!cameraReady && <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm font-bold uppercase tracking-widest animate-pulse">Khởi tạo camera...</div>}
-            </div>
-
-            <div className="mt-6 space-y-4">
-              <div className="flex gap-2 overflow-auto pb-2 no-scrollbar">
-                {[
-                  { id: "none", label: "Gốc" },
-                  { id: "funny", label: "Hài hước" },
-                  { id: "bigeyes", label: "Mắt to" },
-                  { id: "tinyMouth", label: "Miệng xinh" },
-                  { id: "bigNose", label: "Mũi to" },
-                  { id: "tiltFace", label: "Lệch mặt" }
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setCameraFilter(item.id as CameraFilter)}
-                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all ${cameraFilter === item.id ? "bg-cyan-500 text-slate-900" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={() => void captureFromCamera()}
-                disabled={!cameraReady}
-                className="w-full h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 font-black text-slate-950 shadow-lg shadow-emerald-500/20 disabled:opacity-30 active:scale-95 transition-all uppercase tracking-widest"
-              >
-                Chụp ảnh & Lưu
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {room?.status === "countdown" && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-950/95 backdrop-blur-sm p-4 animate-in fade-in duration-500">
-          <div className="text-center">
-            <p className="text-xs font-bold uppercase tracking-[0.4em] text-cyan-500 mb-8 animate-pulse">Chuẩn bị sẵn sàng</p>
-            <div className="relative h-48 w-48 flex items-center justify-center mx-auto">
-              <div className="absolute inset-0 rounded-full border-4 border-cyan-500/20" />
-              <div className="absolute inset-0 rounded-full border-4 border-cyan-500 border-t-transparent animate-spin duration-700" style={{ animationDuration: '2s' }} />
-              <span className="text-9xl font-black text-white italic drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">{countdownLeft}</span>
-            </div>
-            <p className="mt-8 text-xl font-black text-white uppercase italic tracking-wider">
-              {room?.selectedGame === "number" ? "Săn Số V6" : room?.selectedGame === "memory" ? "Board Nhớ" : "Bắt Đầu"}
-            </p>
-          </div>
-        </div>
-      )}
+      {renderPopups()}
     </main>
   );
 }
