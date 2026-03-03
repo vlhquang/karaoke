@@ -194,7 +194,7 @@ export function ReactionPanel({ disabled }: ReactionPanelProps) {
       </button>
 
       {overlayOpen && (
-        <div className="fixed inset-0 z-[120] flex flex-col bg-slate-950/95 p-3 md:p-6">
+        <div className="flex flex-col w-full min-h-[500px] bg-slate-950/20 rounded-3xl">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-lg font-bold text-amber-200 md:text-2xl">{message}</p>
             {phase !== "finished" && (
