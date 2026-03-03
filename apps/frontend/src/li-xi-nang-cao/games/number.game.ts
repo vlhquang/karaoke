@@ -9,11 +9,13 @@ interface NumberPlayerState {
 
 interface NumberState {
   targetCountToWin: number;
+  winCondition: "unique" | "ranking";
   targetNumber: number;
   round: number;
   phase: "PREP" | "WAIT" | "HIGHLIGHT" | "PLAYING";
   phaseEndsAt: number;
   playerStates: Record<string, NumberPlayerState>;
+  itemLifetimeMs: number;
   done: boolean;
   winnerId: string | null;
 }
@@ -21,6 +23,8 @@ interface NumberState {
 export const numberGame: GameEngine = {
   initGame: (room: Room, options?: StartGameOptions): NumberState => {
     const targetCountToWin = options?.number?.targetCount ?? 10;
+    const itemLifetimeMs = options?.number?.itemLifetimeMs ?? 2000;
+    const winCondition = options?.number?.winCondition ?? "unique";
     const playerStates: Record<string, NumberPlayerState> = {};
     [...room.players.keys()].forEach((pid) => {
       playerStates[pid] = { foundCount: 0, totalTimeMs: 0, roundFinished: false, lastActionAt: 0 };
@@ -28,11 +32,13 @@ export const numberGame: GameEngine = {
 
     return {
       targetCountToWin,
+      winCondition,
       targetNumber: Math.floor(Math.random() * 99) + 1,
       round: 1,
       phase: "PREP",
       phaseEndsAt: Date.now() + 5000, // 5s Prep
       playerStates,
+      itemLifetimeMs,
       done: false,
       winnerId: null
     };
@@ -57,15 +63,8 @@ export const numberGame: GameEngine = {
       pState.roundFinished = true;
       pState.lastActionAt = now;
 
-      // Check if this player reached the target count
-      if (pState.foundCount >= state.targetCountToWin && !state.winnerId) {
-        // We don't end the game immediately if we want to wait for others or show the round end
-        // But the user said "Ai săn đủ số lượng trước thì giành chiến thắng"
-        // Let's mark the winner but maybe let the round finish? 
-        // Actually, let's keep it simple: first to reach count wins if others haven't.
-        // But if someone else reaches it in the same round with better time?
-        // Let's wait for the round to end for everyone.
-      }
+      // In UNIQUE mode, if one player reaches target, we can technically check here,
+      // but it's fairer to let the current round finish in case someone else gets it with better time.
     }
 
     room.gameState = state;
@@ -77,35 +76,58 @@ export const numberGame: GameEngine = {
     const now = Date.now();
 
     // Ticker logic: Phase transitions
-    if (!state.done && now >= state.phaseEndsAt) {
+    if (!state.done && now >= state.phaseEndsAt && state.phaseEndsAt > 0) {
       if (state.phase === "PREP") {
         state.phase = "WAIT";
-        // Server chooses targetNumber NOW
         state.targetNumber = Math.floor(Math.random() * 99) + 1;
-        // Server random wait 1-5s
         const randomWait = 1000 + Math.floor(Math.random() * 4000);
         state.phaseEndsAt = now + randomWait;
       } else if (state.phase === "WAIT") {
         state.phase = "HIGHLIGHT";
-        state.phaseEndsAt = now + 1000; // 1s Highlight
+        state.phaseEndsAt = now + 1000;
       } else if (state.phase === "HIGHLIGHT") {
         state.phase = "PLAYING";
-        state.phaseEndsAt = 0; // Playing ends when everyone is finished
+        state.phaseEndsAt = 0;
       }
     }
 
     // Check if everyone finished the current round
-    const allFinished = Object.values(state.playerStates).every((ps) => ps.roundFinished);
-    if (!state.done && state.phase === "PLAYING" && allFinished) {
-      // Check if any winners
-      const potentialWinners = Object.entries(state.playerStates)
-        .filter(([_, ps]) => ps.foundCount >= state.targetCountToWin)
-        .sort((a, b) => a[1].totalTimeMs - b[1].totalTimeMs);
+    const participants = Object.keys(state.playerStates).filter(id => room.players.get(id)?.isOnline);
+    const allFinished = participants.every((pid) => state.playerStates[pid].roundFinished);
 
-      if (potentialWinners.length > 0) {
-        state.winnerId = potentialWinners[0][0];
-        state.done = true;
+    if (!state.done && state.phase === "PLAYING" && allFinished) {
+      if (state.winCondition === "unique") {
+        // Find anyone who reached targetCount
+        const potentialWinners = Object.entries(state.playerStates)
+          .filter(([pid, ps]) => ps.foundCount >= state.targetCountToWin && participants.includes(pid))
+          .sort((a, b) => a[1].totalTimeMs - b[1].totalTimeMs);
+
+        if (potentialWinners.length > 0) {
+          state.winnerId = potentialWinners[0][0];
+          state.done = true;
+        }
       } else {
+        // RANKING mode: Game ends when ALL participants reach targetCount
+        const allReachedTarget = participants.every(pid => state.playerStates[pid].foundCount >= state.targetCountToWin);
+        if (allReachedTarget) {
+          const ranking = Object.entries(state.playerStates)
+            .filter(([pid]) => participants.includes(pid))
+            .sort((a, b) => {
+              // Primary: Rounds (implicit in total rounds, but we need to check how many rounds it took)
+              // Actually, since everyone finishes every round, rounds are the same.
+              // Wait, if someone reaches targetCount in round 5 and another in round 6.
+              // We need to track which round each player finished.
+              // Let's stick to the user's logic: "ai săn được số lượng cấu hình trước sẽ giành chiến thắng"
+              // In ranking mode, we'll sort by foundCount (desc) then totalTimeMs (asc)
+              if (b[1].foundCount !== a[1].foundCount) return b[1].foundCount - a[1].foundCount;
+              return a[1].totalTimeMs - b[1].totalTimeMs;
+            });
+          state.winnerId = ranking[0][0];
+          state.done = true;
+        }
+      }
+
+      if (!state.done) {
         // Move to next round
         state.round += 1;
         state.phase = "PREP";
@@ -116,9 +138,16 @@ export const numberGame: GameEngine = {
       }
     }
 
+    const ranking = Object.entries(state.playerStates)
+      .filter(([pid]) => participants.includes(pid))
+      .sort((a, b) => {
+        if (b[1].foundCount !== a[1].foundCount) return b[1].foundCount - a[1].foundCount;
+        return a[1].totalTimeMs - b[1].totalTimeMs;
+      });
+
     return {
       ...state,
-      targetNumber: state.targetNumber,
+      ranking,
       done: state.done,
       winnerId: state.winnerId
     };

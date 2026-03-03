@@ -19,6 +19,7 @@ type RoomView = {
   hostId: string;
   status: "waiting" | "countdown" | "playing" | "finished";
   selectedGame: LiXiGameType | null;
+  selectedGameOptions: any | null;
   countdownEndsAt: number | null;
   currentGame: LiXiGameType | null;
   players: Array<PlayerView & { ready?: boolean }>;
@@ -380,6 +381,8 @@ export default function LiXiNangCaoPage() {
   const [memoryTheme, setMemoryTheme] = useState<"sports" | "animals" | "fruits" | "vehicles">("animals");
   const [rpsMode, setRpsMode] = useState<"BO1" | "BO3" | "BO5" | "BO7" | "BO11">("BO1");
   const [numberTargetCount, setNumberTargetCount] = useState(10);
+  const [numberItemLifetimeMs, setNumberItemLifetimeMs] = useState(2000);
+  const [numberWinCondition, setNumberWinCondition] = useState<"unique" | "ranking">("unique");
 
   const [gameState, setGameState] = useState<unknown>(null);
   const [resultState, setResultState] = useState<unknown>(null);
@@ -389,6 +392,14 @@ export default function LiXiNangCaoPage() {
   const [winnerPopup, setWinnerPopup] = useState<WinnerPayload | null>(null);
   const [origin, setOrigin] = useState("");
   const [countdownNow, setCountdownNow] = useState(Date.now());
+  const [hidePlayingOverlay, setHidePlayingOverlay] = useState(false);
+
+  // Reset hidePlayingOverlay when room status changes (to show overlay again for next game)
+  useEffect(() => {
+    if (room?.status !== "playing") {
+      setHidePlayingOverlay(false);
+    }
+  }, [room?.status]);
 
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraFilter, setCameraFilter] = useState<CameraFilter>("none");
@@ -495,6 +506,17 @@ export default function LiXiNangCaoPage() {
   }, [room?.selectedGame]);
 
   useEffect(() => {
+    if (room?.selectedGameOptions?.number) {
+      if (room.selectedGameOptions.number.targetCount) {
+        setNumberTargetCount(room.selectedGameOptions.number.targetCount);
+      }
+      if (room.selectedGameOptions.number.itemLifetimeMs) {
+        setNumberItemLifetimeMs(room.selectedGameOptions.number.itemLifetimeMs);
+      }
+    }
+  }, [room?.selectedGameOptions?.number]);
+
+  useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
 
@@ -572,9 +594,12 @@ export default function LiXiNangCaoPage() {
           addLog("Trò chơi đã bắt đầu");
         };
 
-        const onGameUpdate = (payload: unknown) => {
+        const onGameUpdate = (payload: any) => {
           if (!mounted) return;
-          setGameState(payload);
+          // Only update gameState if it's actually in the payload
+          if (payload?.gameState || payload?.result || payload?.phase) {
+            setGameState(payload);
+          }
           const nextRoom = roomFromPayload(payload);
           if (nextRoom) setRoom(nextRoom);
         };
@@ -775,20 +800,20 @@ export default function LiXiNangCaoPage() {
     }
   };
 
-  const selectGame = async (gameType: LiXiGameType): Promise<void> => {
+  const selectGame = async (gameType: LiXiGameType, forceOptions?: any): Promise<void> => {
     if (!roomId || !isHost) return;
     if (myReady) {
       setErrorText("Chủ phòng đang sẵn sàng. Bỏ sẵn sàng để đổi trò chơi.");
       return;
     }
     setSelectedGame(gameType);
-    const options = gameType === "memory"
+    const options = forceOptions || (gameType === "memory"
       ? { memory: { boardLength: memoryBoardLength, theme: memoryTheme } }
       : gameType === "rps"
         ? { rps: { mode: rpsMode } }
         : gameType === "number"
           ? { number: { targetCount: numberTargetCount } }
-          : undefined;
+          : undefined);
     const res = await emitWithAck("host:selectGame", { roomId, gameType, options });
     if (!res.ok) setErrorText(res.message ?? "Không thể chọn trò chơi");
   };
@@ -848,12 +873,13 @@ export default function LiXiNangCaoPage() {
     <>
       {/* Popups */}
       {winnerPopup && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4 animate-in fade-in duration-300">
           <div className="w-full max-w-sm rounded-[40px] border border-white/10 bg-slate-900 p-8 text-center shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
-            <div className="text-6xl mb-4">🏆</div>
-            <h2 className="text-2xl font-black text-white uppercase italic tracking-wider">Chiến thắng!</h2>
-            <p className="mt-2 text-slate-400 font-medium">Chúc mừng <span className="text-emerald-400 font-bold">{winnerPopup.name}</span></p>
+            <p className="mt-2 text-xl font-black text-white italic tracking-tight">
+              NGƯỜI CHIẾN THẮNG
+            </p>
+            <p className="mt-1 text-2xl font-black text-emerald-400 uppercase tracking-wider">{winnerPopup.name}</p>
 
             {winnerPopup.victoryImageDataUrl && (
               <div className="mt-6 aspect-square rounded-3xl overflow-hidden border-2 border-emerald-500/30 shadow-xl">
@@ -861,15 +887,25 @@ export default function LiXiNangCaoPage() {
               </div>
             )}
 
-            <button onClick={() => setWinnerPopup(null)} className="mt-8 w-full h-12 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-all">
-              ĐÓNG
+            <button
+              onClick={() => {
+                setWinnerPopup(null);
+                if (isHost) {
+                  void endGame();
+                } else {
+                  setHidePlayingOverlay(true);
+                }
+              }}
+              className="mt-8 w-full h-12 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-all uppercase tracking-widest text-xs"
+            >
+              Đóng & Quay lại sảnh
             </button>
           </div>
         </div>
       )}
 
       {cameraOpen && (
-        <div className="fixed inset-0 z-[260] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in zoom-in duration-300">
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in zoom-in duration-300">
           <div className="w-full max-w-lg rounded-[40px] border border-cyan-500/30 bg-slate-900 p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-black text-white uppercase italic tracking-wide">Camera Studio</h2>
@@ -928,6 +964,36 @@ export default function LiXiNangCaoPage() {
             <p className="mt-8 text-xl font-black text-white uppercase italic tracking-wider">
               {room?.selectedGame === "number" ? "Săn Số V6" : room?.selectedGame === "memory" ? "Board Nhớ" : "Bắt Đầu"}
             </p>
+          </div>
+        </div>
+      )}
+
+      {(room?.status === "playing" || room?.status === "finished") && !hidePlayingOverlay && (
+        <div className="fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-3 sm:p-6 overflow-y-auto overflow-x-hidden">
+          {/* External Exit Button */}
+          <div className="absolute top-4 right-4 z-[230] sm:top-8 sm:right-8">
+            <button
+              onClick={() => setHidePlayingOverlay(true)}
+              className="group flex flex-col items-center gap-1 transition-all active:scale-90"
+            >
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl border border-white/20 bg-slate-900/80 text-white shadow-2xl backdrop-blur-xl transition-all group-hover:bg-red-500 group-hover:border-red-400">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+              </div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-red-400 transition-colors">Thoát Game</span>
+            </button>
+          </div>
+          <div className="w-full max-w-6xl mx-auto h-full flex flex-col justify-center py-12 sm:py-20">
+            <div className="w-full h-auto max-h-full">
+              <GamePanelSwitch
+                game={currentGame}
+                disabled={!canPlay || (currentGame === "reaction" && !isHost)}
+                onEmit={emitAction}
+                gameState={gameState}
+                playerId={playerId}
+                room={room}
+                onClose={() => setHidePlayingOverlay(true)}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -1116,65 +1182,182 @@ export default function LiXiNangCaoPage() {
         {/* Right Column: Game Area */}
         <div className="space-y-6">
           <section className="rounded-3xl border border-slate-700 bg-slate-900/60 p-6 backdrop-blur-md">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Điều khiển trò chơi</h2>
-              <div className="flex gap-2">
-                {isHost && (room?.status === "waiting" || room?.status === "finished") && (
-                  <button
-                    onClick={() => void startGame()}
-                    disabled={!allReady || !room?.selectedGame || !myReady}
-                    className="h-10 px-4 sm:px-6 rounded-xl bg-cyan-500 font-bold text-slate-950 shadow-lg shadow-cyan-500/20 disabled:opacity-30 disabled:scale-95 transition-all text-xs sm:text-sm"
-                  >
-                    BẮT ĐẦU
-                  </button>
-                )}
-                {isHost && (room?.status === "playing") && (
-                  <button
-                    onClick={() => void endGame()}
-                    className="h-10 px-4 sm:px-6 rounded-xl bg-rose-500 font-bold text-white shadow-lg shadow-rose-500/20 transition-all text-xs sm:text-sm"
-                  >
-                    KẾT THÚC
-                  </button>
-                )}
-                <button
-                  onClick={() => void setReady(!myReady)}
-                  disabled={room?.status !== "waiting"}
-                  className={`h-10 px-4 sm:px-6 rounded-xl font-bold transition-all text-xs sm:text-sm ${myReady ? "bg-emerald-500 text-slate-950" : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"} disabled:opacity-30`}
-                >
-                  {myReady ? "✓ SẴN SÀNG" : "SẴN SÀNG"}
-                </button>
-              </div>
-            </div>
+            {isHost && (room?.status === "waiting" || hidePlayingOverlay) && (
+              <div className="space-y-6 mb-6">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3 ml-1">Chọn trò chơi</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {games.map((g) => (
+                      <button
+                        key={g.type}
+                        onClick={() => void selectGame(g.type)}
+                        disabled={myReady}
+                        className={`p-3 rounded-2xl border text-left transition-all ${selectedGame === g.type ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.1)]" : "border-slate-800 bg-slate-950/40 hover:border-slate-700"}`}
+                      >
+                        <p className={`text-xs font-bold leading-tight ${selectedGame === g.type ? "text-cyan-300" : "text-slate-400"}`}>{g.title}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            {isHost && room?.status === "waiting" && (
-              <div className="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {games.map((g) => (
-                  <button
-                    key={g.type}
-                    onClick={() => void selectGame(g.type)}
-                    disabled={myReady}
-                    className={`p-3 rounded-2xl border text-left transition-all ${selectedGame === g.type ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.1)]" : "border-slate-800 bg-slate-950/40 hover:border-slate-700"}`}
-                  >
-                    <p className={`text-xs font-bold leading-tight ${selectedGame === g.type ? "text-cyan-300" : "text-slate-400"}`}>{g.title}</p>
-                  </button>
-                ))}
+                {/* Game Specific Configurations */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/20 p-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Cấu hình {games.find(g => g.type === selectedGame)?.title}</h3>
+
+                  {selectedGame === "rps" && (
+                    <div className="space-y-4">
+                      <p className="text-xs text-slate-400">Chọn chế độ thi đấu:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {["BO1", "BO3", "BO5", "BO7", "BO11"].map((m) => (
+                          <button
+                            key={m}
+                            onClick={() => { setRpsMode(m as any); void selectGame("rps", { rps: { mode: m } }); }}
+                            disabled={myReady}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${rpsMode === m ? "bg-rose-500 text-white" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedGame === "memory" && (
+                    <div className="space-y-4">
+                      <p className="text-xs text-slate-400">Chọn chủ đề hình ảnh:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: "animals", label: "Động vật" },
+                          { id: "fruits", label: "Hoa quả" },
+                          { id: "sports", label: "Thể thao" },
+                          { id: "vehicles", label: "Xe cộ" }
+                        ].map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => { setMemoryTheme(t.id as any); void selectGame("memory", { memory: { boardLength: memoryBoardLength, theme: t.id } }); }}
+                            disabled={myReady}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${memoryTheme === t.id ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedGame === "number" && (
+                    <div className="space-y-6">
+                      <div className="space-y-4">
+                        <p className="text-xs text-slate-400">Số lượng mục tiêu cần tìm:</p>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="range"
+                            min={1}
+                            max={25}
+                            value={numberTargetCount}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setNumberTargetCount(val);
+                              void selectGame("number", { number: { targetCount: val, itemLifetimeMs: numberItemLifetimeMs, winCondition: numberWinCondition } });
+                            }}
+                            disabled={myReady}
+                            className="flex-1 accent-cyan-500"
+                          />
+                          <span className="w-12 h-10 flex items-center justify-center rounded-xl bg-slate-800 font-bold text-cyan-300 border border-slate-700">{numberTargetCount}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <p className="text-xs text-slate-400">Thời gian hiện số (ms):</p>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="range"
+                            min={500}
+                            max={5000}
+                            step={100}
+                            value={numberItemLifetimeMs}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setNumberItemLifetimeMs(val);
+                              void selectGame("number", { number: { targetCount: numberTargetCount, itemLifetimeMs: val, winCondition: numberWinCondition } });
+                            }}
+                            disabled={myReady}
+                            className="flex-1 accent-violet-500"
+                          />
+                          <span className="w-16 h-10 flex items-center justify-center rounded-xl bg-slate-800 font-bold text-violet-300 border border-slate-700">{numberItemLifetimeMs}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <p className="text-xs text-slate-400">Cách tính thắng cuộc:</p>
+                        <div className="flex gap-2">
+                          {[
+                            { id: "unique", label: "Người thắng duy nhất" },
+                            { id: "ranking", label: "Sắp xếp danh sách" }
+                          ].map((c) => (
+                            <button
+                              key={c.id}
+                              onClick={() => {
+                                setNumberWinCondition(c.id as any);
+                                void selectGame("number", { number: { targetCount: numberTargetCount, itemLifetimeMs: numberItemLifetimeMs, winCondition: c.id as any } });
+                              }}
+                              disabled={myReady}
+                              className={`flex-1 px-4 py-2.5 rounded-xl text-[10px] font-bold transition-all ${numberWinCondition === c.id ? "bg-violet-500 text-white" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                            >
+                              {c.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedGame !== "rps" && selectedGame !== "memory" && selectedGame !== "number" && (
+                    <p className="text-xs text-slate-500 italic">Trò chơi này không cần cấu hình thêm.</p>
+                  )}
+                </div>
               </div>
             )}
 
-            <div className="rounded-3xl border border-slate-800 bg-slate-950/60 p-4 min-h-[500px] flex items-center justify-center relative overflow-hidden">
-              <div className={room?.status === "playing" ? "fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-3 sm:p-6 overflow-y-auto overflow-x-hidden" : ""}>
-                <div className={room?.status === "playing" ? "w-full max-w-4xl mx-auto" : "w-full"}>
-                  <GamePanelSwitch
-                    game={currentGame}
-                    disabled={!canPlay || (currentGame === "reaction" && !isHost)}
-                    onEmit={emitAction}
-                    gameState={gameState}
-                    playerId={playerId}
-                    room={room}
-                  />
-                </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 p-6 rounded-3xl bg-slate-950/40 border border-slate-800">
+              <div className="space-y-1">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Điều khiển trò chơi</h2>
+                <p className="text-[10px] text-slate-500">Tất cả người chơi cần Sẵn sàng để Bắt đầu</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    const nextReady = !myReady;
+                    if (myReady && room?.status === "playing") {
+                      if (isHost) {
+                        void setReady(false);
+                        void endGame();
+                      } else {
+                        void setReady(false);
+                        setHidePlayingOverlay(true);
+                      }
+                    } else {
+                      void setReady(nextReady);
+                    }
+                  }}
+                  disabled={room?.status === "countdown" || !roomId}
+                  className={`h-12 px-6 rounded-2xl font-black transition-all text-xs sm:text-sm shadow-xl ${myReady ? "bg-emerald-500 text-slate-950 shadow-emerald-500/20" : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"} disabled:opacity-30`}
+                >
+                  {myReady ? (room?.status === "playing" ? (isHost ? "DỪNG GAME" : "THOÁT GAME") : "✓ ĐÃ SẴN SÀNG") : "SẴN SÀNG"}
+                </button>
+                {isHost && (room?.status === "waiting" || room?.status === "finished" || hidePlayingOverlay) && (
+                  <button
+                    onClick={() => void startGame()}
+                    disabled={!allReady || !room?.selectedGame || !myReady}
+                    className="h-12 px-6 rounded-2xl bg-gradient-to-br from-cyan-400 to-cyan-600 font-black text-slate-950 shadow-xl shadow-cyan-500/20 disabled:opacity-30 active:scale-95 transition-all text-xs sm:text-sm"
+                  >
+                    {room?.status === "finished" ? "BẮT ĐẦU LẠI" : "BẮT ĐẦU"}
+                  </button>
+                )}
               </div>
             </div>
+
+            {/* Removed inline game panel as it's now in popups only */}
           </section>
 
           {/* Dev Tools / Debug */}

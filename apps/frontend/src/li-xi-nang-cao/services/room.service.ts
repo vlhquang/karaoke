@@ -158,9 +158,9 @@ export class RoomService {
     room.gameState = initialState;
     room.countdownEndsAt = null;
 
-    // Bot injection for solo testing
+    // Bot injection for solo testing (Skip for memory game)
     const onlinePlayers = [...room.players.values()].filter((p) => p.isOnline);
-    if (onlinePlayers.length === 1) {
+    if (onlinePlayers.length === 1 && gameType !== "memory" && gameType !== "number") {
       const botPlayer: Player = {
         playerId: "bot-player-id",
         name: "Máy (Bot)",
@@ -181,15 +181,17 @@ export class RoomService {
     room.countdownEndsAt = null;
   }
 
-  resetToWaiting(room: Room): void {
+  resetToWaiting(room: Room, keepReady = false): void {
     room.status = "waiting";
     room.countdownEndsAt = null;
     room.currentGame = null;
     room.gameState = null;
     // Remove bot if present
     room.players.delete("bot-player-id");
-    for (const player of room.players.values()) {
-      player.ready = false;
+    if (!keepReady) {
+      for (const player of room.players.values()) {
+        player.ready = false;
+      }
     }
   }
 

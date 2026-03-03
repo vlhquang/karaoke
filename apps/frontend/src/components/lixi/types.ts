@@ -6,4 +6,5 @@ export interface LiXiActionProps {
   gameState?: any;
   playerId?: string;
   room?: any;
+  onClose?: () => void;
 }

@@ -20,10 +20,9 @@ const MIN_DELAY_MS = 3000;
 const MAX_DELAY_MS = 10000;
 const DRAW_THRESHOLD_MS = 40;
 
-export function ReactionPanel({ disabled }: ReactionPanelProps) {
+export function ReactionPanel({ disabled, room, onClose }: ReactionPanelProps) {
   const [phase, setPhase] = useState<Phase>("idle");
-  const [overlayOpen, setOverlayOpen] = useState(false);
-  const [message, setMessage] = useState("Nhấn Bắt đầu lượt mới để chơi");
+  const [message, setMessage] = useState("Đang chuẩn bị lượt chơi...");
   const [result, setResult] = useState<RoundResult | null>(null);
   const [leftTappedAt, setLeftTappedAt] = useState<number | null>(null);
   const [rightTappedAt, setRightTappedAt] = useState<number | null>(null);
@@ -52,9 +51,6 @@ export function ReactionPanel({ disabled }: ReactionPanelProps) {
       startTimerRef.current = null;
     }
 
-    setOverlayOpen(true);
-    resetRoundState();
-    setPhase("ready");
     setMessage("Chuẩn bị...");
 
     const delay = Math.floor(Math.random() * (MAX_DELAY_MS - MIN_DELAY_MS + 1)) + MIN_DELAY_MS;
@@ -70,9 +66,9 @@ export function ReactionPanel({ disabled }: ReactionPanelProps) {
       window.clearTimeout(startTimerRef.current);
       startTimerRef.current = null;
     }
-    setOverlayOpen(false);
     setPhase("idle");
-    setMessage("Nhấn Bắt đầu lượt mới để chơi");
+    setMessage("Đang chuẩn bị lượt chơi...");
+    onClose?.();
   };
 
   const finishEarlyLose = (earlySide: Side): void => {
@@ -173,6 +169,17 @@ export function ReactionPanel({ disabled }: ReactionPanelProps) {
     }
   }, [leftTappedAt, phase, rightTappedAt]);
 
+  useEffect(() => {
+    // Auto-start when the room status becomes "playing" and we are idle
+    if (room?.status === "playing" && phase === "idle" && !disabled) {
+      startRound();
+    }
+    // If room returns to waiting/finished, ensure we reset overlay
+    if (room?.status !== "playing" && phase !== "idle" && phase !== "finished") {
+      setPhase("idle");
+    }
+  }, [room?.status, phase, disabled]);
+
   const resultText = useMemo(() => {
     if (!result) return "Chưa có kết quả.";
     if (result.reason === "early") return "Kết quả: bấm sớm bị xử thua ngay.";
@@ -180,58 +187,93 @@ export function ReactionPanel({ disabled }: ReactionPanelProps) {
   }, [result]);
 
   return (
-    <div className="space-y-3">
-      <div className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200">
-        2 người chơi cùng chạm trên màn hình host. Delay ngẫu nhiên 3-10 giây, bấm sớm sẽ thua.
+    <div className="relative flex h-[min(85vh,750px)] w-full flex-col items-center justify-center overflow-hidden rounded-3xl bg-slate-950/40 border border-slate-800 shadow-2xl">
+      {/* HUD Layer */}
+      <div className="absolute top-4 left-4 right-4 z-50 flex justify-between items-start pointer-events-none">
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-400">Phản Xạ</span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-black text-white">Chạm Đấu</span>
+          </div>
+        </div>
+
+
+        <div className="text-right">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Kết quả</span>
+          <p className="font-mono text-[10px] font-bold text-white max-w-[100px] leading-tight text-right">
+            {result ? resultText : "---"}
+          </p>
+        </div>
       </div>
 
-      <button
-        onClick={startRound}
-        disabled={disabled}
-        className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-base font-bold text-slate-900 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        Bắt đầu lượt mới
-      </button>
+      {/* Main Game Area */}
+      <div className="relative h-full w-full flex flex-col pt-16">
+        <div className="mb-4 flex flex-col items-center justify-center shrink-0">
+          <p className="text-xl font-black text-amber-200 uppercase italic tracking-tighter md:text-3xl animate-in zoom-in duration-300">{message}</p>
+        </div>
 
-      {overlayOpen && (
-        <div className="flex flex-col w-full min-h-[500px] bg-slate-950/20 rounded-3xl">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-lg font-bold text-amber-200 md:text-2xl">{message}</p>
-            {phase !== "finished" && (
-              <button onClick={closeOverlay} className="rounded-lg border border-slate-500 px-3 py-1.5 text-sm text-slate-200">
-                Đóng
-              </button>
+        <div className="grid flex-1 grid-cols-2 gap-4 p-4">
+          <button
+            onClick={() => registerTap("left")}
+            disabled={disabled || phase === "finished" || phase === "idle"}
+            className={`group relative flex flex-col items-center justify-center rounded-3xl border-4 transition-all duration-300
+              ${phase === "go" || leftTappedAt !== null
+                ? "border-cyan-400 bg-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.2)]"
+                : "border-slate-800 bg-slate-900/50"
+              }
+              disabled:cursor-not-allowed
+            `}
+          >
+            <span className="text-4xl font-black text-cyan-200 md:text-5xl">TRÁI</span>
+            {leftTappedAt !== null && (
+              <span className="absolute bottom-4 font-mono text-sm text-cyan-400">
+                {Math.round(leftTappedAt - goTimeRef.current)}ms
+              </span>
             )}
-          </div>
+          </button>
 
-          <div className="grid flex-1 grid-cols-2 gap-3">
+          <button
+            onClick={() => registerTap("right")}
+            disabled={disabled || phase === "finished" || phase === "idle"}
+            className={`group relative flex flex-col items-center justify-center rounded-3xl border-4 transition-all duration-300
+              ${phase === "go" || rightTappedAt !== null
+                ? "border-fuchsia-400 bg-fuchsia-500/20 shadow-[0_0_30_px_rgba(232,121,249,0.2)]"
+                : "border-slate-800 bg-slate-900/50"
+              }
+              disabled:cursor-not-allowed
+            `}
+          >
+            <span className="text-4xl font-black text-fuchsia-200 md:text-5xl">PHẢI</span>
+            {rightTappedAt !== null && (
+              <span className="absolute bottom-4 font-mono text-sm text-fuchsia-400">
+                {Math.round(rightTappedAt - goTimeRef.current)}ms
+              </span>
+            )}
+          </button>
+        </div>
+
+        {phase === "finished" && (
+          <div className="absolute inset-x-0 bottom-4 z-50 flex justify-center px-4">
             <button
-              onClick={() => registerTap("left")}
-              disabled={disabled || phase === "finished"}
-              className="rounded-2xl border border-cyan-300/40 bg-cyan-500/15 px-3 py-8 text-center text-2xl font-extrabold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 md:text-4xl"
+              onClick={() => startRound()}
+              className="w-full max-w-sm rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 py-4 text-sm font-black text-slate-950 shadow-xl shadow-orange-500/20 transition-all hover:scale-[1.02] active:scale-95"
             >
-              BÊN TRÁI
-            </button>
-            <button
-              onClick={() => registerTap("right")}
-              disabled={disabled || phase === "finished"}
-              className="rounded-2xl border border-fuchsia-300/40 bg-fuchsia-500/15 px-3 py-8 text-center text-2xl font-extrabold text-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-50 md:text-4xl"
-            >
-              BÊN PHẢI
+              CHƠI LẠI LƯỢT NÀY
             </button>
           </div>
+        )}
+      </div>
 
-          {phase === "finished" && (
-            <div className="mt-4 space-y-3 rounded-2xl border border-slate-700 bg-slate-900/80 p-4">
-              <p className="text-center text-lg font-bold text-emerald-300 md:text-2xl">{message}</p>
-              <p className="text-center text-sm text-slate-200">{resultText}</p>
-              <div className="flex justify-center">
-                <button onClick={closeOverlay} className="rounded-xl border border-slate-500 px-8 py-3 text-base font-semibold text-slate-200 hover:bg-slate-800">
-                  Đóng
-                </button>
-              </div>
-            </div>
-          )}
+      {/* Intro / Waiting State */}
+      {phase === "idle" && (
+        <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm p-8 text-center">
+          <div className="mb-6 h-20 w-20 flex items-center justify-center rounded-3xl bg-cyan-500 text-slate-950 shadow-2xl shadow-cyan-500/20">
+            <svg className="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+          </div>
+          <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tighter">PHẢN XẠ SIÊU TỐC</h2>
+          <p className="text-sm text-slate-400 max-w-[240px] leading-relaxed">
+            Chờ Host nhấn Bắt đầu. Hai người chơi chạm nhanh nhất để chiến thắng!
+          </p>
         </div>
       )}
     </div>
