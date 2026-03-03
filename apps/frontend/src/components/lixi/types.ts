@@ -5,4 +5,5 @@ export interface LiXiActionProps {
   onEmit: (event: string, payload: Record<string, unknown>) => void;
   gameState?: any;
   playerId?: string;
+  room?: any;
 }

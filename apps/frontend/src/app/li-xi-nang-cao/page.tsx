@@ -349,6 +349,7 @@ export default function LiXiNangCaoPage() {
   const [memoryBoardLength, setMemoryBoardLength] = useState(12);
   const [memoryTheme, setMemoryTheme] = useState<"sports" | "animals" | "fruits" | "vehicles">("animals");
   const [rpsMode, setRpsMode] = useState<"BO1" | "BO3" | "BO5" | "BO7" | "BO11">("BO1");
+  const [numberTargetCount, setNumberTargetCount] = useState(10);
 
   const [gameState, setGameState] = useState<unknown>(null);
   const [resultState, setResultState] = useState<unknown>(null);
@@ -706,7 +707,9 @@ export default function LiXiNangCaoPage() {
       ? { memory: { boardLength: memoryBoardLength, theme: memoryTheme } }
       : gameType === "rps"
         ? { rps: { mode: rpsMode } }
-        : undefined;
+        : gameType === "number"
+          ? { number: { targetCount: numberTargetCount } }
+          : undefined;
     const res = await emitWithAck("host:selectGame", { roomId, gameType, options });
     if (!res.ok) setErrorText(res.message ?? "Không thể chọn trò chơi");
   };
@@ -718,7 +721,9 @@ export default function LiXiNangCaoPage() {
       ? { memory: { boardLength: memoryBoardLength, theme: memoryTheme } }
       : selectedGame === "rps"
         ? { rps: { mode: rpsMode } }
-        : undefined;
+        : selectedGame === "number"
+          ? { number: { targetCount: numberTargetCount } }
+          : undefined;
     const res = await emitWithAck("host:startGame", { roomId, options });
     if (!res.ok) setErrorText(res.message ?? "Không thể bắt đầu trò chơi");
   };
@@ -991,6 +996,31 @@ export default function LiXiNangCaoPage() {
                 className="mt-2 rounded-lg border border-emerald-300/60 px-3 py-1.5 text-sm font-semibold text-emerald-200 disabled:opacity-50"
               >
                 Áp dụng cấu hình ghi nhớ
+              </button>
+            </div>
+          )}
+
+          {isHost && selectedGame === "number" && (
+            <div className="mt-4 rounded-xl border border-violet-400/30 bg-violet-500/10 p-3">
+              <p className="text-sm font-semibold text-violet-200">Cấu hình Săn số</p>
+              <div className="mt-2 flex items-center gap-2">
+                <label htmlFor="number-target-count" className="text-sm text-slate-200">Số lượng cần săn</label>
+                <input
+                  id="number-target-count"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={numberTargetCount}
+                  onChange={(e) => setNumberTargetCount(Number(e.target.value))}
+                  className="w-20 rounded-lg border border-slate-600 bg-slate-950 px-3 py-1.5 text-sm text-slate-100"
+                />
+              </div>
+              <button
+                onClick={() => void selectGame("number")}
+                disabled={!canHostSelectGame}
+                className="mt-2 rounded-lg border border-violet-300/60 px-3 py-1.5 text-sm font-semibold text-violet-200 disabled:opacity-50"
+              >
+                Áp dụng cấu hình Săn số
               </button>
             </div>
           )}
