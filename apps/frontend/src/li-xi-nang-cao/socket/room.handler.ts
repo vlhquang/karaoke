@@ -2,6 +2,7 @@ import type { Socket } from "socket.io";
 import type { RoomService } from "../services/room.service";
 import { createRoomSchema, joinRoomSchema, roomIdSchema, startGameSchema, selectGameSchema, setReadySchema, kickPlayerSchema } from "../validators/room.validator";
 import { gameEngines } from "../games";
+import { processGameStep } from "./game.handler";
 import type { GameType } from "../types";
 import { AppError } from "../utils/errors";
 import { logger } from "../utils/logger";
@@ -227,6 +228,8 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
             room: toRoomPayload(latestRoom),
             gameState: latestRoom.gameState
           });
+          // Trigger bot simulation if solo
+          processGameStep(socket.nsp, roomService, latestRoom);
         } finally {
           clearCountdownTimer(parsed.roomId);
         }
@@ -298,6 +301,9 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
         room: toRoomPayload(room),
         gameState: room.gameState
       });
+
+      // Trigger bot simulation if solo
+      processGameStep(socket.nsp, roomService, room);
 
       if (ack) ack({ ok: true });
     } catch (error) {
