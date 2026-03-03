@@ -42,6 +42,9 @@ export interface StartGameOptions {
   rps?: {
     mode?: "BO1" | "BO3" | "BO5" | "BO7" | "BO11";
   };
+  number?: {
+    targetCount?: number;
+  };
 }
 
 export interface GameEngine {

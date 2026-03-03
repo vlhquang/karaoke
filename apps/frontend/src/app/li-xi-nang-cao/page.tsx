@@ -41,6 +41,36 @@ type CameraFilter =
 
 type FaceBox = { x: number; y: number; width: number; height: number };
 
+const LIXI_SESSION_KEY = "lixi_session_v6";
+
+interface LiXiSessionCache {
+  roomId: string;
+  playerId: string;
+  name: string;
+  role: "host" | "player";
+}
+
+const saveLiXiSession = (session: LiXiSessionCache): void => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(LIXI_SESSION_KEY, JSON.stringify(session));
+};
+
+const loadLiXiSession = (): LiXiSessionCache | null => {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(LIXI_SESSION_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const clearLiXiSession = (): void => {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(LIXI_SESSION_KEY);
+};
+
 type BrowserFaceDetector = {
   detect: (input: HTMLVideoElement) => Promise<Array<{ boundingBox: DOMRectReadOnly }>>;
 };
@@ -349,6 +379,7 @@ export default function LiXiNangCaoPage() {
   const [memoryBoardLength, setMemoryBoardLength] = useState(12);
   const [memoryTheme, setMemoryTheme] = useState<"sports" | "animals" | "fruits" | "vehicles">("animals");
   const [rpsMode, setRpsMode] = useState<"BO1" | "BO3" | "BO5" | "BO7" | "BO11">("BO1");
+  const [numberTargetCount, setNumberTargetCount] = useState(10);
 
   const [gameState, setGameState] = useState<unknown>(null);
   const [resultState, setResultState] = useState<unknown>(null);
@@ -377,10 +408,10 @@ export default function LiXiNangCaoPage() {
   const canPlay = Boolean(roomId && playerId);
   const currentGame = room?.currentGame ?? room?.selectedGame ?? selectedGame;
   const joinUrl = roomId && origin ? `${origin}/li-xi-nang-cao?room=${roomId}` : "";
-  const readyCount = room?.players.filter((player) => player.ready).length ?? 0;
-  const onlineCount = room?.players.filter((player) => player.isOnline).length ?? 0;
+  const readyCount = room?.players.filter((player: any) => player.ready).length ?? 0;
+  const onlineCount = room?.players.filter((player: any) => player.isOnline).length ?? 0;
   const allReady = onlineCount > 0 && readyCount === onlineCount;
-  const myReady = room?.players.find((player) => player.playerId === playerId)?.ready ?? false;
+  const myReady = room?.players.find((player: any) => player.playerId === playerId)?.ready ?? false;
   const countdownLeft = room?.countdownEndsAt ? Math.max(0, Math.ceil((room.countdownEndsAt - countdownNow) / 1000)) : 0;
   const canHostSelectGame = Boolean(isHost && room?.status === "waiting" && !myReady);
 
@@ -394,7 +425,7 @@ export default function LiXiNangCaoPage() {
       cancelAnimationFrame(cameraRafRef.current);
       cameraRafRef.current = null;
     }
-    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current?.getTracks().forEach((track: any) => track.stop());
     cameraStreamRef.current = null;
     if (cameraVideoRef.current) {
       cameraVideoRef.current.srcObject = null;
@@ -410,7 +441,7 @@ export default function LiXiNangCaoPage() {
         video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false
       });
-      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current?.getTracks().forEach((track: any) => track.stop());
       cameraStreamRef.current = stream;
       setCameraOpen(true);
     } catch (error) {
@@ -479,6 +510,31 @@ export default function LiXiNangCaoPage() {
           if (!mounted) return;
           setConnected(true);
           addLog("Kết nối realtime /lixi thành công");
+
+          // Try to restore session if not already in a room
+          const cached = loadLiXiSession();
+          if (cached) {
+            void (async () => {
+              const res = await emitWithAck("room:restoreSession", {
+                roomId: cached.roomId,
+                playerId: cached.playerId
+              });
+              if (res.ok) {
+                const data = res as { room?: RoomView; playerId?: string };
+                if (mounted) {
+                  setRoom(data.room ?? null);
+                  setRoomIdInput(data.room?.roomId ?? "");
+                  setPlayerId(String(data.playerId ?? ""));
+                  setRole(cached.role);
+                  setName(cached.name);
+                  addLog(`Đã khôi phục phiên: ${cached.roomId}`);
+                }
+              } else {
+                // If restore fails, clear session to avoid constant attempts
+                // clearLiXiSession(); // Optional: might be transient error
+              }
+            })();
+          }
         };
 
         const onDisconnect = () => {
@@ -676,23 +732,46 @@ export default function LiXiNangCaoPage() {
 
   const createRoom = async (): Promise<void> => {
     setErrorText("");
-    setRole("host");
+    const displayName = name.trim() || "Chủ phòng";
     const res = await emitWithAck("host:createRoom", {
-      name: name.trim() || "Chủ phòng",
+      name: displayName,
       victoryImageDataUrl: victoryImageDataUrl || undefined
     });
-    if (!res.ok) setErrorText(res.message ?? "Tạo phòng thất bại");
+    if (res.ok) {
+      const data = res as { roomId: string; playerId: string };
+      setRole("host");
+      saveLiXiSession({
+        roomId: data.roomId,
+        playerId: data.playerId,
+        name: displayName,
+        role: "host"
+      });
+    } else {
+      setErrorText(res.message ?? "Tạo phòng thất bại");
+    }
   };
 
   const joinRoom = async (): Promise<void> => {
     setErrorText("");
-    setRole("player");
+    const displayName = name.trim() || "Người chơi";
+    const rId = roomIdInput.trim().toUpperCase();
     const res = await emitWithAck("player:joinRoom", {
-      roomId: roomIdInput.trim().toUpperCase(),
-      name: name.trim() || "Người chơi",
+      roomId: rId,
+      name: displayName,
       victoryImageDataUrl: victoryImageDataUrl || undefined
     });
-    if (!res.ok) setErrorText(res.message ?? "Vào phòng thất bại");
+    if (res.ok) {
+      const data = res as { roomId: string; playerId: string };
+      setRole("player");
+      saveLiXiSession({
+        roomId: data.roomId,
+        playerId: data.playerId,
+        name: displayName,
+        role: "player"
+      });
+    } else {
+      setErrorText(res.message ?? "Vào phòng thất bại");
+    }
   };
 
   const selectGame = async (gameType: LiXiGameType): Promise<void> => {
@@ -706,7 +785,9 @@ export default function LiXiNangCaoPage() {
       ? { memory: { boardLength: memoryBoardLength, theme: memoryTheme } }
       : gameType === "rps"
         ? { rps: { mode: rpsMode } }
-        : undefined;
+        : gameType === "number"
+          ? { number: { targetCount: numberTargetCount } }
+          : undefined;
     const res = await emitWithAck("host:selectGame", { roomId, gameType, options });
     if (!res.ok) setErrorText(res.message ?? "Không thể chọn trò chơi");
   };
@@ -718,7 +799,9 @@ export default function LiXiNangCaoPage() {
       ? { memory: { boardLength: memoryBoardLength, theme: memoryTheme } }
       : selectedGame === "rps"
         ? { rps: { mode: rpsMode } }
-        : undefined;
+        : selectedGame === "number"
+          ? { number: { targetCount: numberTargetCount } }
+          : undefined;
     const res = await emitWithAck("host:startGame", { roomId, options });
     if (!res.ok) setErrorText(res.message ?? "Không thể bắt đầu trò chơi");
   };
@@ -759,26 +842,78 @@ export default function LiXiNangCaoPage() {
     })();
   };
 
-  if (!role) {
+  if (!roomId) {
     return (
-      <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center justify-center px-4 py-10">
-        <section className="w-full rounded-2xl border border-slate-700 bg-slate-900/70 p-6">
-          <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Lì xì nâng cao</h1>
-            <Link href="/" className="rounded-lg border border-slate-600 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800">
-              Về Portal
-            </Link>
+      <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-4 py-8">
+        <section className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="text-center">
+            <h1 className="text-4xl font-black bg-gradient-to-br from-cyan-300 to-violet-400 bg-clip-text text-transparent">LÌ XÌ NÂNG CAO</h1>
+            <p className="mt-2 text-slate-400 font-medium">Phiên bản V6 • Trò chơi tương tác nhóm</p>
           </div>
-          <p className="text-sm text-slate-300">Chọn vai trò để bắt đầu:</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <button onClick={() => setRole("host")} className="rounded-xl border border-cyan-300/70 bg-cyan-500/15 px-4 py-4 text-left">
-              <p className="text-lg font-semibold text-cyan-100">Chủ phòng</p>
-              <p className="mt-1 text-sm text-slate-300">Tạo phòng, chọn game, bắt đầu và quản lý người chơi.</p>
-            </button>
-            <button onClick={() => setRole("player")} className="rounded-xl border border-emerald-300/70 bg-emerald-500/15 px-4 py-4 text-left">
-              <p className="text-lg font-semibold text-emerald-100">Người chơi</p>
-              <p className="mt-1 text-sm text-slate-300">Vào phòng bằng mã, sẵn sàng và tham gia trò chơi.</p>
-            </button>
+
+          <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 backdrop-blur-xl shadow-2xl">
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Tên hiển thị</label>
+                <input
+                  className="mt-1.5 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-lg font-semibold text-white focus:border-cyan-500/50 focus:outline-none transition-all"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nhập tên của bạn..."
+                />
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">Tùy chọn chiến thắng</p>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => void openCamera()} className="flex-1 rounded-xl bg-cyan-500/10 border border-cyan-500/30 px-4 py-2.5 text-sm font-bold text-cyan-400 hover:bg-cyan-500/20 transition-all">
+                    📸 Mở Camera
+                  </button>
+                  <label className="flex-1 cursor-pointer rounded-xl bg-violet-500/10 border border-violet-500/30 px-4 py-2.5 text-sm font-bold text-violet-400 text-center hover:bg-violet-500/20 transition-all">
+                    📁 Chọn Ảnh
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => void handleImageCapture(e.target.files?.[0] ?? null)} />
+                  </label>
+                </div>
+                {victoryImageDataUrl && (
+                  <div className="mt-4 relative group">
+                    <img className="w-full h-32 object-cover rounded-xl border border-slate-700" src={victoryImageDataUrl} alt="Preview" />
+                    <button onClick={() => setVictoryImageDataUrl("")} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  onClick={() => void createRoom()}
+                  className="h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 font-bold text-slate-950 shadow-lg shadow-cyan-950/20 hover:scale-[1.02] active:scale-95 transition-all"
+                >
+                  TẠO PHÒNG
+                </button>
+                <div className="relative group">
+                  <input
+                    className="h-14 w-full rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 font-bold text-emerald-300 uppercase placeholder:text-emerald-900 group-hover:border-emerald-500/50 transition-all focus:outline-none"
+                    value={roomIdInput}
+                    onChange={(e) => setRoomIdInput(e.target.value.toUpperCase())}
+                    placeholder="MÃ PHÒNG"
+                  />
+                  <button
+                    onClick={() => void joinRoom()}
+                    disabled={!roomIdInput.trim()}
+                    className="absolute right-2 top-2 h-10 px-4 rounded-xl bg-emerald-500 font-bold text-slate-950 disabled:opacity-0 transition-all"
+                  >
+                    VÀO
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <Link href="/" className="text-sm font-semibold text-slate-500 hover:text-slate-300 transition-colors">
+              ← Quay lại Portal
+            </Link>
           </div>
         </section>
       </main>
@@ -787,336 +922,244 @@ export default function LiXiNangCaoPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-4 py-6 md:px-8 md:py-10">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Lì xì nâng cao</h1>
-        <Link href="/" className="rounded-lg border border-slate-600 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800">
-          Về Portal
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-cyan-500 font-black text-slate-900 shadow-lg shadow-cyan-500/20">L6</div>
+          <h1 className="text-2xl font-black tracking-tight text-white uppercase italic">Lì Xì V6</h1>
+        </div>
+        <Link href="/" className="rounded-xl border border-slate-700 bg-slate-900/50 px-4 py-2 text-sm font-bold text-slate-300 hover:bg-slate-800 transition-all">
+          ← Thoát
         </Link>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_1fr]">
-        <section className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
-          <p className="text-sm text-slate-300">Trạng thái kết nối: {connected ? "Đang kết nối" : "Mất kết nối"}</p>
+      <div className="grid gap-6 xl:grid-cols-[400px_1fr]">
+        {/* Left Column: Room Info & Controls */}
+        <aside className="space-y-6">
+          <section className="rounded-3xl border border-slate-700 bg-slate-900/60 p-6 backdrop-blur-md shadow-xl overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" /></svg>
+            </div>
 
-          <div className="mt-4 space-y-3">
-            {!roomId && (
-              <div className="mt-4 space-y-3">
-                <input className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên của bạn" />
-                <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-3">
-                  <p className="text-sm font-semibold text-slate-100">Ảnh chọc vui khi chiến thắng</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button onClick={() => void openCamera()} className="rounded-lg bg-cyan-500 px-3 py-2 text-sm font-semibold text-slate-900">
-                      Mở camera + filter
-                    </button>
-                    <label className="cursor-pointer rounded-lg bg-violet-500 px-3 py-2 text-sm font-semibold text-white">
-                      Chụp/Chọn ảnh
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0] ?? null;
-                          void handleImageCapture(file);
-                          event.currentTarget.value = "";
-                        }}
-                      />
-                    </label>
-                    <button
-                      onClick={() => setVictoryImageDataUrl("")}
-                      disabled={!victoryImageDataUrl}
-                      className="rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50"
-                    >
-                      Xóa ảnh
-                    </button>
-                  </div>
-                  {victoryImageDataUrl && (
-                    <img className="mt-3 w-full max-w-xs rounded-lg border border-slate-700 object-cover" src={victoryImageDataUrl} alt="Anh choc vui cua ban" />
-                  )}
-                  {cameraError && <p className="mt-2 text-xs text-red-300">{cameraError}</p>}
-                </div>
-                {role === "host" ? (
-                  <button onClick={() => void createRoom()} className="rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-900">
-                    Tạo phòng
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <input
-                      className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 uppercase"
-                      value={roomIdInput}
-                      onChange={(e) => setRoomIdInput(e.target.value.toUpperCase())}
-                      placeholder="Mã phòng"
-                    />
-                    <button onClick={() => void joinRoom()} className="rounded-lg border border-cyan-300/60 px-4 py-2 font-semibold text-cyan-200">
-                      Vào
-                    </button>
-                  </div>
-                )}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Mã phòng</span>
+                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase ${connected ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
+                  {connected ? "Ổn định" : "Mất kết nối"}
+                </span>
               </div>
-            )}
-          </div>
 
-          <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950/60 p-3 text-sm">
-            <p>Phòng: <span className="font-mono text-cyan-200">{roomId || "-"}</span></p>
-            <p>Vai trò: <span className="font-semibold">{isHost ? "Chủ phòng" : canPlay ? "Người chơi" : "-"}</span></p>
-            <p>Trạng thái: <span className="font-semibold">{room?.status ?? "-"}</span></p>
-            <p>Game đã chọn: <span className="font-semibold">{room?.selectedGame ?? "-"}</span></p>
-            <p>Sẵn sàng: <span className="font-semibold">{readyCount}/{onlineCount}</span></p>
-            {room?.status === "countdown" && <p>Game bắt đầu sau: <span className="font-semibold text-amber-300">{countdownLeft}s</span></p>}
-            {joinUrl && (
-              <div className="mt-3 flex items-center gap-3 rounded-lg border border-cyan-400/30 bg-cyan-500/10 p-2">
-                <QRCodeSVG value={joinUrl} size={84} includeMargin />
-                <div>
-                  <p className="text-xs font-semibold text-cyan-100">Quét mã để vào phòng</p>
-                  <p className="mt-1 break-all text-[11px] text-slate-300">{joinUrl}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {errorText && <div className="mt-3 rounded-lg border border-red-400/50 bg-red-500/10 px-3 py-2 text-sm text-red-200">{errorText}</div>}
-
-        </section>
-
-        <section className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-slate-400">Danh sách người chơi</h2>
-          <div className="space-y-2">
-            {room?.players?.length ? room.players.map((p) => (
-              <div key={p.playerId} className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2">
-                <div>
-                  <p className="text-sm font-semibold text-slate-100">{p.name}</p>
-                  <p className="text-xs text-slate-400">Độ trễ: {p.latency}ms • {p.ready ? "Sẵn sàng" : "Chưa sẵn sàng"}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`rounded-full px-2 py-1 text-xs ${p.isOnline ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-700 text-slate-300"}`}>
-                    {p.isOnline ? "Trực tuyến" : "Ngoại tuyến"}
+              <div className="flex items-center gap-2 group">
+                <div className="flex-1 bg-slate-950/80 border border-slate-700 rounded-2xl px-4 py-3 flex items-center justify-between">
+                  <span className="font-mono text-2xl font-black text-cyan-300 tracking-wider">
+                    {roomId || "------"}
                   </span>
-                  {isHost && !p.ready && p.playerId !== playerId && room?.status === "waiting" && (
+                  <button
+                    onClick={() => {
+                      if (roomId) {
+                        void navigator.clipboard.writeText(roomId);
+                        addLog("Đã sao chép mã phòng");
+                      }
+                    }}
+                    className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                    title="Sao chép mã phòng"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div className="bg-slate-950/40 p-3 rounded-2xl border border-slate-800">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Thành viên</p>
+                  <p className="text-xl font-black text-white">{onlineCount}<span className="text-slate-600 text-sm">/{room?.players?.length ?? 0}</span></p>
+                </div>
+                <div className="bg-slate-950/40 p-3 rounded-2xl border border-slate-800">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Sẵn sàng</p>
+                  <p className="text-xl font-black text-emerald-400">{readyCount}<span className="text-slate-600 text-sm">/{onlineCount}</span></p>
+                </div>
+              </div>
+
+              {joinUrl && (
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center gap-3">
+                  <div className="p-2 bg-white rounded-xl">
+                    <QRCodeSVG value={joinUrl} size={120} />
+                  </div>
+                  <p className="text-[10px] font-medium text-slate-400 break-all text-center">{joinUrl}</p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-slate-700 bg-slate-900/40 p-6">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4 ml-1">Người chơi</h2>
+            <div className="space-y-3 max-h-[400px] overflow-auto pr-2 custom-scrollbar">
+              {room?.players?.map((p: any) => (
+                <div key={p.playerId} className={`group flex items-center justify-between p-3 rounded-2xl border transition-all ${p.playerId === playerId ? "bg-cyan-500/10 border-cyan-500/30" : "bg-slate-950/40 border-slate-800"}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${p.isOnline ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-slate-600"}`} />
+                    <div>
+                      <p className={`text-sm font-bold ${p.playerId === playerId ? "text-cyan-300" : "text-white"}`}>
+                        {p.name} {p.playerId === room?.hostId && "👑"}
+                      </p>
+                      <p className="text-[10px] font-medium text-slate-500">
+                        {p.ready ? "✓ Sẵn sàng" : "• Đang chờ"} • {p.latency}ms
+                      </p>
+                    </div>
+                  </div>
+                  {isHost && p.playerId !== playerId && room?.status === "waiting" && (
                     <button
                       onClick={() => void kickPlayer(p.playerId)}
-                      className="rounded-lg border border-red-300/60 px-2 py-1 text-xs font-semibold text-red-200"
+                      className="opacity-0 group-hover:opacity-100 p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 transition-all hover:text-white"
                     >
-                      Kick
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                   )}
                 </div>
-              </div>
-            )) : <p className="text-sm text-slate-400">Chưa có người chơi.</p>}
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
-          <h2 className="text-lg font-semibold">{isHost ? "Chọn trò chơi" : "Trò chơi đã chọn bởi host"}</h2>
-          {isHost ? (
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {games.map((g) => (
-                <button
-                  key={g.type}
-                  onClick={() => void selectGame(g.type)}
-                  disabled={!canHostSelectGame}
-                  className={`rounded-xl border p-3 text-left transition ${selectedGame === g.type ? g.color : "border-slate-700 bg-slate-900/50"} disabled:cursor-not-allowed disabled:opacity-50`}
-                >
-                  <p className="font-semibold">{g.title}</p>
-                  <p className="mt-1 text-xs text-slate-300">{g.desc}</p>
-                </button>
               ))}
             </div>
-          ) : (
-            <div className="mt-3 rounded-xl border border-slate-700 bg-slate-950/60 p-3 text-sm text-slate-200">
-              {room?.selectedGame ? `Host đã chọn: ${room.selectedGame}` : "Host chưa chọn trò chơi."}
-            </div>
-          )}
+          </section>
+        </aside>
 
-          {isHost && selectedGame === "rps" && (
-            <div className="mt-4 rounded-xl border border-rose-400/30 bg-rose-500/10 p-3">
-              <p className="text-sm font-semibold text-rose-200">Cấu hình Oẳn Tù Tì</p>
-              <div className="mt-2 flex items-center gap-2">
-                <label htmlFor="rps-mode" className="text-sm text-slate-200">Chế độ chơi</label>
-                <select
-                  id="rps-mode"
-                  value={rpsMode}
-                  onChange={(e) => setRpsMode(e.target.value as "BO1" | "BO3" | "BO5" | "BO7" | "BO11")}
-                  className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-1.5 text-sm text-slate-100"
+        {/* Right Column: Game Area */}
+        <div className="space-y-6">
+          <section className="rounded-3xl border border-slate-700 bg-slate-900/60 p-6 backdrop-blur-md">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Điều khiển trò chơi</h2>
+              <div className="flex gap-2">
+                {isHost && (room?.status === "waiting" || room?.status === "finished") && (
+                  <button
+                    onClick={() => void startGame()}
+                    disabled={!allReady || !room?.selectedGame || !myReady}
+                    className="h-10 px-6 rounded-xl bg-cyan-500 font-bold text-slate-950 shadow-lg shadow-cyan-500/20 disabled:opacity-30 disabled:scale-95 transition-all"
+                  >
+                    BẮT ĐẦU
+                  </button>
+                )}
+                {isHost && (room?.status === "playing") && (
+                  <button
+                    onClick={() => void restartGame()}
+                    className="h-10 px-6 rounded-xl bg-sky-500 font-bold text-slate-950 shadow-lg shadow-sky-500/20 transition-all"
+                  >
+                    CHƠI LẠI
+                  </button>
+                )}
+                <button
+                  onClick={() => void setReady(!myReady)}
+                  disabled={room?.status !== "waiting"}
+                  className={`h-10 px-6 rounded-xl font-bold transition-all ${myReady ? "bg-emerald-500 text-slate-950" : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"} disabled:opacity-30`}
                 >
-                  <option value="BO1">BO1 (Đấu 1 ván)</option>
-                  <option value="BO3">BO3 (Thắng 2/3 ván)</option>
-                  <option value="BO5">BO5 (Thắng 3/5 ván)</option>
-                  <option value="BO7">BO7 (Thắng 4/7 ván)</option>
-                  <option value="BO11">BO11 (Thắng 6/11 ván)</option>
-                </select>
+                  {myReady ? "✓ SẴN SÀNG" : "BẤM SẴN SÀNG"}
+                </button>
               </div>
-              <button
-                onClick={() => void selectGame("rps")}
-                disabled={!canHostSelectGame}
-                className="mt-2 rounded-lg border border-rose-300/60 px-3 py-1.5 text-sm font-semibold text-rose-200 disabled:opacity-50"
-              >
-                Áp dụng cấu hình Oẳn Tù Tì
-              </button>
             </div>
-          )}
 
-          {isHost && selectedGame === "memory" && (
-            <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
-              <p className="text-sm font-semibold text-emerald-200">Cấu hình board nhớ</p>
-              <div className="mt-2 flex items-center gap-2">
-                <label htmlFor="memory-board-length" className="text-sm text-slate-200">Số ô trên board</label>
-                <select
-                  id="memory-board-length"
-                  value={memoryBoardLength}
-                  onChange={(e) => setMemoryBoardLength(Number(e.target.value))}
-                  className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-1.5 text-sm text-slate-100"
-                >
-                  {[8, 12, 16, 20, 24, 30, 36].map((value) => (
-                    <option key={value} value={value}>{value} ô</option>
-                  ))}
-                </select>
+            {isHost && room?.status === "waiting" && (
+              <div className="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {games.map((g) => (
+                  <button
+                    key={g.type}
+                    onClick={() => void selectGame(g.type)}
+                    disabled={myReady}
+                    className={`p-3 rounded-2xl border text-left transition-all ${selectedGame === g.type ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.1)]" : "border-slate-800 bg-slate-950/40 hover:border-slate-700"}`}
+                  >
+                    <p className={`text-xs font-bold leading-tight ${selectedGame === g.type ? "text-cyan-300" : "text-slate-400"}`}>{g.title}</p>
+                  </button>
+                ))}
               </div>
-              <div className="mt-2 flex items-center gap-2">
-                <label htmlFor="memory-theme" className="text-sm text-slate-200">Chủ đề hình</label>
-                <select
-                  id="memory-theme"
-                  value={memoryTheme}
-                  onChange={(e) => setMemoryTheme(e.target.value as "sports" | "animals" | "fruits" | "vehicles")}
-                  className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-1.5 text-sm text-slate-100"
-                >
-                  <option value="animals">Động vật</option>
-                  <option value="fruits">Trái cây</option>
-                  <option value="vehicles">Xe cộ</option>
-                  <option value="sports">Thể thao</option>
-                </select>
-              </div>
-              <button
-                onClick={() => void selectGame("memory")}
-                disabled={!canHostSelectGame}
-                className="mt-2 rounded-lg border border-emerald-300/60 px-3 py-1.5 text-sm font-semibold text-emerald-200 disabled:opacity-50"
-              >
-                Áp dụng cấu hình ghi nhớ
-              </button>
+            )}
+
+            <div className="rounded-3xl border border-slate-800 bg-slate-950/60 p-4 min-h-[500px] flex items-center justify-center relative overflow-hidden">
+              <GamePanelSwitch
+                game={currentGame}
+                disabled={!canPlay || (currentGame === "reaction" && !isHost)}
+                onEmit={emitAction}
+                gameState={gameState}
+                playerId={playerId}
+                room={room}
+              />
             </div>
-          )}
+          </section>
 
-          <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-950/40 p-3">
-            <h3 className="mb-2 text-sm font-semibold uppercase tracking-widest text-slate-400">Bảng điều khiển trò chơi</h3>
-            <GamePanelSwitch
-              game={currentGame}
-              disabled={!canPlay || (currentGame === "reaction" && !isHost)}
-              onEmit={emitAction}
-              gameState={gameState}
-              playerId={playerId}
-            />
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-2">
-            <button
-              onClick={() => void setReady(!myReady)}
-              disabled={!canPlay || room?.status !== "waiting"}
-              className={`rounded-lg px-6 py-3 font-bold transition shadow-lg ${myReady ? "bg-emerald-500 text-slate-900" : "bg-emerald-500/20 border border-emerald-400/50 text-emerald-400 hover:bg-emerald-500/30"} disabled:opacity-30`}
-            >
-              {myReady ? "ĐÃ SẴN SÀNG" : "BẤM SẴN SÀNG"}
-            </button>
-            <button
-              onClick={() => void startGame()}
-              disabled={!isHost || !canPlay || !allReady || !room?.selectedGame || room.status !== "waiting" || !myReady}
-              className="rounded-lg bg-cyan-100/10 border border-cyan-500/50 px-6 py-3 font-bold text-cyan-400 disabled:opacity-30 disabled:border-slate-700 disabled:text-slate-500"
-            >
-              BẮT ĐẦU (5S)
-            </button>
-            <button
-              onClick={() => void restartGame()}
-              disabled={!isHost || !room || (room.status !== "finished" && room.status !== "playing") || !myReady}
-              className="rounded-lg bg-sky-100/10 border border-sky-500/50 px-6 py-3 font-bold text-sky-400 disabled:opacity-30 disabled:border-slate-700 disabled:text-slate-500"
-            >
-              CHƠI LẠI
-            </button>
-            <button
-              onClick={() => void endGame()}
-              disabled={!isHost || !canPlay || !myReady}
-              className="rounded-lg border border-amber-400/60 px-6 py-3 font-bold text-amber-200 disabled:opacity-50"
-            >
-              KẾT THÚC
-            </button>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
-          <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-400">Trạng thái game</h3>
-          <pre className="mt-2 max-h-72 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-cyan-100">{pretty(gameState)}</pre>
-        </section>
-
-        <section className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
-          <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-400">Kết quả</h3>
-          <pre className="mt-2 max-h-72 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-emerald-100">{pretty(resultState)}</pre>
-        </section>
-
-        <section className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4 xl:col-span-2">
-          <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-400">Nhật ký realtime</h3>
-          <div className="mt-2 max-h-60 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-200">
-            {logs.length ? logs.map((line, index) => <p key={`${line}-${index}`}>{line}</p>) : <p>Chưa có log.</p>}
-          </div>
-        </section>
+          {/* Dev Tools / Debug */}
+          <section className="grid sm:grid-cols-2 gap-6">
+            <div className="rounded-3xl border border-slate-700 bg-slate-900/40 p-6">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Trạng thái game</h3>
+              <pre className="max-h-48 overflow-auto rounded-xl bg-slate-950 p-4 text-[10px] font-mono text-cyan-100 custom-scrollbar">{pretty(gameState)}</pre>
+            </div>
+            <div className="rounded-3xl border border-slate-700 bg-slate-900/40 p-6">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Nhật ký hệ thống</h3>
+              <div className="max-h-48 overflow-auto rounded-xl bg-slate-950 p-4 text-[10px] font-mono text-slate-300 custom-scrollbar">
+                {logs.map((line: string, i: number) => <p key={i} className="mb-1 leading-relaxed"><span className="text-slate-600 mr-2">[{i}]</span> {line}</p>)}
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
 
+      {/* Popups */}
       {winnerPopup && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-emerald-300/50 bg-slate-900 p-4">
-            <p className="text-xl font-bold text-emerald-300">Chiến thắng!</p>
-            <p className="mt-1 text-sm text-slate-200">{winnerPopup.name} là người chiến thắng.</p>
-            {winnerPopup.victoryImageDataUrl ? (
-              <img
-                className="mt-3 w-full rounded-xl border border-slate-700 object-cover"
-                src={winnerPopup.victoryImageDataUrl}
-                alt={`Anh choc vui cua ${winnerPopup.name}`}
-              />
-            ) : (
-              <p className="mt-3 rounded-xl border border-slate-700 bg-slate-800/70 p-3 text-sm text-slate-300">Người thắng chưa thiết lập ảnh chọc vui.</p>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="w-full max-w-sm rounded-[40px] border border-white/10 bg-slate-900 p-8 text-center shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
+            <div className="text-6xl mb-4">🏆</div>
+            <h2 className="text-2xl font-black text-white uppercase italic tracking-wider">Chiến thắng!</h2>
+            <p className="mt-2 text-slate-400 font-medium">Chúc mừng <span className="text-emerald-400 font-bold">{winnerPopup.name}</span></p>
+
+            {winnerPopup.victoryImageDataUrl && (
+              <div className="mt-6 aspect-square rounded-3xl overflow-hidden border-2 border-emerald-500/30 shadow-xl">
+                <img className="w-full h-full object-cover" src={winnerPopup.victoryImageDataUrl} alt="Winner" />
+              </div>
             )}
-            <button onClick={() => setWinnerPopup(null)} className="mt-4 w-full rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-200">
-              Đóng
+
+            <button onClick={() => setWinnerPopup(null)} className="mt-8 w-full h-12 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-all">
+              ĐÓNG
             </button>
           </div>
         </div>
       )}
 
       {cameraOpen && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/85 p-3">
-          <div className="w-full max-w-lg rounded-2xl border border-cyan-300/40 bg-slate-900 p-4">
-            <p className="text-lg font-bold text-cyan-200">Chụp ảnh với filter</p>
-            <p className="mt-1 text-xs text-slate-300">Chọn filter rồi bấm Chụp ảnh</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {[
-                { id: "none", label: "Gốc" },
-                { id: "bigeyes", label: "Mắt siêu to" },
-                { id: "tinyMouth", label: "Miệng tí hon" },
-                { id: "bigNose", label: "Mũi siêu to" },
-                { id: "longChin", label: "Cằm dài" },
-                { id: "bigForehead", label: "Trán siêu to" },
-                { id: "puffyCheeks", label: "Má phồng" },
-                { id: "tiltFace", label: "Mặt lệch" },
-                { id: "wobble", label: "Lắc nhòe" },
-                { id: "crossEyes", label: "Mắt lé" },
-                { id: "funny", label: "Mặt hài tổng hợp" }
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setCameraFilter(item.id as CameraFilter)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${cameraFilter === item.id ? "bg-cyan-500 text-slate-900" : "border border-slate-600 text-slate-200"}`}
-                >
-                  {item.label}
-                </button>
-              ))}
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in zoom-in duration-300">
+          <div className="w-full max-w-lg rounded-[40px] border border-cyan-500/30 bg-slate-900 p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-black text-white uppercase italic tracking-wide">Camera Studio</h2>
+              <button onClick={stopCamera} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition-all">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
-            <video ref={cameraVideoRef} className="hidden" playsInline muted />
-            <canvas ref={cameraCanvasRef} width={640} height={480} className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950" />
-            <div className="mt-3 grid grid-cols-2 gap-2">
+
+            <div className="relative aspect-video rounded-3xl overflow-hidden bg-slate-950 border border-slate-800">
+              <video ref={cameraVideoRef} className="hidden" playsInline muted />
+              <canvas ref={cameraCanvasRef} width={640} height={480} className="w-full h-full object-cover" />
+              {!cameraReady && <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm font-bold uppercase tracking-widest animate-pulse">Khởi tạo camera...</div>}
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <div className="flex gap-2 overflow-auto pb-2 no-scrollbar">
+                {[
+                  { id: "none", label: "Gốc" },
+                  { id: "funny", label: "Hài hước" },
+                  { id: "bigeyes", label: "Mắt to" },
+                  { id: "tinyMouth", label: "Miệng xinh" },
+                  { id: "bigNose", label: "Mũi to" },
+                  { id: "tiltFace", label: "Lệch mặt" }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setCameraFilter(item.id as CameraFilter)}
+                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all ${cameraFilter === item.id ? "bg-cyan-500 text-slate-900" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
               <button
                 onClick={() => void captureFromCamera()}
                 disabled={!cameraReady}
-                className="rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-slate-900 disabled:opacity-50"
+                className="w-full h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 font-black text-slate-950 shadow-lg shadow-emerald-500/20 disabled:opacity-30 active:scale-95 transition-all uppercase tracking-widest"
               >
-                Chụp ảnh
-              </button>
-              <button onClick={stopCamera} className="rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-100">
-                Đóng camera
+                Chụp ảnh & Lưu
               </button>
             </div>
           </div>
@@ -1124,17 +1167,20 @@ export default function LiXiNangCaoPage() {
       )}
 
       {room?.status === "countdown" && (
-        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/90 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-amber-300/50 bg-slate-900 p-5 text-center">
-            <p className="text-xs uppercase tracking-[0.2em] text-amber-200">Chuẩn bị bắt đầu</p>
-            <p className="mt-2 text-xl font-bold text-slate-100">
-              {room?.selectedGame ? `Game: ${room.selectedGame}` : "Game"}
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-950/95 backdrop-blur-sm p-4 animate-in fade-in duration-500">
+          <div className="text-center">
+            <p className="text-xs font-bold uppercase tracking-[0.4em] text-cyan-500 mb-8 animate-pulse">Chuẩn bị sẵn sàng</p>
+            <div className="relative h-48 w-48 flex items-center justify-center mx-auto">
+              <div className="absolute inset-0 rounded-full border-4 border-cyan-500/20" />
+              <div className="absolute inset-0 rounded-full border-4 border-cyan-500 border-t-transparent animate-spin duration-700" style={{ animationDuration: '2s' }} />
+              <span className="text-9xl font-black text-white italic drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">{countdownLeft}</span>
+            </div>
+            <p className="mt-8 text-xl font-black text-white uppercase italic tracking-wider">
+              {room?.selectedGame === "number" ? "Săn Số V6" : room?.selectedGame === "memory" ? "Board Nhớ" : "Bắt Đầu"}
             </p>
-            <p className="mt-4 text-6xl font-black text-amber-300">{countdownLeft}</p>
-            <p className="mt-2 text-sm text-slate-300">Popup đã mở, game sẽ bắt đầu sau khi đếm ngược về 0.</p>
           </div>
         </div>
       )}
-    </main >
+    </main>
   );
 }

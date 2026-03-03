@@ -8,15 +8,13 @@ import type { LiXiActionProps, LiXiGameType } from "./types";
 
 interface GamePanelSwitchProps extends LiXiActionProps {
   game: LiXiGameType;
-  gameState?: unknown;
-  playerId?: string;
 }
 
-export function GamePanelSwitch({ game, disabled, onEmit, gameState, playerId }: GamePanelSwitchProps) {
-  if (game === "reaction") return <ReactionPanel disabled={disabled} onEmit={onEmit} gameState={gameState} playerId={playerId} />;
-  if (game === "memory") return <MemoryPanel disabled={disabled} onEmit={onEmit} gameState={gameState} playerId={playerId} />;
-  if (game === "rps") return <RpsPanel disabled={disabled} onEmit={onEmit} gameState={gameState} playerId={playerId} />;
-  if (game === "number") return <NumberPanel disabled={disabled} onEmit={onEmit} gameState={gameState} playerId={playerId} />;
-  if (game === "shake") return <ShakePanel disabled={disabled} onEmit={onEmit} />;
-  return <ColorPanel disabled={disabled} onEmit={onEmit} />;
+export function GamePanelSwitch({ game, disabled, onEmit, gameState, playerId, room }: GamePanelSwitchProps) {
+  if (game === "reaction") return <ReactionPanel disabled={disabled} onEmit={onEmit} gameState={gameState} playerId={playerId} room={room} />;
+  if (game === "memory") return <MemoryPanel disabled={disabled} onEmit={onEmit} gameState={gameState} playerId={playerId} room={room} />;
+  if (game === "rps") return <RpsPanel disabled={disabled} onEmit={onEmit} gameState={gameState} playerId={playerId} room={room} />;
+  if (game === "number") return <NumberPanel disabled={disabled} onEmit={onEmit} gameState={gameState} playerId={playerId} room={room} />;
+  if (game === "shake") return <ShakePanel disabled={disabled} onEmit={onEmit} room={room} />;
+  return <ColorPanel disabled={disabled} onEmit={onEmit} room={room} />;
 }

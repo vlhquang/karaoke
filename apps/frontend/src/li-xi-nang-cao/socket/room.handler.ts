@@ -69,6 +69,23 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
     }
   });
 
+  socket.on("room:restoreSession", (payload: any, ack?: (res: any) => void) => {
+    try {
+      const { roomId, playerId } = payload;
+      const { room, player } = roomService.restorePlayer(roomId, playerId, socket.id);
+
+      socket.data.lixi = { roomId: room.roomId, playerId: player.playerId, isHost: room.hostId === player.playerId };
+      socket.join(`lixi:${room.roomId}`);
+
+      // Notify others that player is back online
+      socket.to(`lixi:${room.roomId}`).emit("game:update", { room: toRoomPayload(room) });
+
+      if (ack) ack({ ok: true, room: toRoomPayload(room), playerId: player.playerId });
+    } catch (error) {
+      if (ack) ack({ ok: false, message: error instanceof Error ? error.message : "Restore session failed" });
+    }
+  });
+
   socket.on("player:joinRoom", (payload: unknown, ack?: (res: unknown) => void) => {
     try {
       const parsed = joinRoomSchema.parse(payload);

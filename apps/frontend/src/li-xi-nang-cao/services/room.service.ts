@@ -56,6 +56,14 @@ export class RoomService {
     return { room, player };
   }
 
+  restorePlayer(roomId: string, playerId: string, socketId: string): { room: Room; player: Player } {
+    const room = this.getRoom(roomId);
+    const player = this.getPlayer(room, playerId);
+    player.socketId = socketId;
+    player.isOnline = true;
+    return { room, player };
+  }
+
   getRoom(roomId: string): Room {
     const room = this.rooms.get(roomId);
     if (!room) {
