@@ -94,7 +94,7 @@ export function RpsPanel({ disabled, onEmit, gameState, playerId }: RpsPanelProp
       </div>
 
       {overlayOpen && (
-        <div className="fixed inset-0 z-[130] flex flex-col overflow-hidden bg-slate-950 p-4 md:p-8">
+        <div className="flex flex-col w-full min-h-[500px]">
           {/* Header */}
           <div className="mb-6 flex shrink-0 items-center justify-between">
             <div>
@@ -210,7 +210,7 @@ export function RpsPanel({ disabled, onEmit, gameState, playerId }: RpsPanelProp
 
           {/* Victory Overlay */}
           {rps.done && (
-            <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/90 backdrop-blur-md">
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md rounded-3xl">
               <div className="flex flex-col items-center text-center">
                 <div className="mb-4 text-9xl">
                   {rps.winnerId === playerId ? "🏆" : "💀"}

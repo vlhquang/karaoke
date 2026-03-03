@@ -235,7 +235,7 @@ export function MemoryPanel({ disabled, onEmit, gameState, playerId }: MemoryPan
       </div>
 
       {overlayOpen && (
-        <div className="fixed inset-0 z-[130] flex flex-col overflow-hidden bg-slate-950 p-3 md:p-6">
+        <div className="flex flex-col w-full min-h-[500px] bg-slate-950/20 rounded-3xl">
           <div className="mb-2 flex shrink-0 items-center justify-between gap-3">
             <div>
               <p className="text-lg font-bold text-emerald-200 md:text-2xl">Game Trí Nhớ Nhanh</p>
@@ -273,44 +273,44 @@ export function MemoryPanel({ disabled, onEmit, gameState, playerId }: MemoryPan
                 width: `${boardLayout.gridWidth}px`
               }}
             >
-            {memory.board.map((value, index) => {
-              const isMatched = matched.includes(index);
-              const isRevealed = revealed.includes(index);
-              const show = isMatched || isRevealed;
-              const cardIcon = iconForCard(memory.theme, value);
-              return (
-                <button
-                  key={`${memory.seed}-${index}`}
-                  onClick={() => onCardClick(index)}
-                  disabled={disabled || submitted || isMatched || memory.phase !== "running"}
-                  aria-label={isMatched ? `Ô ${index + 1} đã khớp` : `Ô ${index + 1}`}
-                  className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border font-bold transition ${isMatched
-                    ? "border-emerald-300/60 bg-emerald-500/10 text-transparent"
-                    : isRevealed
-                      ? "border-amber-300 bg-amber-400/20 text-amber-100 shadow-[0_0_0_1px_rgba(252,211,77,0.3)]"
-                      : "border-cyan-300/90 bg-slate-950 text-cyan-100 hover:border-cyan-200 hover:bg-slate-900"} disabled:cursor-not-allowed disabled:opacity-70`}
-                  style={{ width: `${boardLayout.cell}px`, height: `${boardLayout.cell}px`, fontSize: `${boardLayout.fontSize}px`, lineHeight: 1 }}
-                >
-                  {isMatched ? (
-                    ""
-                  ) : show ? (
-                    <span
-                      className="flex items-center justify-center rounded-md"
-                      style={{
-                        width: "90%",
-                        height: "90%",
-                        fontSize: `${Math.max(18, Math.floor(boardLayout.cell * 0.82))}px`,
-                        lineHeight: 1
-                      }}
-                    >
-                      {cardIcon}
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: `${Math.max(18, Math.floor(boardLayout.cell * 0.5))}px`, lineHeight: 1 }}>❓</span>
-                  )}
-                </button>
-              );
-            })}
+              {memory.board.map((value, index) => {
+                const isMatched = matched.includes(index);
+                const isRevealed = revealed.includes(index);
+                const show = isMatched || isRevealed;
+                const cardIcon = iconForCard(memory.theme, value);
+                return (
+                  <button
+                    key={`${memory.seed}-${index}`}
+                    onClick={() => onCardClick(index)}
+                    disabled={disabled || submitted || isMatched || memory.phase !== "running"}
+                    aria-label={isMatched ? `Ô ${index + 1} đã khớp` : `Ô ${index + 1}`}
+                    className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border font-bold transition ${isMatched
+                      ? "border-emerald-300/60 bg-emerald-500/10 text-transparent"
+                      : isRevealed
+                        ? "border-amber-300 bg-amber-400/20 text-amber-100 shadow-[0_0_0_1px_rgba(252,211,77,0.3)]"
+                        : "border-cyan-300/90 bg-slate-950 text-cyan-100 hover:border-cyan-200 hover:bg-slate-900"} disabled:cursor-not-allowed disabled:opacity-70`}
+                    style={{ width: `${boardLayout.cell}px`, height: `${boardLayout.cell}px`, fontSize: `${boardLayout.fontSize}px`, lineHeight: 1 }}
+                  >
+                    {isMatched ? (
+                      ""
+                    ) : show ? (
+                      <span
+                        className="flex items-center justify-center rounded-md"
+                        style={{
+                          width: "90%",
+                          height: "90%",
+                          fontSize: `${Math.max(18, Math.floor(boardLayout.cell * 0.82))}px`,
+                          lineHeight: 1
+                        }}
+                      >
+                        {cardIcon}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: `${Math.max(18, Math.floor(boardLayout.cell * 0.5))}px`, lineHeight: 1 }}>❓</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

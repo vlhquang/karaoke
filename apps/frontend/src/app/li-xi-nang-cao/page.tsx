@@ -1162,8 +1162,8 @@ export default function LiXiNangCaoPage() {
             )}
 
             <div className="rounded-3xl border border-slate-800 bg-slate-950/60 p-4 min-h-[500px] flex items-center justify-center relative overflow-hidden">
-              <div className={room?.status === "playing" ? "fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4 overflow-auto" : ""}>
-                <div className={room?.status === "playing" ? "w-full max-w-4xl" : "w-full"}>
+              <div className={room?.status === "playing" ? "fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-3 sm:p-6 overflow-y-auto overflow-x-hidden" : ""}>
+                <div className={room?.status === "playing" ? "w-full max-w-4xl mx-auto" : "w-full"}>
                   <GamePanelSwitch
                     game={currentGame}
                     disabled={!canPlay || (currentGame === "reaction" && !isHost)}
