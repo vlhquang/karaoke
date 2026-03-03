@@ -410,7 +410,7 @@ export default function LiXiNangCaoPage() {
   const joinUrl = roomId && origin ? `${origin}/li-xi-nang-cao?room=${roomId}` : "";
   const readyCount = room?.players.filter((player: any) => player.ready).length ?? 0;
   const onlineCount = room?.players.filter((player: any) => player.isOnline).length ?? 0;
-  const allReady = onlineCount > 0 && readyCount === onlineCount;
+  const allReady = onlineCount >= 2 && readyCount === onlineCount;
   const myReady = room?.players.find((player: any) => player.playerId === playerId)?.ready ?? false;
   const countdownLeft = room?.countdownEndsAt ? Math.max(0, Math.ceil((room.countdownEndsAt - countdownNow) / 1000)) : 0;
   const canHostSelectGame = Boolean(isHost && room?.status === "waiting" && !myReady);
@@ -844,7 +844,7 @@ export default function LiXiNangCaoPage() {
 
   if (!roomId) {
     return (
-      <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-4 py-8">
+      <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-4 py-8 overflow-x-hidden">
         <section className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="text-center">
             <h1 className="text-4xl font-black bg-gradient-to-br from-cyan-300 to-violet-400 bg-clip-text text-transparent">LÌ XÌ NÂNG CAO</h1>
@@ -866,10 +866,10 @@ export default function LiXiNangCaoPage() {
               <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
                 <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">Tùy chọn chiến thắng</p>
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => void openCamera()} className="flex-1 rounded-xl bg-cyan-500/10 border border-cyan-500/30 px-4 py-2.5 text-sm font-bold text-cyan-400 hover:bg-cyan-500/20 transition-all">
+                  <button onClick={() => void openCamera()} className="flex-1 rounded-xl bg-cyan-500/10 border border-cyan-500/30 px-2 sm:px-4 py-2.5 text-[10px] sm:text-xs md:text-sm font-bold text-cyan-400 hover:bg-cyan-500/20 transition-all">
                     📸 Mở Camera
                   </button>
-                  <label className="flex-1 cursor-pointer rounded-xl bg-violet-500/10 border border-violet-500/30 px-4 py-2.5 text-sm font-bold text-violet-400 text-center hover:bg-violet-500/20 transition-all">
+                  <label className="flex-1 cursor-pointer rounded-xl bg-violet-500/10 border border-violet-500/30 px-2 sm:px-4 py-2.5 text-[10px] sm:text-xs md:text-sm font-bold text-violet-400 text-center hover:bg-violet-500/20 transition-all overflow-hidden whitespace-nowrap">
                     📁 Chọn Ảnh
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => void handleImageCapture(e.target.files?.[0] ?? null)} />
                   </label>
@@ -887,7 +887,7 @@ export default function LiXiNangCaoPage() {
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <button
                   onClick={() => void createRoom()}
-                  className="h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 font-bold text-slate-950 shadow-lg shadow-cyan-950/20 hover:scale-[1.02] active:scale-95 transition-all"
+                  className="h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 font-bold text-slate-950 shadow-lg shadow-cyan-950/20 hover:scale-[1.02] active:scale-95 transition-all text-sm sm:text-base"
                 >
                   TẠO PHÒNG
                 </button>
@@ -901,7 +901,7 @@ export default function LiXiNangCaoPage() {
                   <button
                     onClick={() => void joinRoom()}
                     disabled={!roomIdInput.trim()}
-                    className="absolute right-2 top-2 h-10 px-4 rounded-xl bg-emerald-500 font-bold text-slate-950 disabled:opacity-0 transition-all"
+                    className="absolute right-2 top-2 h-10 px-4 rounded-xl bg-emerald-500 font-bold text-slate-950 disabled:hidden transition-all"
                   >
                     VÀO
                   </button>
@@ -921,7 +921,7 @@ export default function LiXiNangCaoPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-7xl px-4 py-6 md:px-8 md:py-10">
+    <main className="mx-auto min-h-screen max-w-7xl px-4 py-6 md:px-8 md:py-10 overflow-x-hidden">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-cyan-500 font-black text-slate-900 shadow-lg shadow-cyan-500/20">L6</div>
@@ -1030,7 +1030,7 @@ export default function LiXiNangCaoPage() {
                   <button
                     onClick={() => void startGame()}
                     disabled={!allReady || !room?.selectedGame || !myReady}
-                    className="h-10 px-6 rounded-xl bg-cyan-500 font-bold text-slate-950 shadow-lg shadow-cyan-500/20 disabled:opacity-30 disabled:scale-95 transition-all"
+                    className="h-10 px-4 sm:px-6 rounded-xl bg-cyan-500 font-bold text-slate-950 shadow-lg shadow-cyan-500/20 disabled:opacity-30 disabled:scale-95 transition-all text-xs sm:text-sm"
                   >
                     BẮT ĐẦU
                   </button>
@@ -1038,7 +1038,7 @@ export default function LiXiNangCaoPage() {
                 {isHost && (room?.status === "playing") && (
                   <button
                     onClick={() => void restartGame()}
-                    className="h-10 px-6 rounded-xl bg-sky-500 font-bold text-slate-950 shadow-lg shadow-sky-500/20 transition-all"
+                    className="h-10 px-4 sm:px-6 rounded-xl bg-sky-500 font-bold text-slate-950 shadow-lg shadow-sky-500/20 transition-all text-xs sm:text-sm"
                   >
                     CHƠI LẠI
                   </button>
@@ -1046,9 +1046,9 @@ export default function LiXiNangCaoPage() {
                 <button
                   onClick={() => void setReady(!myReady)}
                   disabled={room?.status !== "waiting"}
-                  className={`h-10 px-6 rounded-xl font-bold transition-all ${myReady ? "bg-emerald-500 text-slate-950" : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"} disabled:opacity-30`}
+                  className={`h-10 px-4 sm:px-6 rounded-xl font-bold transition-all text-xs sm:text-sm ${myReady ? "bg-emerald-500 text-slate-950" : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"} disabled:opacity-30`}
                 >
-                  {myReady ? "✓ SẴN SÀNG" : "BẤM SẴN SÀNG"}
+                  {myReady ? "✓ SẴN SÀNG" : "SẴN SÀNG"}
                 </button>
               </div>
             </div>
@@ -1129,7 +1129,7 @@ export default function LiXiNangCaoPage() {
             </div>
 
             <div className="relative aspect-video rounded-3xl overflow-hidden bg-slate-950 border border-slate-800">
-              <video ref={cameraVideoRef} className="hidden" playsInline muted />
+              <video ref={cameraVideoRef} className="absolute inset-0 w-px h-px opacity-0 pointer-events-none" playsInline muted />
               <canvas ref={cameraCanvasRef} width={640} height={480} className="w-full h-full object-cover" />
               {!cameraReady && <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm font-bold uppercase tracking-widest animate-pulse">Khởi tạo camera...</div>}
             </div>
