@@ -20,7 +20,7 @@
         <nav>
             <ul>
                 <li><a href="index.html">Hướng dẫn</a></li>
-                <li><a href="#">Xem & Nghe</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
                 <li><a href="#">Hỏi đáp (FAQ)</a></li>
                 <li><a href="#">Oracle University</a></li>
             </ul>
@@ -30,83 +30,382 @@
     <main>
         <div class="hero">
             <h1>Học Java</h1>
-            <p>Chào mừng bạn đến với lộ trình học tập Java chính thức. Khám phá các khóa học từ cơ bản đến chuyên sâu.
-            </p>
+            <p>Chào mừng bạn đến với cổng học tập Java chính thức. Khám phá các hướng dẫn từ cơ bản đến chuyên sâu.</p>
         </div>
 
         <div class="container">
             <div class="full-width">
+
+                <!-- 1. Chạy ứng dụng Java đầu tiên -->
                 <h2 class="section-title">Chạy ứng dụng Java đầu tiên của bạn</h2>
                 <div class="grid">
                     <div class="card">
                         <a href="pages/bat-dau.html">
                             <h3>Bắt đầu với Java</h3>
-                            <p>Tìm hiểu các bước cơ bản để cài đặt JDK và chạy chương trình đầu tiên của bạn.</p>
+                            <p>Tải và cài đặt JDK, viết lớp Java đầu tiên và tạo ứng dụng Java đầu tiên của bạn.</p>
                         </a>
                     </div>
                     <div class="card">
                         <a href="pages/chuong-trinh-don-le.html">
                             <h3>Chạy chương trình mã nguồn đơn lẻ</h3>
-                            <p>Sử dụng tính năng chạy trực tiếp tệp .java mà không cần biên dịch thủ công.</p>
+                            <p>Khởi chạy chương trình Java đơn giản trực tiếp từ tệp nguồn bằng Java launcher.</p>
                         </a>
                     </div>
                     <div class="card">
                         <a href="pages/jshell.html">
                             <h3>JShell - Công cụ Shell của Java</h3>
-                            <p>Tìm hiểu cách sử dụng REPL để thử nghiệm mã Java một cách nhanh chóng.</p>
+                            <p>jshell tương tác đánh giá khai báo, câu lệnh và biểu thức Java trong vòng lặp
+                                read-eval-print (REPL).</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/ide-vscode.html">
+                            <h3>Xây dựng ứng dụng Java trong Visual Studio Code</h3>
+                            <p>Extension Oracle Java Platform cho phép phát triển dự án Maven và Gradle trong VS Code.
+                            </p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/ide-intellij.html">
+                            <h3>Xây dựng ứng dụng Java trong IntelliJ IDEA</h3>
+                            <p>Học cách code, chạy, test, debug và document ứng dụng Java trong IntelliJ IDEA.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/ide-eclipse.html">
+                            <h3>Xây dựng ứng dụng Java trong Eclipse IDE</h3>
+                            <p>Cài đặt và bắt đầu với Eclipse IDE để phát triển ứng dụng Java.</p>
                         </a>
                     </div>
                 </div>
 
+                <!-- 2. Cập nhật tính năng mới -->
+                <h2 class="section-title">Cập nhật tính năng mới</h2>
+                <div class="grid">
+                    <div class="card">
+                        <a href="pages/tien-hoa-java.html">
+                            <h3>Sự tiến hóa của nền tảng Java</h3>
+                            <p>Java đã phát triển rất nhiều kể từ Java 8. Hãy cùng xem xét sự tiến hóa đó.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/tinh-nang-xem-truoc.html">
+                            <h3>Sử dụng các tính năng xem trước trong JDK</h3>
+                            <p>Cách biên dịch và thực thi các tính năng xem trước (preview) có trong JDK.</p>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 3. Làm quen với ngôn ngữ -->
                 <h2 class="section-title">Làm quen với ngôn ngữ</h2>
                 <div class="grid">
                     <div class="card">
+                        <a href="pages/oop-gioi-thieu.html">
+                            <h3>Đối tượng, Lớp, Interface, Package và Kế thừa</h3>
+                            <p>Giới thiệu lập trình hướng đối tượng (OOP).</p>
+                        </a>
+                    </div>
+                    <div class="card">
                         <a href="pages/ngon-ngu-co-ban.html">
                             <h3>Cơ bản về ngôn ngữ Java</h3>
-                            <p>Biến, kiểu dữ liệu, toán tử và cấu trúc điều khiển trong Java.</p>
+                            <p>Tìm hiểu những kiến thức cơ bản của ngôn ngữ Java.</p>
                         </a>
                     </div>
                     <div class="card">
-                        <a href="#">
+                        <a href="pages/lop-va-doi-tuong.html">
                             <h3>Lớp và Đối tượng</h3>
-                            <p>Tìm hiểu về lập trình hướng đối tượng (OOP) thông qua Class và Object.</p>
+                            <p>Định nghĩa lớp của riêng bạn, khai báo biến thành viên, phương thức và constructor.</p>
                         </a>
                     </div>
                     <div class="card">
-                        <a href="#">
-                            <h3>Records - Mô hình dữ liệu bất biến</h3>
-                            <p>Sử dụng tính năng Records để định nghĩa các lớp lưu trữ dữ liệu gọn gàng.</p>
+                        <a href="pages/records.html">
+                            <h3>Sử dụng Records để mô hình hóa dữ liệu bất biến</h3>
+                            <p>Cách mô hình hóa dữ liệu bất biến với records để làm code đơn giản và dễ đọc hơn.</p>
                         </a>
                     </div>
                     <div class="card">
-                        <a href="#">
+                        <a href="pages/so-va-chuoi.html">
                             <h3>Số và Chuỗi</h3>
-                            <p>Cách xử lý dữ liệu kiểu số và làm việc với văn bản trong Java.</p>
+                            <p>Hiểu về số, ký tự và chuỗi ký tự trong Java.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/ke-thua.html">
+                            <h3>Kế thừa (Inheritance)</h3>
+                            <p>Tận dụng kế thừa trong các ứng dụng Java.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/interface.html">
+                            <h3>Interface</h3>
+                            <p>Tạo và sử dụng interface.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/generics.html">
+                            <h3>Generics</h3>
+                            <p>Làm việc với các kiểu có tham số (parameterized types).</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/lambda.html">
+                            <h3>Lambda Expressions</h3>
+                            <p>Sử dụng Lambda Expressions để cải thiện khả năng đọc code.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/annotations.html">
+                            <h3>Annotations</h3>
+                            <p>Annotations là một dạng metadata, cung cấp thông tin về chương trình mà không ảnh hưởng
+                                trực tiếp đến hoạt động của code.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/packages.html">
+                            <h3>Packages</h3>
+                            <p>Cách nhóm các lớp và interface vào package, cách sử dụng các lớp trong package.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/pattern-matching.html">
+                            <h3>Sử dụng Pattern Matching</h3>
+                            <p>Pattern matching là sự tiến hóa lớn tiếp theo của ngôn ngữ Java.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/ngoai-le.html">
+                            <h3>Ngoại lệ (Exceptions)</h3>
+                            <p>Sử dụng ngoại lệ để xử lý lỗi và các sự kiện khác thường.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/functional-style.html">
+                            <h3>Tái cấu trúc sang phong cách Functional</h3>
+                            <p>Học cách chuyển đổi code từ phong cách Imperative sang Functional.</p>
                         </a>
                     </div>
                 </div>
 
+                <!-- 4. Làm chủ API -->
                 <h2 class="section-title">Làm chủ API</h2>
                 <div class="grid">
                     <div class="card">
-                        <a href="#">
-                            <h3>Collections Framework</h3>
-                            <p>Học cách sử dụng List, Set, Map và các cấu trúc dữ liệu quan trọng.</p>
+                        <a href="pages/collections.html">
+                            <h3>The Collections Framework</h3>
+                            <p>Tìm hiểu Collections Framework để lưu trữ và truy xuất dữ liệu trong collections và
+                                hashmaps.</p>
                         </a>
                     </div>
                     <div class="card">
-                        <a href="#">
-                            <h3>Stream API</h3>
-                            <p>Xử lý tập hợp dữ liệu một cách hiệu quả và hiện đại theo phong cách functional.</p>
+                        <a href="pages/stream-api.html">
+                            <h3>The Stream API</h3>
+                            <p>Xử lý dữ liệu trong bộ nhớ với Java streams và collectors. Xử lý nhanh hơn với parallel
+                                streams.</p>
                         </a>
                     </div>
                     <div class="card">
-                        <a href="#">
-                            <h3>Java I/O API</h3>
-                            <p>Cách đọc và ghi dữ liệu từ tệp tin và các luồng (streams).</p>
+                        <a href="pages/java-io.html">
+                            <h3>The Java I/O API</h3>
+                            <p>Truy cập tài nguyên bên ngoài với Java Input / Output API.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/io-hien-dai.html">
+                            <h3>Tác vụ I/O thường gặp trong Java hiện đại</h3>
+                            <p>Tập trung vào các tác vụ thường gặp trong lập trình: đọc/ghi text, ảnh, JSON từ web...
+                            </p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/date-time.html">
+                            <h3>The Date Time API</h3>
+                            <p>Bao gồm Date Time API được thêm vào JDK 8, gồm các khái niệm và lớp cốt lõi.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/regex.html">
+                            <h3>Biểu thức chính quy (Regular Expressions)</h3>
+                            <p>Tổng quan về regular expressions và các lớp cốt lõi trong API này.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/reflection-intro.html">
+                            <h3>Giới thiệu Java Reflection</h3>
+                            <p>Reflection cho phép đối tượng nhìn vào gương và khám phá các trường, phương thức,
+                                constructor của nó.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/reflection-api.html">
+                            <h3>The Reflection API</h3>
+                            <p>Đi sâu vào Reflection API để kiểm tra hoặc sửa đổi hành vi runtime của ứng dụng trong
+                                JVM.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/method-handles.html">
+                            <h3>Giới thiệu Method Handles</h3>
+                            <p>Method handles, điểm khác biệt với Reflection API và công cụ chúng cung cấp.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/security.html">
+                            <h3>Bảo mật với JDK Libraries</h3>
+                            <p>Tổng quan về các API bảo mật và các thành phần cốt lõi của API này.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/virtual-threads.html">
+                            <h3>Virtual Threads</h3>
+                            <p>Virtual Threads: Là gì, Tại sao, và Như thế nào?</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/ffm-api.html">
+                            <h3>The Foreign Function and Memory API</h3>
+                            <p>FFM API giúp chương trình Java tương tác với code và dữ liệu bên ngoài Java runtime.</p>
                         </a>
                     </div>
                 </div>
+
+                <!-- 5. Tổ chức ứng dụng -->
+                <h2 class="section-title">Tổ chức ứng dụng</h2>
+                <div class="grid">
+                    <div class="card">
+                        <a href="pages/modules.html">
+                            <h3>Modules</h3>
+                            <p>Hiểu cách hệ thống module định hình JDK và cách bạn có thể dùng nó để làm code base dễ
+                                bảo trì hơn.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/jlink.html">
+                            <h3>Tạo Runtime và Application Images với JLink</h3>
+                            <p>Học cách sử dụng công cụ dòng lệnh jlink để tạo runtime image tùy chỉnh hoặc application
+                                image độc lập.</p>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 6. Tìm hiểu JVM -->
+                <h2 class="section-title">Tìm hiểu JVM</h2>
+                <div class="grid">
+                    <div class="card">
+                        <a href="pages/jdk-core-tools.html">
+                            <h3>Các công cụ JDK cốt lõi</h3>
+                            <p>Tìm hiểu các công cụ JDK để biên dịch, chạy, phân tích và giám sát code.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/monitoring-tools.html">
+                            <h3>Công cụ giám sát (Monitoring Tools)</h3>
+                            <p>Tìm hiểu các công cụ JDK để giám sát ứng dụng của bạn.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/jpackage.html">
+                            <h3>JPackage</h3>
+                            <p>Đóng gói ứng dụng để tạo trình cài đặt (installer) native.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/garbage-collection.html">
+                            <h3>Garbage Collection in Java</h3>
+                            <p>Hiểu các khía cạnh chính về cách garbage collection hoạt động trong Java và cách tinh
+                                chỉnh.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/jfr.html">
+                            <h3>JDK Flight Recorder</h3>
+                            <p>Học cách sử dụng JDK Flight Recorder để giám sát, phân tích hiệu suất và kiểm thử ứng
+                                dụng.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/jwebserver.html">
+                            <h3>JWebserver - Java Simple Web Server</h3>
+                            <p>Công cụ cung cấp HTTP server tối giản, được thiết kế cho prototype, testing và debugging.
+                            </p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/complementary-tools.html">
+                            <h3>Các công cụ JDK bổ sung</h3>
+                            <p>Học cách sử dụng các công cụ JDK bổ sung như jextract.</p>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 7. Ứng dụng Client phong phú -->
+                <h2 class="section-title">Ứng dụng Client phong phú (Rich Client)</h2>
+                <div class="grid">
+                    <div class="card">
+                        <a href="pages/javafx-install.html">
+                            <h3>Tải và cài đặt JavaFX</h3>
+                            <p>Hướng dẫn tải và cài đặt JavaFX runtime trên máy của bạn.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/javafx.html">
+                            <h3>Cơ bản về JavaFX</h3>
+                            <p>Học cách tạo các ứng dụng JavaFX đơn giản.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/javafx-animations.html">
+                            <h3>Giới thiệu về JavaFX animations</h3>
+                            <p>Học cách tạo các hiệu ứng animation JavaFX nâng cao.</p>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 8. Tài nguyên thêm -->
+                <h2 class="section-title">Tài nguyên thêm</h2>
+                <div class="grid">
+                    <div class="card">
+                        <a href="pages/chung-chi-java.html">
+                            <h3>Bắt đầu với Chứng chỉ Java</h3>
+                            <p>Tổng quan về Chứng chỉ Java và cách ôn luyện.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="pages/debugging.html">
+                            <h3>Debugging trong Java</h3>
+                            <p>Học cách sử dụng debugger để tìm và sửa lỗi trong code.</p>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 9. Tài liệu tham khảo -->
+                <h2 class="section-title">Tài liệu tham khảo phiên bản mới nhất</h2>
+                <div class="grid">
+                    <div class="card">
+                        <a href="https://docs.oracle.com/en/java/javase/25/" target="_blank">
+                            <h3>Tài liệu Java</h3>
+                            <p>Tài liệu Java SE 25 chính thức từ Oracle.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="https://docs.oracle.com/en/java/javase/25/docs/api/index.html" target="_blank">
+                            <h3>Java API Docs</h3>
+                            <p>Tài liệu API Java SE 25 đầy đủ.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="https://www.oracle.com/java/technologies/javase/25u-relnotes.html" target="_blank">
+                            <h3>Ghi chú phát hành Java</h3>
+                            <p>Thông tin chi tiết về các thay đổi trong phiên bản Java mới nhất.</p>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="https://docs.oracle.com/javase/specs/index.html" target="_blank">
+                            <h3>Đặc tả ngôn ngữ &amp; JVM</h3>
+                            <p>Đặc tả ngôn ngữ Java và Máy ảo Java.</p>
+                        </a>
+                    </div>
+                </div>
+
             </div>
         </div>
     </main>
@@ -114,32 +413,35 @@
     <footer>
         <div class="footer-grid">
             <div class="footer-col">
-                <h4>Về chúng tôi</h4>
+                <h4>Về Java</h4>
                 <ul>
-                    <li><a href="#">Giới thiệu</a></li>
-                    <li><a href="#">Cộng đồng</a></li>
-                    <li><a href="#">Bản quyền</a></li>
+                    <li><a href="https://www.oracle.com/java/" target="_blank">Về Java</a></li>
+                    <li><a href="https://openjdk.org/" target="_blank">Về OpenJDK</a></li>
+                    <li><a href="https://www.oracle.com/java/java-se-subscription/" target="_blank">Oracle Java SE
+                            Subscription</a></li>
                 </ul>
             </div>
             <div class="footer-col">
-                <h4>Học Java</h4>
+                <h4>Tài nguyên</h4>
                 <ul>
-                    <li><a href="index.html">Hướng dẫn</a></li>
-                    <li><a href="#">Tài liệu API</a></li>
-                    <li><a href="#">Chứng chỉ</a></li>
+                    <li><a href="https://www.oracle.com/java/technologies/javase-downloads.html" target="_blank">Tất cả
+                            phiên bản</a></li>
+                    <li><a href="https://github.com/openjdk/jdk" target="_blank">Mã nguồn</a></li>
+                    <li><a href="https://docs.oracle.com/en/java/" target="_blank">Tài liệu</a></li>
                 </ul>
             </div>
             <div class="footer-col">
-                <h4>Cập nhật</h4>
+                <h4>Cộng đồng</h4>
                 <ul>
-                    <li><a href="#">Blog</a></li>
-                    <li><a href="#">Sự kiện</a></li>
-                    <li><a href="#">Newsletter</a></li>
+                    <li><a href="https://dev.java/community/jugs/" target="_blank">Java User Groups</a></li>
+                    <li><a href="https://dev.java/community/events/" target="_blank">Hội nghị Java</a></li>
+                    <li><a href="https://youtube.com/java" target="_blank">Java trên YouTube</a></li>
                 </ul>
             </div>
         </div>
         <div class="footer-bottom">
-            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên <a href="https://dev.java/learn/"
+                    target="_blank">dev.java</a>.</p>
         </div>
     </footer>
 </body>

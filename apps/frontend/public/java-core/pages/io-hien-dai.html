@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>I/O hiện đại trong Java - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; I/O hiện đại</div>
+                <h1>Tác vụ I/O thường gặp trong Java hiện đại</h1>
+                <section id="text-files">
+                    <h2>Đọc và ghi file văn bản</h2>
+                    <div class="code-block">
+                        <pre><code>// Đọc toàn bộ file
+String content = Files.readString(Path.of("data.txt"), StandardCharsets.UTF_8);
+
+// Đọc từng dòng
+List&lt;String&gt; lines = Files.readAllLines(Path.of("data.txt"), StandardCharsets.UTF_8);
+
+// Ghi file
+Files.writeString(Path.of("output.txt"), "Hello World\n", 
+    StandardCharsets.UTF_8, 
+    StandardOpenOption.CREATE, 
+    StandardOpenOption.APPEND);</code></pre>
+                    </div>
+                </section>
+                <section id="web">
+                    <h2>Đọc dữ liệu từ web</h2>
+                    <div class="code-block">
+                        <pre><code>// HTTP Client (Java 11+)
+HttpClient client = HttpClient.newHttpClient();
+HttpRequest request = HttpRequest.newBuilder()
+    .uri(URI.create("https://api.example.com/data"))
+    .build();
+
+HttpResponse&lt;String&gt; response = client.send(request,
+    HttpResponse.BodyHandlers.ofString());
+
+IO.println(response.body());</code></pre>
+                    </div>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="java-io.html">&lt; Java I/O</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="date-time.html">Date Time &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#text-files">Đọc/ghi file</a></li>
+                    <li><a href="#web">Đọc từ web</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xử lý ngoại lệ (Exceptions) - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; Xử lý ngoại lệ
+                </div>
+                <h1>Xử lý ngoại lệ (Exceptions)</h1>
+
+                <section id="what-is">
+                    <h2>Ngoại lệ là gì?</h2>
+                    <p>Một <strong>ngoại lệ (exception)</strong> là một sự kiện xảy ra trong quá trình thực thi chương
+                        trình, làm gián đoạn luồng lệnh bình thường. Khi xảy ra lỗi, Java tạo ra một đối tượng ngoại lệ
+                        và "ném" (throw) nó.</p>
+                </section>
+
+                <section id="try-catch">
+                    <h2>Khối try-catch-finally</h2>
+                    <div class="code-block">
+                        <pre><code>try {
+    // Đặt code có thể gây lỗi ở đây
+    int[] arr = {1, 2, 3};
+    IO.println(arr[10]); // Lỗi: ArrayIndexOutOfBoundsException
+} catch (ArrayIndexOutOfBoundsException e) {
+    // Xử lý lỗi
+    IO.println("Lỗi: Chỉ số mảng vượt quá giới hạn: " + e.getMessage());
+} finally {
+    // Code này luôn được thực thi dù có lỗi hay không
+    IO.println("Khối finally luôn chạy.");
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="types">
+                    <h2>Phân loại ngoại lệ</h2>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>Checked Exceptions:</strong> Phải được xử lý hoặc khai báo (ví dụ:
+                            <code>IOException</code>). Trình biên dịch kiểm tra.</li>
+                        <li><strong>Unchecked Exceptions (RuntimeException):</strong> Không bắt buộc xử lý (ví dụ:
+                            <code>NullPointerException</code>, <code>ArrayIndexOutOfBoundsException</code>).</li>
+                        <li><strong>Errors:</strong> Vấn đề nghiêm trọng của JVM (ví dụ: <code>OutOfMemoryError</code>),
+                            thường không thể phục hồi.</li>
+                    </ul>
+                </section>
+
+                <section id="throw">
+                    <h2>Ném ngoại lệ (throw &amp; throws)</h2>
+                    <div class="code-block">
+                        <pre><code>// Khai báo phương thức có thể ném ngoại lệ
+public void checkAge(int age) throws IllegalArgumentException {
+    if (age &lt; 0) {
+        throw new IllegalArgumentException("Tuổi không hợp lệ: " + age);
+    }
+    IO.println("Tuổi hợp lệ: " + age);
+}</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="lambda.html">&lt; Lambda Expressions</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="collections.html">Collections Framework &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#what-is">Ngoại lệ là gì?</a></li>
+                    <li><a href="#try-catch">try-catch-finally</a></li>
+                    <li><a href="#types">Phân loại ngoại lệ</a></li>
+                    <li><a href="#throw">throw &amp; throws</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

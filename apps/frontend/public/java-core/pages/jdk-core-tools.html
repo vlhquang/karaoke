@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Các công cụ JDK cốt lõi - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; JDK Core Tools</div>
+                <h1>Các công cụ JDK cốt lõi</h1>
+                <section id="tools">
+                    <h2>Bộ công cụ cốt lõi</h2>
+                    <p>JDK cung cấp nhiều công cụ dòng lệnh quan trọng:</p>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>javac:</strong> Trình biên dịch Java, chuyển tệp <code>.java</code> thành bytecode
+                            <code>.class</code>.</li>
+                        <li><strong>java:</strong> Java launcher, khởi chạy ứng dụng Java.</li>
+                        <li><strong>jar:</strong> Quản lý tệp JAR (Java ARchive).</li>
+                        <li><strong>javadoc:</strong> Tạo tài liệu API HTML từ comment trong code.</li>
+                        <li><strong>jdeps:</strong> Phân tích phụ thuộc module và package.</li>
+                    </ul>
+                </section>
+                <section id="javac">
+                    <h2>javac - Biên dịch</h2>
+                    <div class="code-block">
+                        <pre><code># Biên dịch một tệp
+javac HelloWorld.java
+
+# Biên dịch với classpath
+javac -cp lib/*.jar src/Main.java -d out/
+
+# Biên dịch cho phiên bản Java cụ thể
+javac --release 21 Main.java</code></pre>
+                    </div>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="jlink.html">&lt; JLink</a></div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="monitoring-tools.html">Monitoring Tools &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#tools">Bộ công cụ</a></li>
+                    <li><a href="#javac">javac</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

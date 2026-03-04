@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Annotations trong Java - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; Annotations</div>
+                <h1>Annotations (Chú thích)</h1>
+                <section id="what-is">
+                    <h2>Annotations là gì?</h2>
+                    <p>Annotations là một dạng metadata cung cấp thông tin về chương trình mà không ảnh hưởng trực tiếp
+                        đến hoạt động của code. Chúng bắt đầu bằng ký tự <code>@</code>.</p>
+                </section>
+                <section id="common">
+                    <h2>Các Annotation phổ biến</h2>
+                    <div class="code-block">
+                        <pre><code>@Override      // Ghi đè phương thức từ lớp cha
+@Deprecated    // Đánh dấu code lỗi thời
+@SuppressWarnings("unchecked") // Tắt cảnh báo
+
+// Annotation tự định nghĩa
+@interface MyAnnotation {
+    String value() default "default";
+    int count() default 1;
+}
+
+// Sử dụng
+@MyAnnotation(value = "test", count = 3)
+public class MyClass { }</code></pre>
+                    </div>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="lambda.html">&lt; Lambda</a></div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="packages.html">Packages &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#what-is">Annotations là gì?</a></li>
+                    <li><a href="#common">Phổ biến</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

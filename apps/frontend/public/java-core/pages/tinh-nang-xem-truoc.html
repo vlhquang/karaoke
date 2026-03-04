@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tính năng xem trước (Preview) - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; Tính năng xem trước</div>
+                <h1>Sử dụng các tính năng xem trước trong JDK</h1>
+
+                <section id="what-is">
+                    <h2>Tính năng xem trước là gì?</h2>
+                    <p><strong>Preview features</strong> là các tính năng ngôn ngữ hoặc JVM đã hoàn chỉnh nhưng chưa cố
+                        định trong một phiên bản JDK cụ thể. Chúng được đưa vào để cộng đồng phản hồi trước khi ra mắt
+                        chính thức.</p>
+                </section>
+
+                <section id="enable">
+                    <h2>Cách bật tính năng xem trước</h2>
+                    <p>Bạn cần truyền flag <code>--enable-preview</code> khi biên dịch và chạy:</p>
+                    <div class="code-block">
+                        <pre><code># Biên dịch
+javac --enable-preview --release 25 Main.java
+
+# Chạy
+java --enable-preview Main</code></pre>
+                    </div>
+                </section>
+
+                <section id="caution">
+                    <h2>Lưu ý</h2>
+                    <p>Tính năng xem trước chỉ nên dùng để thử nghiệm và phản hồi, không nên dùng trong môi trường sản
+                        xuất vì chúng có thể thay đổi hoặc bị loại bỏ trong phiên bản tiếp theo.</p>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="tien-hoa-java.html">&lt; Tiến hóa
+                            Java</a></div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="oop-gioi-thieu.html">OOP &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#what-is">Preview là gì?</a></li>
+                    <li><a href="#enable">Cách bật</a></li>
+                    <li><a href="#caution">Lưu ý</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

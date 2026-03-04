@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lambda Expressions - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; Lambda
+                    Expressions
+                </div>
+                <h1>Lambda Expressions</h1>
+
+                <section id="intro">
+                    <h2>Lambda là gì?</h2>
+                    <p>Lambda expression (biểu thức lambda) là một hàm ẩn danh (anonymous function) ngắn gọn, có thể
+                        được truyền như một tham số. Chúng được giới thiệu trong Java 8 và là nền tảng của lập trình hàm
+                        (functional programming) trong Java.</p>
+                </section>
+
+                <section id="syntax">
+                    <h2>Cú pháp Lambda</h2>
+                    <div class="code-block">
+                        <pre><code>// Cú pháp: (tham số) -> biểu_thức
+// Hoặc: (tham số) -> { khối_lệnh; }
+
+// Ví dụ 1: Không tham số
+Runnable r = () -> IO.println("Hello Lambda!");
+
+// Ví dụ 2: Một tham số
+Consumer&lt;String&gt; printer = name -> IO.println("Hello, " + name);
+
+// Ví dụ 3: Nhiều tham số
+Comparator&lt;Integer&gt; comp = (a, b) -> a - b;</code></pre>
+                    </div>
+                </section>
+
+                <section id="functional-interface">
+                    <h2>Functional Interface</h2>
+                    <p>Lambda chỉ có thể được sử dụng ở những nơi mong đợi một <strong>Functional Interface</strong> —
+                        là một interface chỉ có <em>đúng một</em> phương thức trừu tượng. Các functional interface phổ
+                        biến trong <code>java.util.function</code>:</p>
+                    <div class="code-block">
+                        <pre><code>// Predicate&lt;T&gt;: nhận T, trả về boolean
+Predicate&lt;String&gt; isEmpty = s -> s.isEmpty();
+
+// Function&lt;T, R&gt;: nhận T, trả về R
+Function&lt;String, Integer&gt; length = s -> s.length();
+
+// Consumer&lt;T&gt;: nhận T, không trả về gì
+Consumer&lt;String&gt; print = s -> IO.println(s);
+
+// Supplier&lt;T&gt;: không nhận tham số, trả về T
+Supplier&lt;String&gt; greeting = () -> "Hello!";</code></pre>
+                    </div>
+                </section>
+
+                <section id="practical">
+                    <h2>Ví dụ thực tế</h2>
+                    <div class="code-block">
+                        <pre><code>List&lt;String&gt; names = List.of("Alice", "Bob", "Charlie");
+
+// Sắp xếp bằng lambda
+names.stream()
+     .sorted((a, b) -> a.compareTo(b))
+     .forEach(name -> IO.println(name));</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="generics.html">&lt; Generics</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="ngoai-le.html">Xử lý ngoại lệ &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Lambda là gì?</a></li>
+                    <li><a href="#syntax">Cú pháp</a></li>
+                    <li><a href="#functional-interface">Functional Interface</a></li>
+                    <li><a href="#practical">Ví dụ thực tế</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interface - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; Interface
+                </div>
+                <h1>Interface trong Java</h1>
+
+                <section id="what-is">
+                    <h2>Interface là gì?</h2>
+                    <p>Một <strong>interface</strong> là một "hợp đồng" định nghĩa những gì một lớp có thể làm, mà không
+                        cần lo đến cách nó làm. Một interface chứa các khai báo phương thức trừu tượng (abstract), các
+                        phương thức mặc định (default), phương thức tĩnh (static), và các hằng số (constants).</p>
+                    <div class="code-block">
+                        <pre><code>public interface Flyable {
+    void fly(); // phương thức trừu tượng
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="implements">
+                    <h2>Triển khai Interface (implements)</h2>
+                    <p>Một lớp triển khai interface bằng từ khóa <code>implements</code> và bắt buộc phải cài đặt tất cả
+                        các phương thức trừu tượng của interface đó.</p>
+                    <div class="code-block">
+                        <pre><code>public class Bird implements Flyable {
+    @Override
+    public void fly() {
+        System.out.println("Bird is flying");
+    }
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="difference">
+                    <h2>Interface vs Abstract Class</h2>
+                    <ul style="margin-left: 20px;">
+                        <li>Một lớp chỉ có thể kế thừa (<code>extends</code>) <strong>một</strong> lớp cha.</li>
+                        <li>Nhưng một lớp có thể triển khai (<code>implements</code>) <strong>nhiều</strong> interface
+                            cùng lúc.</li>
+                    </ul>
+                </section>
+
+                <section id="type">
+                    <h2>Dùng Interface như một kiểu dữ liệu</h2>
+                    <p>Khi một lớp triển khai một interface, bạn có thể sử dụng tên interface như một kiểu dữ liệu để
+                        khai báo biến tham chiếu đến đối tượng của lớp đó. Đây là nền tảng của tính đa hình
+                        (polymorphism).</p>
+                    <div class="code-block">
+                        <pre><code>Flyable myBird = new Bird();
+myBird.fly();</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="ke-thua.html">&lt; Kế thừa</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="so-va-chuoi.html">Số và Chuỗi &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#what-is">Interface là gì?</a></li>
+                    <li><a href="#implements">Triển khai Interface</a></li>
+                    <li><a href="#difference">Interface vs Abstract Class</a></li>
+                    <li><a href="#type">Dùng như kiểu dữ liệu</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

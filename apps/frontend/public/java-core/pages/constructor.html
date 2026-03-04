@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Constructor trong Java - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; <a
+                        href="lop-va-doi-tuong.html">Lớp và Đối tượng</a> &gt; Constructor
+                </div>
+                <h1>Constructor</h1>
+
+                <section id="what-is">
+                    <h2>Constructor là gì?</h2>
+                    <p>Một lớp chứa các constructor được gọi khi tạo mới một đối tượng. Constructor có cùng tên với lớp
+                        và không có kiểu trả về.</p>
+                    <div class="code-block">
+                        <pre><code>public class Bicycle {
+    private int gear;
+    private int speed;
+
+    // Constructor
+    public Bicycle(int startGear, int startSpeed) {
+        gear = startGear;
+        speed = startSpeed;
+    }
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="usage">
+                    <h2>Sử dụng Constructor</h2>
+                    <p>Khi tạo đối tượng bằng toán tử <code>new</code>, bạn truyền tham số cho constructor:</p>
+                    <div class="code-block">
+                        <pre><code>Bicycle myBike = new Bicycle(5, 25);</code></pre>
+                    </div>
+                </section>
+
+                <section id="no-arg">
+                    <h2>Constructor không tham số</h2>
+                    <p>Nếu bạn không định nghĩa bất kỳ constructor nào, Java sẽ tự động cung cấp một constructor không
+                        có tham số (no-argument constructor), khởi tạo tất cả các trường về giá trị mặc định. Tuy nhiên,
+                        nếu bạn đã khai báo ít nhất một constructor, constructor mặc định này sẽ không được cung cấp.
+                    </p>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="dinh-nghia-phuong-thuc.html">&lt; Định nghĩa phương thức</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="tao-va-dung-doi-tuong.html">Tạo và sử dụng đối tượng &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#what-is">Constructor là gì?</a></li>
+                    <li><a href="#usage">Sử dụng Constructor</a></li>
+                    <li><a href="#no-arg">Constructor không tham số</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

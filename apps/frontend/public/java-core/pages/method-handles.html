@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Method Handles - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; Method Handles</div>
+                <h1>Giới thiệu Method Handles</h1>
+                <section id="what-is">
+                    <h2>Method Handle là gì?</h2>
+                    <p>Method Handle là một tham chiếu trực tiếp, được kiểm tra kiểu, đến một phương thức, hàm khởi tạo,
+                        truy cập trường, hoặc thao tác chuyển đổi kiểu tương tự. Chúng là phương án hiệu suất cao thay
+                        thế cho Reflection API.</p>
+                </section>
+                <section id="example">
+                    <h2>Ví dụ</h2>
+                    <div class="code-block">
+                        <pre><code>import java.lang.invoke.*;
+
+MethodHandles.Lookup lookup = MethodHandles.lookup();
+
+// Lấy handle cho phương thức String.toUpperCase()
+MethodType mt = MethodType.methodType(String.class);
+MethodHandle toUpperCase = lookup.findVirtual(String.class, "toUpperCase", mt);
+
+// Gọi method handle
+String result = (String) toUpperCase.invoke("hello");
+IO.println(result); // "HELLO"</code></pre>
+                    </div>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="reflection-api.html">&lt;
+                            Reflection API</a></div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="security.html">Bảo mật &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#what-is">Method Handle là gì?</a></li>
+                    <li><a href="#example">Ví dụ</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

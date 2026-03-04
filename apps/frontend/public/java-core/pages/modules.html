@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modules trong Java - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; Modules
+                </div>
+                <h1>Modules trong Java (JPMS)</h1>
+
+                <section id="intro">
+                    <h2>Java Platform Module System (JPMS)</h2>
+                    <p>Được giới thiệu trong Java 9 (Project Jigsaw), Hệ thống Module Java (JPMS) cho phép chia nhỏ JDK
+                        và ứng dụng thành các <strong>module</strong> riêng biệt, cải thiện đóng gói và bảo mật.</p>
+                </section>
+
+                <section id="module-info">
+                    <h2>Khai báo module (module-info.java)</h2>
+                    <p>Mỗi module được định nghĩa bởi tệp <code>module-info.java</code> tại thư mục gốc của module:</p>
+                    <div class="code-block">
+                        <pre><code>// module-info.java
+module com.example.myapp {
+    // Phụ thuộc vào module khác
+    requires java.sql;
+    requires transitive java.logging;
+
+    // Xuất package để các module khác sử dụng
+    exports com.example.myapp.api;
+    exports com.example.myapp.model;
+
+    // Mở package cho reflection (ví dụ: cho framework)
+    opens com.example.myapp.config to spring.core;
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="benefits">
+                    <h2>Lợi ích của Module System</h2>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>Strong encapsulation:</strong> Mã nội bộ không thể bị truy cập từ bên ngoài module.
+                        </li>
+                        <li><strong>Reliable dependencies:</strong> Phụ thuộc được khai báo rõ ràng, không còn
+                            "classpath hell".</li>
+                        <li><strong>Smaller deployments:</strong> Tạo runtime nhỏ gọn với chỉ các module cần thiết
+                            (jlink).</li>
+                        <li><strong>Improved security:</strong> Giảm bề mặt tấn công.</li>
+                    </ul>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="date-time.html">&lt; Date Time API</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="garbage-collection.html">Garbage Collection &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">JPMS là gì?</a></li>
+                    <li><a href="#module-info">module-info.java</a></li>
+                    <li><a href="#benefits">Lợi ích</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Các công cụ JDK bổ sung - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; Công cụ JDK bổ sung</div>
+                <h1>Các công cụ JDK bổ sung</h1>
+                <section id="jextract">
+                    <h2>jextract</h2>
+                    <p><code>jextract</code> là công cụ hỗ trợ FFM API, tự động tạo các binding Java từ header file C
+                        (<code>.h</code>). Điều này giúp đơn giản hóa việc tích hợp với thư viện native.</p>
+                    <div class="code-block">
+                        <pre><code># Tạo Java binding từ header file C
+jextract --target-package com.example.native \
+         -l mylib \
+         mylib.h</code></pre>
+                    </div>
+                </section>
+                <section id="other">
+                    <h2>Các công cụ khác</h2>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>jshell:</strong> REPL (Read-Eval-Print Loop) tương tác.</li>
+                        <li><strong>jdeprscan:</strong> Quét sử dụng API đã bị deprecated.</li>
+                        <li><strong>jcmd:</strong> Gửi lệnh chẩn đoán đến tiến trình JVM đang chạy.</li>
+                    </ul>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="jwebserver.html">&lt;
+                            JWebserver</a></div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="javafx-install.html">JavaFX Setup &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#jextract">jextract</a></li>
+                    <li><a href="#other">Công cụ khác</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

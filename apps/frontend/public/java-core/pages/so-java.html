@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Số (Numbers) trong Java - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; <a
+                        href="so-va-chuoi.html">Số và Chuỗi</a> &gt; Số
+                </div>
+                <h1>Số (Numbers) trong Java</h1>
+
+                <section id="wrappers">
+                    <h2>Lớp bao bọc (Wrapper Classes)</h2>
+                    <p>Mỗi kiểu số nguyên thủy có một lớp bao bọc tương ứng trong gói <code>java.lang</code>:</p>
+                    <div class="code-block">
+                        <pre><code>// Kiểu nguyên thủy  → Lớp bao bọc
+// byte              → Byte
+// short             → Short
+// int               → Integer
+// long              → Long
+// float             → Float
+// double            → Double
+
+Integer x = 5;  // Autoboxing từ int sang Integer
+int y = x;      // Unboxing từ Integer sang int</code></pre>
+                    </div>
+                </section>
+
+                <section id="methods">
+                    <h2>Các phương thức của lớp bao bọc</h2>
+                    <p>Các lớp bao bọc cung cấp nhiều phương thức hữu ích:</p>
+                    <div class="code-block">
+                        <pre><code>// Chuyển đổi
+int i = Integer.parseInt("42");
+String s = String.valueOf(123);
+double d = Double.parseDouble("3.14");
+
+// Giới hạn kiểu
+IO.println(Integer.MAX_VALUE); // 2147483647
+IO.println(Integer.MIN_VALUE); // -2147483648</code></pre>
+                    </div>
+                </section>
+
+                <section id="math">
+                    <h2>Lớp Math</h2>
+                    <p>Lớp <code>java.lang.Math</code> cung cấp các hàm toán học tĩnh:</p>
+                    <div class="code-block">
+                        <pre><code>Math.abs(-5);         // 5
+Math.max(10, 20);     // 20
+Math.min(10, 20);     // 10
+Math.pow(2, 10);      // 1024.0
+Math.sqrt(16);        // 4.0
+Math.floor(3.7);      // 3.0
+Math.ceil(3.2);       // 4.0
+Math.round(3.5);      // 4
+Math.random();        // Số ngẫu nhiên từ [0, 1)</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="so-va-chuoi.html">&lt; Số và Chuỗi</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="ky-tu.html">Ký tự &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#wrappers">Lớp bao bọc</a></li>
+                    <li><a href="#methods">Phương thức wrapper</a></li>
+                    <li><a href="#math">Lớp Math</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

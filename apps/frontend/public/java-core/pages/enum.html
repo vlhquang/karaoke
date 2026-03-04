@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enum trong Java - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; <a
+                        href="lop-va-doi-tuong.html">Lớp và Đối tượng</a> &gt; Enum
+                </div>
+                <h1>Enum (Kiểu liệt kê)</h1>
+
+                <section id="what-is">
+                    <h2>Enum là gì?</h2>
+                    <p>Một <strong>enum type</strong> là một kiểu dữ liệu đặc biệt cho phép một biến chỉ được là một
+                        trong số các hằng số được định nghĩa trước. Enum phù hợp để biểu diễn các tập hợp cố định như
+                        ngày trong tuần, mùa, hướng la bàn, vv.</p>
+                    <div class="code-block">
+                        <pre><code>public enum Day {
+    SUNDAY, MONDAY, TUESDAY, WEDNESDAY,
+    THURSDAY, FRIDAY, SATURDAY
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="usage">
+                    <h2>Sử dụng Enum</h2>
+                    <div class="code-block">
+                        <pre><code>Day today = Day.MONDAY;
+
+switch (today) {
+    case MONDAY:
+        IO.println("Đầu tuần làm việc.");
+        break;
+    case FRIDAY:
+        IO.println("Gần cuối tuần rồi!");
+        break;
+    case SATURDAY:
+    case SUNDAY:
+        IO.println("Cuối tuần!");
+        break;
+    default:
+        IO.println("Giữa tuần.");
+        break;
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="methods">
+                    <h2>Enum có phương thức và trường</h2>
+                    <p>Trong Java, enum có thể có constructor, trường và phương thức, giúp bạn thêm chức năng vào mỗi
+                        hằng số.</p>
+                    <div class="code-block">
+                        <pre><code>public enum Planet {
+    MERCURY(3.303e+23, 2.4397e6),
+    VENUS(4.869e+24, 6.0518e6),
+    EARTH(5.976e+24, 6.37814e6);
+
+    private final double mass;
+    private final double radius;
+
+    Planet(double mass, double radius) {
+        this.mass = mass;
+        this.radius = radius;
+    }
+
+    double surfaceGravity() {
+        final double G = 6.67300E-11;
+        return G * mass / (radius * radius);
+    }
+}</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="lop-long-nhau.html">&lt; Lớp lồng nhau</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="records.html">Records &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#what-is">Enum là gì?</a></li>
+                    <li><a href="#usage">Sử dụng Enum</a></li>
+                    <li><a href="#methods">Enum có phương thức</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

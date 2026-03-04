@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Reflection API - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; Reflection API</div>
+                <h1>The Reflection API</h1>
+                <section id="deep-dive">
+                    <h2>Đi sâu vào Reflection API</h2>
+                    <p>Reflection API trong <code>java.lang.reflect</code> cung cấp các lớp như <code>Class</code>,
+                        <code>Field</code>, <code>Method</code>, <code>Constructor</code> cho phép kiểm tra và sửa đổi
+                        hành vi runtime.</p>
+                </section>
+                <section id="accessibility">
+                    <h2>Truy cập thành viên private</h2>
+                    <div class="code-block">
+                        <pre><code>class Secret {
+    private String hidden = "Bí mật";
+}
+
+Secret obj = new Secret();
+Field field = Secret.class.getDeclaredField("hidden");
+field.setAccessible(true); // Bypass access control
+String value = (String) field.get(obj);
+IO.println(value); // "Bí mật"</code></pre>
+                    </div>
+                    <p><strong>Lưu ý:</strong> Kể từ Java 9, truy cập reflection vào các class trong module bị hạn chế
+                        hơn. Bạn cần module export/open để cho phép reflection.</p>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="reflection-intro.html">&lt; Giới
+                            thiệu Reflection</a></div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="method-handles.html">Method Handles &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#deep-dive">Reflection API</a></li>
+                    <li><a href="#accessibility">Thành viên private</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

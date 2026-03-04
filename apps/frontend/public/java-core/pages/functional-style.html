@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tái cấu trúc sang Functional Style - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; Tái cấu trúc Functional</div>
+                <h1>Tái cấu trúc sang phong cách Functional</h1>
+                <section id="imperative-vs-functional">
+                    <h2>Imperative vs Functional</h2>
+                    <p>Phong cách <strong>imperative</strong> mô tả <em>làm thế nào</em> để đạt được kết quả (các bước
+                        thực hiện). Phong cách <strong>functional</strong> mô tả <em>cái gì</em> cần đạt được (khai báo
+                        kết quả).</p>
+                </section>
+                <section id="example">
+                    <h2>Ví dụ tái cấu trúc</h2>
+                    <div class="code-block">
+                        <pre><code>List&lt;String&gt; names = List.of("Alice", "Bob", "Charlie", "Anna");
+
+// Imperative (cũ)
+List&lt;String&gt; result = new ArrayList&lt;&gt;();
+for (String name : names) {
+    if (name.startsWith("A")) {
+        result.add(name.toUpperCase());
+    }
+}
+
+// Functional (mới)
+List&lt;String&gt; result = names.stream()
+    .filter(name -> name.startsWith("A"))
+    .map(String::toUpperCase)
+    .collect(Collectors.toList());</code></pre>
+                    </div>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="ngoai-le.html">&lt; Ngoại lệ</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="collections.html">Collections &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#imperative-vs-functional">So sánh</a></li>
+                    <li><a href="#example">Ví dụ</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>
