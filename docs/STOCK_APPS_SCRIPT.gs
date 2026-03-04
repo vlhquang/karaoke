@@ -170,7 +170,11 @@ function handleDelete(payload) {
   for (var i = 0; i < values.length; i++) {
     var rowId = Number(values[i][0]);
     if (rowId === id) {
-      sheet.deleteRow(i + 2);
+      var rowIndex = i + 2;
+      // Soft delete: keep row for audit/history, hide from UI by status filter.
+      sheet.getRange(rowIndex, 6).setValue("DELETED");
+      sheet.getRange(rowIndex, 7).setValue("");
+      sheet.getRange(rowIndex, 8).setValue("");
       return jsonResponse({ ok: true });
     }
   }

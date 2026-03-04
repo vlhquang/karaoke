@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { LiXiActionProps } from "./types";
 
+// Seeded LCG random number generator
+function createSeededRng(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+}
+
 interface PopItem {
   id: string;
   type: "target" | "noise" | "bomb";
@@ -29,6 +38,9 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room, onClo
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const targetAppearsAtRef = useRef<number>(0);
+  // Track which roundSeed we've been spawning items for to reset the generator per-round
+  const spawnCounterRef = useRef<number>(0);
+  const rngRef = useRef<(() => number) | null>(null);
 
   // Sync state transitions
   useEffect(() => {
@@ -36,38 +48,52 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room, onClo
       setItems([]);
       setTargetFoundInRound(false);
       setBlinded(false);
+      spawnCounterRef.current = 0;
+      rngRef.current = null;
     } else if (phase === "PLAYING" && !localRoundStartedAt) {
       setLocalRoundStartedAt(performance.now());
+      // Initialize seeded RNG for this round using server-provided roundSeed
+      const seed = state?.roundSeed ?? Math.floor(Math.random() * 1_000_000);
+      rngRef.current = createSeededRng(seed);
+      spawnCounterRef.current = 0;
     } else if (phase !== "PLAYING") {
       setLocalRoundStartedAt(null);
     }
-  }, [phase]);
+  }, [phase, state?.roundSeed]);
 
-  // Dynamic Popping Logic
+  // Dynamic Popping Logic — using shared seeded RNG
   useEffect(() => {
     if (phase !== "PLAYING" || targetFoundInRound || blinded) return;
 
     const spawnItem = () => {
       const now = performance.now();
-      const rand = Math.random();
-      let type: "target" | "noise" | "bomb" = "noise";
+      const rng = rngRef.current;
+      // Fallback to Math.random if no seed (shouldn't happen)
+      const rand1 = rng ? rng() : Math.random();
+      const rand2 = rng ? rng() : Math.random();
+      const rand3 = rng ? rng() : Math.random();
+      const rand4 = rng ? rng() : Math.random();
+      const rand5 = rng ? rng() : Math.random();
+      const rand6 = rng ? rng() : Math.random();
 
-      if (rand < 0.1) {
+      let type: "target" | "noise" | "bomb" = "noise";
+      if (rand1 < 0.1) {
         type = "target";
-      } else if (rand < 0.4) { // 30% bomb (0.1 to 0.4)
+      } else if (rand1 < 0.4) {
         type = "bomb";
       } else {
         type = "noise";
       }
 
+      spawnCounterRef.current += 1;
       const newItem: PopItem = {
-        id: Math.random().toString(36).substring(2, 9),
+        id: `item-${state?.round ?? 0}-${spawnCounterRef.current}`,
         type,
-        value: type === "target" ? state.targetNumber : Math.floor(Math.random() * 99) + 1,
-        x: 10 + Math.random() * 80, // 10% to 90%
-        y: 10 + Math.random() * 80,
-        scale: 0.8 + Math.random() * 0.4,
-        expiresAt: now + (state.itemLifetimeMs ?? 2000) * (0.8 + Math.random() * 0.4)
+        value: type === "target" ? state.targetNumber : Math.floor(rand2 * 99) + 1,
+        x: 10 + rand3 * 80,
+        y: 10 + rand4 * 80,
+        scale: 0.8 + rand5 * 0.4,
+        expiresAt: now + (state.itemLifetimeMs ?? 2000) * (0.8 + rand6 * 0.4)
       };
 
       setItems((prev: PopItem[]) => [...prev.filter((item: PopItem) => item.expiresAt > now), newItem]);
@@ -78,7 +104,7 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room, onClo
     }, Math.max(200, (state.itemLifetimeMs ?? 2000) / 5));
 
     return () => clearInterval(interval);
-  }, [phase, targetFoundInRound, blinded, items.length, state?.targetNumber]);
+  }, [phase, targetFoundInRound, blinded, items.length, state?.targetNumber, state?.roundSeed]);
 
   // Auto-cleanup expired items
   useEffect(() => {

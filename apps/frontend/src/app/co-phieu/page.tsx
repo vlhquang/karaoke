@@ -211,7 +211,7 @@ export default function StockPage() {
     };
 
     const handleDelete = async (id: number) => {
-        if (!confirm("Xác nhận XÓA VĨNH VIỄN giao dịch này?")) return;
+        if (!confirm("Xác nhận đánh dấu giao dịch này là DELETED?")) return;
         setIsLoading(true);
         try {
             const res = await fetch("/api/stocks", {
@@ -222,7 +222,7 @@ export default function StockPage() {
             const data = await res.json();
             if (data.ok) {
                 setTransactions(transactions.filter((tx) => tx.id !== id));
-                showToast("Đã xóa giao dịch");
+                showToast("Đã cập nhật trạng thái DELETED");
             } else {
                 alert(data.message || "Xóa thất bại");
             }

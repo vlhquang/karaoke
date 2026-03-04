@@ -11,6 +11,7 @@ interface NumberState {
   targetCountToWin: number;
   winCondition: "unique" | "ranking";
   targetNumber: number;
+  roundSeed: number;
   round: number;
   phase: "PREP" | "WAIT" | "HIGHLIGHT" | "PLAYING";
   phaseEndsAt: number;
@@ -34,6 +35,7 @@ export const numberGame: GameEngine = {
       targetCountToWin,
       winCondition,
       targetNumber: Math.floor(Math.random() * 99) + 1,
+      roundSeed: Math.floor(Math.random() * 1_000_000),
       round: 1,
       phase: "PREP",
       phaseEndsAt: Date.now() + 5000, // 5s Prep
@@ -130,6 +132,7 @@ export const numberGame: GameEngine = {
       if (!state.done) {
         // Move to next round
         state.round += 1;
+        state.roundSeed = Math.floor(Math.random() * 1_000_000);
         state.phase = "PREP";
         state.phaseEndsAt = now + 5000;
         Object.values(state.playerStates).forEach((ps) => {

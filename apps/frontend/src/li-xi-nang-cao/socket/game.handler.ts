@@ -49,16 +49,12 @@ export const processGameStep = (
           }, delay);
         }
       }
-      // RPS: engine.calculateResult handles missing choices anyway, so no need for explicit bot submit
-      // except to make it look active. Let's add RPS bot choice injection for better feedback.
       if (room.currentGame === "rps") {
         const state = room.gameState as any;
         const currentRound = state.rounds[state.currentRoundIndex];
         if (!currentRound.revealed && !currentRound.submissions[botId]) {
-          // Bot submits choice randomly
           const choices = ["rock", "paper", "scissors"];
           currentRound.submissions[botId] = choices[Math.floor(Math.random() * choices.length)];
-          // Calculate result will see this
         }
       }
     }
@@ -81,7 +77,7 @@ export const processGameStep = (
   const winnerId = (result as { winnerId?: string | null }).winnerId ?? null;
   const isDone = Boolean((result as { done?: boolean }).done);
 
-  if (room.currentGame === "rps" || room.currentGame === "number" || room.currentGame === "reaction" || room.currentGame === "racing") {
+  if (room.currentGame === "rps" || room.currentGame === "number" || room.currentGame === "reaction") {
     nsp.to(`lixi:${room.roomId}`).emit("game:update", {
       roomId: room.roomId,
       game: room.currentGame,
@@ -141,7 +137,4 @@ export const registerGameHandlers = (socket: AuthedSocket, roomService: RoomServ
   socket.on("number:found", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "number:found", payload));
   socket.on("shake:submit", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "shake:submit", payload));
   socket.on("color:tap", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "color:tap", payload));
-  socket.on("racing:lane_change", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "racing:lane_change", payload));
-  socket.on("racing:collision", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "racing:collision", payload));
-  socket.on("racing:answer", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "racing:answer", payload));
 };

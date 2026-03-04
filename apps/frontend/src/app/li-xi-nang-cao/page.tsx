@@ -89,7 +89,6 @@ const games: Array<{ type: LiXiGameType; title: string; desc: string; color: str
   { type: "number", title: "Săn số", desc: "Chạm đúng số mục tiêu trước.", color: "bg-violet-500/20 border-violet-400/50" },
   { type: "shake", title: "Lắc máy", desc: "Lắc mạnh trong 5 giây.", color: "bg-fuchsia-500/20 border-fuchsia-400/50" },
   { type: "color", title: "Chạm màu", desc: "Chạm đúng màu mục tiêu.", color: "bg-rose-500/20 border-rose-400/50" },
-  { type: "racing", title: "Đua xe", desc: "Tránh né chướng ngại vật.", color: "bg-orange-500/20 border-orange-400/50" }
 ];
 
 const pretty = (value: unknown): string => {
@@ -1225,23 +1224,49 @@ export default function LiXiNangCaoPage() {
 
                   {selectedGame === "memory" && (
                     <div className="space-y-4">
-                      <p className="text-xs text-slate-400">Chọn chủ đề hình ảnh:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { id: "animals", label: "Động vật" },
-                          { id: "fruits", label: "Hoa quả" },
-                          { id: "sports", label: "Thể thao" },
-                          { id: "vehicles", label: "Xe cộ" }
-                        ].map((t) => (
-                          <button
-                            key={t.id}
-                            onClick={() => { setMemoryTheme(t.id as any); void selectGame("memory", { memory: { boardLength: memoryBoardLength, theme: t.id } }); }}
-                            disabled={myReady}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${memoryTheme === t.id ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
-                          >
-                            {t.label}
-                          </button>
-                        ))}
+                      <div className="space-y-2">
+                        <p className="text-xs text-slate-400">Số cặp cần tìm (độ khó):</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { pairs: 4, label: "4 cặp", hint: "Dễ" },
+                            { pairs: 6, label: "6 cặp", hint: "" },
+                            { pairs: 8, label: "8 cặp", hint: "" },
+                            { pairs: 10, label: "10 cặp", hint: "Trung bình" },
+                            { pairs: 12, label: "12 cặp", hint: "" },
+                            { pairs: 16, label: "16 cặp", hint: "Khó" },
+                            { pairs: 20, label: "20 cặp", hint: "" },
+                            { pairs: 24, label: "24 cặp", hint: "Rất khó" },
+                          ].map((opt) => (
+                            <button
+                              key={opt.pairs}
+                              onClick={() => { setMemoryBoardLength(opt.pairs * 2); void selectGame("memory", { memory: { boardLength: opt.pairs * 2, theme: memoryTheme } }); }}
+                              disabled={myReady}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${memoryBoardLength === opt.pairs * 2 ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                            >
+                              {opt.label}{opt.hint ? <span className="ml-1 opacity-60">({opt.hint})</span> : null}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs text-slate-400">Chọn chủ đề hình ảnh:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { id: "animals", label: "Động vật" },
+                            { id: "fruits", label: "Hoa quả" },
+                            { id: "sports", label: "Thể thao" },
+                            { id: "vehicles", label: "Xe cộ" }
+                          ].map((t) => (
+                            <button
+                              key={t.id}
+                              onClick={() => { setMemoryTheme(t.id as any); void selectGame("memory", { memory: { boardLength: memoryBoardLength, theme: t.id } }); }}
+                              disabled={myReady}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${memoryTheme === t.id ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                            >
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
