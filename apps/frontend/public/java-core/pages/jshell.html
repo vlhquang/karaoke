@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JShell - Công cụ Shell của Java - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem & Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> > <a href="../index.html">Hướng dẫn</a> > JShell
+                </div>
+
+                <h1>JShell - Công cụ Shell của Java</h1>
+
+                <section id="intro">
+                    <h2>Giới thiệu về jshell</h2>
+                    <p><code>jshell</code> là một công cụ tương tác cho phép đánh giá các khai báo, câu lệnh và biểu
+                        thức của ngôn ngữ lập trình Java trong một vòng lặp <strong>read-eval-print (REPL)</strong>.</p>
+                    <p>Nó cung cấp một cách để tìm hiểu ngôn ngữ, khám phá các mã và API lạ, và tạo mẫu mã phức tạp một
+                        cách nhanh chóng. Các câu lệnh Java, định nghĩa biến, định nghĩa phương thức, định nghĩa lớp,
+                        câu lệnh import và biểu thức đều được chấp nhận. Các đoạn mã được nhập vào được gọi là
+                        <strong>snippets</strong>.
+                    </p>
+                </section>
+
+                <section id="basics">
+                    <h2>Khởi động và Kết thúc phiên jshell</h2>
+                    <p><code>jshell</code> đi kèm với JDK. Để bắt đầu một phiên làm việc, hãy nhập <code>jshell</code>
+                        trên dòng lệnh. Một thông báo chào mừng sẽ hiện ra, cùng với dấu nhắc để nhập các lệnh và đoạn
+                        mã.</p>
+                    <div class="code-block">
+                        <pre><code>$ jshell
+|  Welcome to JShell -- Version 25
+|  For an introduction type: /help intro
+
+jshell></code></pre>
+                    </div>
+                    <p>Để kết thúc phiên làm việc, hãy sử dụng lệnh <code>/exit</code>.</p>
+                    <div class="code-block">
+                        <pre><code>jshell> /exit
+|  Goodbye</code></pre>
+                    </div>
+                </section>
+
+                <section id="snippets">
+                    <h2>Nhập các đoạn mã (Snippets)</h2>
+                    <p>Ví dụ sau đây cho thấy hai biến và một phương thức được định nghĩa, sau đó phương thức được chạy.
+                        Lưu ý rằng một biến tạm (scratch variable) sẽ tự động được tạo để giữ kết quả nếu không có biến
+                        nào được cung cấp.</p>
+                    <div class="code-block">
+                        <button class="copy-btn">Copy</button>
+                        <pre><code>jshell> int a=4
+a ==> 4
+
+jshell> int b=8
+b ==> 8
+
+jshell> int square(int i1) {
+   ...> return i1 * i1;
+   ...> }
+|  created method square(int)
+
+jshell> square(b)
+$5 ==> 64</code></pre>
+                    </div>
+                </section>
+
+                <section id="changing">
+                    <h2>Thay đổi các đoạn mã</h2>
+                    <p>Bạn có thể thay đổi định nghĩa của một biến, phương thức hoặc lớp bằng cách nhập lại nó. Bạn có
+                        thể sử dụng phím mũi tên lên để lấy lại các mục đã nhập trước đó để tránh phải nhập lại toàn bộ.
+                    </p>
+                    <div class="code-block">
+                        <button class="copy-btn">Copy</button>
+                        <pre><code>jshell> String grade(int testScore) {
+   ...> if (testScore >= 90) {
+   ...> return "Pass";
+   ...> }
+   ...> return "Fail";
+   ...> }
+|  created method grade(int)
+
+jshell> grade(88)
+$3 ==> "Fail"</code></pre>
+                    </div>
+                    <p>Để thay đổi phương thức <code>grade</code> cho phép nhiều sinh viên vượt qua hơn, hãy nhập lại
+                        định nghĩa phương thức và thay đổi điểm đạt thành 80:</p>
+                    <div class="code-block">
+                        <pre><code>jshell> String grade(int testScore) { ... }
+|  modified method grade(int)
+
+jshell> grade(88)
+$5 ==> "Pass"</code></pre>
+                    </div>
+                </section>
+
+                <section id="commands">
+                    <h2>Các lệnh hữu ích trong jshell</h2>
+                    <ul style="margin-left: 20px;">
+                        <li><code>/list</code>: Chỉnh sửa hoặc liệt kê các đoạn mã đã nhập.</li>
+                        <li><code>/edit</code>: Mở một trình soạn thảo để chỉnh sửa các đoạn mã.</li>
+                        <li><code>/drop</code>: Xóa một đoạn mã.</li>
+                        <li><code>/history</code>: Hiển thị những gì đã được nhập trong phiên này.</li>
+                        <li><code>/open</code>: Mở một tệp hoặc tập lệnh (script).</li>
+                    </ul>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="chuong-trinh-don-le.html">
+                            < Chạy chương trình mã nguồn đơn lẻ</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="ngon-ngu-co-ban.html">Cơ bản về ngôn ngữ Java ></a>
+                    </div>
+                </div>
+            </article>
+
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Giới thiệu jshell</a></li>
+                    <li><a href="#basics">Khởi động/Kết thúc</a></li>
+                    <li><a href="#snippets">Nhập đoạn mã</a></li>
+                    <li><a href="#changing">Thay đổi đoạn mã</a></li>
+                    <li><a href="#commands">Các lệnh hữu ích</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

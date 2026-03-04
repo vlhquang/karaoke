@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiểu dữ liệu nguyên thủy - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem & Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> > <a href="../index.html">Hướng dẫn</a> > <a
+                        href="ngon-ngu-co-ban.html">Cơ bản về ngôn ngữ Java</a> > Kiểu dữ liệu nguyên thủy
+                </div>
+
+                <h1>Kiểu dữ liệu nguyên thủy</h1>
+
+                <section id="intro">
+                    <h2>Giới thiệu</h2>
+                    <p>Ngôn ngữ lập trình Java là ngôn ngữ <strong>định kiểu tĩnh (statically-typed)</strong>, điều đó
+                        có nghĩa là tất cả các biến phải được khai báo trước khi chúng có thể được sử dụng. Việc này bao
+                        gồm việc xác định kiểu dữ liệu và tên của biến:</p>
+                    <div class="code-block">
+                        <pre><code>int gear = 1;</code></pre>
+                    </div>
+                </section>
+
+                <section id="primitive-types">
+                    <h2>8 kiểu dữ liệu nguyên thủy</h2>
+                    <p>Java hỗ trợ 8 kiểu dữ liệu nguyên thủy, được định nghĩa sẵn bởi ngôn ngữ và được đặt tên bằng các
+                        từ khóa riêng:</p>
+                    <ul style="margin-left: 20px; margin-bottom: 20px;">
+                        <li><strong>byte:</strong> Số nguyên 8-bit. Phạm vi từ -128 đến 127. Hữu ích để tiết kiệm bộ nhớ
+                            trong các mảng lớn.</li>
+                        <li><strong>short:</strong> Số nguyên 16-bit. Phạm vi từ -32,768 đến 32,767.</li>
+                        <li><strong>int:</strong> Số nguyên 32-bit. Đây là lựa chọn mặc định cho các số nguyên.</li>
+                        <li><strong>long:</strong> Số nguyên 64-bit. Sử dụng khi bạn cần một phạm vi giá trị rộng hơn
+                            <code>int</code> cung cấp.
+                        </li>
+                        <li><strong>float:</strong> Số thực dấu phẩy động 32-bit (đơn độ chính xác). Không nên dùng cho
+                            các giá trị chính xác như tiền tệ.</li>
+                        <li><strong>double:</strong> Số thực dấu phẩy động 64-bit (độ chính xác kép). Đây là lựa chọn
+                            mặc định cho các số thập phân.</li>
+                        <li><strong>boolean:</strong> Chỉ có hai giá trị có thể: <code>true</code> (đúng) và
+                            <code>false</code> (sai).
+                        </li>
+                        <li><strong>char:</strong> Một ký tự Unicode 16-bit duy nhất.</li>
+                    </ul>
+                </section>
+
+                <section id="literals">
+                    <h2>Hằng số trực tiếp (Literals)</h2>
+                    <p>Một <strong>literal</strong> là biểu diễn mã nguồn của một giá trị cố định; các literal được đại
+                        diện trực tiếp trong mã của bạn mà không yêu cầu tính toán.</p>
+                    <div class="code-block">
+                        <pre><code>boolean result = true;
+char capitalC = 'C';
+byte b = 100;
+int i = 100000;</code></pre>
+                    </div>
+                    <h3>Số nguyên Literals</h3>
+                    <p>Một số nguyên literal là kiểu <code>long</code> nếu nó kết thúc bằng chữ <code>L</code> hoặc
+                        <code>l</code>; nếu không nó là kiểu <code>int</code>. Nên dùng chữ <code>L</code> hoa để tránh
+                        nhầm lẫn với số 1.
+                    </p>
+                    <div class="code-block">
+                        <pre><code>long val = 26L;</code></pre>
+                    </div>
+                    <h3>Số thực Literals</h3>
+                    <p>Một số thực literal là kiểu <code>float</code> nếu kết thúc bằng <code>F</code> hoặc
+                        <code>f</code>; nếu không nó là kiểu <code>double</code> (có thể kết thúc bằng <code>D</code>
+                        hoặc <code>d</code>).
+                    </p>
+                    <div class="code-block">
+                        <pre><code>double d1 = 123.4;
+float f1 = 123.4f;</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="bien-va-cach-dat-ten.html">
+                            < Tạo biến và Cách đặt tên</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="mang-trong-java.html">Mảng trong Java ></a>
+                    </div>
+                </div>
+            </article>
+
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Giới thiệu</a></li>
+                    <li><a href="#primitive-types">8 kiểu nguyên thủy</a></li>
+                    <li><a href="#literals">Hằng số Literals</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rẽ nhánh với câu lệnh Switch - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem & Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> > <a href="../index.html">Hướng dẫn</a> > <a
+                        href="ngon-ngu-co-ban.html">Cơ bản về ngôn ngữ Java</a> > Rẽ nhánh với câu lệnh Switch
+                </div>
+
+                <h1>Rẽ nhánh với câu lệnh Switch</h1>
+
+                <section id="intro">
+                    <h2>Câu lệnh Switch là gì?</h2>
+                    <p>Câu lệnh <code>switch</code> cho phép thực hiện nhiều đường dẫn thực thi khác nhau. Nó nhận một
+                        biến lựa chọn (selector variable) làm đối số và sử dụng giá trị của biến này để chọn đường dẫn
+                        sẽ được thực thi.</p>
+                    <p>Các kiểu dữ liệu được hỗ trợ cho biến lựa chọn:</p>
+                    <ul style="margin-left: 20px;">
+                        <li>Các kiểu nguyên thủy: <code>byte</code>, <code>short</code>, <code>char</code>, và
+                            <code>int</code>.
+                        </li>
+                        <li>Các kiểu bao bọc (Wrapper types): <code>Character</code>, <code>Byte</code>,
+                            <code>Short</code>, và <code>Integer</code>.
+                        </li>
+                        <li>Các kiểu liệt kê (Enumerated types - Enum).</li>
+                        <li>Kiểu <code>String</code>.</li>
+                    </ul>
+                    <p><em>Lưu ý: <code>boolean</code>, <code>long</code>, <code>float</code>, và <code>double</code>
+                            không được hỗ trợ làm biến lựa chọn.</em></p>
+                </section>
+
+                <section id="example">
+                    <h2>Ví dụ về Switch</h2>
+                    <div class="code-block">
+                        <pre><code>int quarter = 1;
+String quarterLabel;
+switch (quarter) {
+    case 0:
+        quarterLabel = "Q1 - Mùa Đông";
+        break;
+    case 1:
+        quarterLabel = "Q2 - Mùa Xuân";
+        break;
+    case 2:
+        quarterLabel = "Q3 - Mùa Hạ";
+        break;
+    case 3:
+        quarterLabel = "Q4 - Mùa Thu";
+        break;
+    default:
+        quarterLabel = "Quý không hợp lệ";
+        break;
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="break">
+                    <h2>Từ khóa break và Cơ chế Fall-through</h2>
+                    <p>Mỗi câu lệnh <code>break</code> sẽ kết thúc câu lệnh <code>switch</code> bao quanh nó. Luồng điều
+                        khiển sẽ tiếp tục với câu lệnh đầu tiên sau khối switch.</p>
+                    <p>Nếu thiếu <code>break</code>, các câu lệnh trong khối switch sẽ bị "trôi" (fall-through). Tất cả
+                        các câu lệnh sau nhãn <code>case</code> khớp sẽ được thực thi theo trình tự cho đến khi gặp
+                        <code>break</code>.
+                    </p>
+                </section>
+
+                <section id="string">
+                    <h2>Sử dụng String trong Switch</h2>
+                    <p>Trong Java SE 7 và mới hơn, bạn có thể sử dụng đối tượng <code>String</code> trong biểu thức
+                        switch.</p>
+                    <div class="code-block">
+                        <pre><code>String month = "August";
+switch (month.toLowerCase()) {
+    case "january": monthNumber = 1; break;
+    case "february": monthNumber = 2; break;
+    // ...
+    default: monthNumber = 0; break;
+}</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="dieu-khien-luong.html">
+                            < Câu lệnh điều khiển luồng</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="bieu-thuc-switch.html">Rẽ nhánh với Switch Expression ></a>
+                    </div>
+                </div>
+            </article>
+
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Giới thiệu</a></li>
+                    <li><a href="#example">Ví dụ</a></li>
+                    <li><a href="#break">Break & Fall-through</a></li>
+                    <li><a href="#string">Dùng String</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

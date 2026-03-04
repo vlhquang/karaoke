@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sử dụng định danh kiểu var - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem & Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> > <a href="../index.html">Hướng dẫn</a> > <a
+                        href="ngon-ngu-co-ban.html">Cơ bản về ngôn ngữ Java</a> > Sử dụng kiểu var
+                </div>
+
+                <h1>Sử dụng định danh kiểu var</h1>
+
+                <section id="intro">
+                    <h2>Từ khóa var</h2>
+                    <p>Bắt đầu từ Java 10, bạn có thể sử dụng định danh <code>var</code> thay cho kiểu dữ liệu rõ ràng
+                        khi khai báo <strong>biến cục bộ</strong>. Điều này được gọi là <strong>Local Variable Type
+                            Inference</strong> (Suy luận kiểu biến cục bộ).</p>
+                    <p>Khi sử dụng <code>var</code>, trình biên dịch Java sẽ tự động suy luận kiểu của biến dựa trên giá
+                        trị khởi tạo của nó.</p>
+                </section>
+
+                <section id="examples">
+                    <h2>Ví dụ sử dụng var</h2>
+                    <div class="code-block">
+                        <pre><code>// Thay vì viết:
+String message = "Hello World";
+// Bạn có thể viết:
+var message = "Hello World"; // Trình biên dịch suy luận kiểu String
+
+// Ví dụ với danh sách
+var list = new ArrayList&lt;String&gt;(); // Suy luận kiểu ArrayList&lt;String&gt;</code></pre>
+                    </div>
+                </section>
+
+                <section id="restrictions">
+                    <h2>Các hạn chế khi dùng var</h2>
+                    <p>Mặc dù hữu ích, <code>var</code> có một số quy tắc và hạn chế quan trọng:</p>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>Chỉ dùng cho biến cục bộ:</strong> Bạn không thể dùng <code>var</code> cho các
+                            trường (fields) của lớp, tham số phương thức, hoặc kiểu trả về của phương thức.</li>
+                        <li><strong>Phải khởi tạo ngay:</strong> Biến <code>var</code> phải được khởi tạo ngay khi khai
+                            báo để trình biên dịch có cơ sở suy luận kiểu.</li>
+                        <li><strong>Không thể khởi tạo null:</strong> <code>var x = null;</code> là không hợp lệ vì
+                            không thể suy luận kiểu từ <code>null</code>.</li>
+                        <li><strong>Không thể dùng cho mảng khởi tạo kiểu {}:</strong> <code>var a = {1, 2, 3};</code>
+                            là không hợp lệ.</li>
+                    </ul>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="mang-trong-java.html">
+                            < Mảng trong Java</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="toan-tu-java.html">Sử dụng các Toán tử ></a>
+                    </div>
+                </div>
+            </article>
+
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Từ khóa var</a></li>
+                    <li><a href="#examples">Ví dụ</a></li>
+                    <li><a href="#restrictions">Hạn chế</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

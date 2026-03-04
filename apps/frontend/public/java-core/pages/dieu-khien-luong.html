@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Câu lệnh điều khiển luồng - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem & Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> > <a href="../index.html">Hướng dẫn</a> > <a
+                        href="ngon-ngu-co-ban.html">Cơ bản về ngôn ngữ Java</a> > Câu lệnh điều khiển luồng
+                </div>
+
+                <h1>Các câu lệnh điều khiển luồng</h1>
+                <p>Các câu lệnh trong mã nguồn của bạn thường được thực thi từ trên xuống dưới, theo đúng thứ tự mà
+                    chúng xuất hiện. Tuy nhiên, các câu lệnh điều khiển luồng cho phép bạn phá vỡ sự thực thi tuần tự đó
+                    bằng cách sử dụng các cấu trúc rẽ nhánh, lặp và ra quyết định.</p>
+
+                <section id="if-else">
+                    <h2>Câu lệnh If-Then và If-Then-Else</h2>
+                    <p>Câu lệnh <code>if-then</code> là câu lệnh điều khiển luồng cơ bản nhất. Nó chỉ thực thi một khối
+                        mã <em>nếu</em> một điều kiện cụ thể là đúng (true).</p>
+                    <div class="code-block">
+                        <pre><code>if (isMoving) {
+    currentSpeed++;
+}</code></pre>
+                    </div>
+                    <p>Câu lệnh <code>if-then-else</code> cung cấp một đường dẫn thực thi phụ khi biểu thức "if" có giá
+                        trị là false.</p>
+                    <div class="code-block">
+                        <pre><code>if (testScore >= 90) {
+    grade = 'A';
+} else if (testScore >= 80) {
+    grade = 'B';
+} else {
+    grade = 'F';
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="switch">
+                    <h2>Câu lệnh Switch</h2>
+                    <p>Câu lệnh <code>switch</code> cho phép thực thi nhiều đường dẫn tiềm năng khác nhau dựa trên giá
+                        trị của một biến. Nó hoạt động với các kiểu dữ liệu nguyên thủy (thường là int, char), Enum, và
+                        String.</p>
+                    <p><em>(Chi tiết hơn về Switch sẽ có ở bài học riêng)</em></p>
+                </section>
+
+                <section id="loops">
+                    <h2>Các câu lệnh lặp (While, Do-While và For)</h2>
+                    <p>Câu lệnh <strong>while</strong> thực thi một khối lệnh liên tục khi một điều kiện cụ thể còn
+                        đúng:</p>
+                    <div class="code-block">
+                        <pre><code>while (count < 11) {
+    IO.println("Count is: " + count);
+    count++;
+}</code></pre>
+                    </div>
+                    <p>Câu lệnh <strong>do-while</strong> tương tự như while, nhưng đảm bảo rằng khối mã sẽ được thực
+                        hiện <em>ít nhất một lần</em>:</p>
+                    <div class="code-block">
+                        <pre><code>do {
+    IO.println("Count is: " + count);
+    count++;
+} while (count < 11);</code></pre>
+                    </div>
+                    <p>Câu lệnh <strong>for</strong> cung cấp một cách gọn gàng để lặp qua một phạm vi giá trị:</p>
+                    <div class="code-block">
+                        <pre><code>for (int i=1; i < 11; i++) {
+    IO.println("Count is: " + i);
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="branching">
+                    <h2>Câu lệnh rẽ nhánh (Break, Continue, Return)</h2>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>break:</strong> Thoát khỏi vòng lặp hiện tại hoặc câu lệnh switch ngay lập tức.</li>
+                        <li><strong>continue:</strong> Bỏ qua phần còn lại của lần lặp hiện tại và bắt đầu lần lặp tiếp
+                            theo.</li>
+                        <li><strong>return:</strong> Thoát khỏi phương thức hiện tại và có thể trả về một giá trị.</li>
+                    </ul>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="bieu-thuc-cau-lenh-khoi.html">
+                            < Biểu thức, Câu lệnh và Khối mã</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="cau-lenh-switch.html">Rẽ nhánh với câu lệnh Switch ></a>
+                    </div>
+                </div>
+            </article>
+
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#if-else">If-Then-Else</a></li>
+                    <li><a href="#switch">Switch</a></li>
+                    <li><a href="#loops">Vòng lặp</a></li>
+                    <li><a href="#branching">Rẽ nhánh</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

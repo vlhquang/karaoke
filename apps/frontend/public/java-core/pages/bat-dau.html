@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bắt đầu với Java - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem & Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> > <a href="../index.html">Hướng dẫn</a> > Bắt đầu với Java
+                </div>
+
+                <h1>Bắt đầu với Java</h1>
+
+                <section id="elements">
+                    <h2>Các thành phần của một ứng dụng Java</h2>
+                    <p>Nếu bạn thực sự muốn chạy ngay mã Java đầu tiên của mình, bạn có thể thử <strong>Java
+                            Playground</strong> có sẵn trên trang web này. Bạn có thể thử hầu hết các đoạn mã nhỏ trong
+                        đó. Ví dụ: bạn có thể in ra <code>Hello World!</code>, đây chắc chắn là điều đầu tiên bạn muốn
+                        thử. Bạn không cần cài đặt bất cứ thứ gì, chỉ cần nhập mã Java, nhấn chạy và xong!</p>
+                </section>
+
+                <section id="cycle">
+                    <h2>Chu kỳ Biên dịch và Thực thi trong Java</h2>
+                    <p>Có một vài bước bạn cần tuân theo để tạo một ứng dụng Java. Hướng dẫn này chỉ cho bạn cách tạo
+                        một chương trình Java rất đơn giản. Nếu bạn cần tạo một ứng dụng doanh nghiệp, quy trình sẽ phức
+                        tạp hơn nhưng cốt lõi vẫn là những bước đơn giản này.</p>
+                    <p>Bước đầu tiên là viết mã Java trong một trình soạn thảo văn bản.</p>
+                    <p>Sau đó, mã này phải được chuyển đổi sang một định dạng khác mà máy tính của bạn có thể thực thi
+                        được. Quá trình chuyển đổi này được thực hiện bởi một phần mềm đặc biệt gọi là <strong>trình
+                            biên dịch (compiler)</strong>. Một số ngôn ngữ không có trình biên dịch; Java thì có. Mỗi
+                        trình biên dịch là riêng biệt cho từng ngôn ngữ.</p>
+                    <p>Tệp được tạo ra bởi trình biên dịch thường được gọi là tệp nhị phân (binary file) hoặc tệp thực
+                        thi (executable file). Trong khi bạn có thể đọc và hiểu mã nguồn, các tệp nhị phân không dành
+                        cho con người đọc. Chỉ máy tính mới có thể hiểu được nó.</p>
+                </section>
+
+                <section id="first-program">
+                    <h2>Tạo chương trình Java đầu tiên</h2>
+                    <p>Mã Java bạn viết được lưu trong các tệp văn bản thuần túy. Trong hướng dẫn này, ứng dụng của bạn
+                        sẽ được viết trong một tệp văn bản duy nhất. Các ứng dụng lớn hơn có thể yêu cầu hàng nghìn tệp
+                        như vậy.</p>
+                    <p>Chúng ta sẽ giả định tên tệp là <code>MyFirstJavaApp.java</code>. Bạn có thể đặt bất kỳ tên nào,
+                        miễn là giữ phần mở rộng là <code>.java</code>.</p>
+                    <div class="code-block">
+                        <button class="copy-btn">Copy</button>
+                        <pre><code>void main() { 
+    IO.println("Hello, World!"); 
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="jdk-setup">
+                    <h2>Cài đặt Bộ công cụ phát triển Java - JDK</h2>
+                    <p>Để biên dịch và chạy Java, bạn cần <strong>Java Development Kit (JDK)</strong>. JDK chứa nhiều
+                        công cụ, bao gồm trình biên dịch và môi trường thực thi.</p>
+                    <p>Bạn có thể tải JDK từ trang: <a href="https://jdk.java.net/"
+                            target="_blank">https://jdk.java.net/</a>. Hãy chọn phiên bản mới nhất phù hợp với hệ điều
+                        hành của bạn (Windows, Linux, hoặc macOS).</p>
+                </section>
+
+                <section id="run">
+                    <h2>Biên dịch và Chạy chương trình</h2>
+                    <p>Sau khi cài đặt JDK, hãy mở terminal hoặc command prompt và di chuyển đến thư mục chứa tệp
+                        <code>MyFirstJavaApp.java</code> của bạn.
+                    </p>
+                    <p>Kiểm tra xem Java đã được cài đặt chưa bằng lệnh:</p>
+                    <div class="code-block">
+                        <pre><code>> java -version</code></pre>
+                    </div>
+                    <p>Để chạy chương trình, hãy nhập lệnh sau:</p>
+                    <div class="code-block">
+                        <pre><code>> java MyFirstJavaApp.java</code></pre>
+                    </div>
+                    <p>Nếu chương trình in ra <code>Hello World!</code>, xin chúc mừng! Bạn đã chạy thành công chương
+                        trình Java đầu tiên của mình.</p>
+                </section>
+
+                <section id="interactive">
+                    <h2>Làm cho chương trình có tính tương tác</h2>
+                    <p>Hãy nâng cấp chương trình để hỏi tên người dùng:</p>
+                    <div class="code-block">
+                        <button class="copy-btn">Copy</button>
+                        <pre><code>void main() { 
+    IO.println("Chào mừng bạn!"); 
+    var name = IO.readln("Tên của bạn là gì? "); 
+    IO.println("Xin chào " + name); 
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="further">
+                    <h2>Đi xa hơn</h2>
+                    <p>Các lập trình viên chuyên nghiệp thường sử dụng <strong>Môi trường phát triển tích hợp
+                            (IDE)</strong> như IntelliJ IDEA, Eclipse hoặc NetBeans để quản lý mã nguồn hiệu quả hơn.
+                    </p>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Bài học này</span>
+                        <a href="#">Bắt đầu với Java</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="chuong-trinh-don-le.html">Chạy chương trình mã nguồn đơn lẻ ></a>
+                    </div>
+                </div>
+            </article>
+
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#elements">Thành phần ứng dụng</a></li>
+                    <li><a href="#cycle">Chu kỳ biên dịch</a></li>
+                    <li><a href="#first-program">Tạo chương trình đầu tiên</a></li>
+                    <li><a href="#jdk-setup">Cài đặt JDK</a></li>
+                    <li><a href="#run">Chạy chương trình</a></li>
+                    <li><a href="#interactive">Tính tương tác</a></li>
+                    <li><a href="#further">Đi xa hơn</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

@@ -31,6 +31,12 @@ export default function HomePage() {
       title: "Lì Xì Nâng Cao",
       description: "Bộ mini game realtime (reaction, memory, rps, number, shake, color).",
       badge: "New"
+    },
+    {
+      href: "/hoc-tap",
+      title: "Học tập",
+      description: "Tài liệu học tập, Java core và các kiến thức lập trình khác.",
+      badge: "New"
     }
   ];
 

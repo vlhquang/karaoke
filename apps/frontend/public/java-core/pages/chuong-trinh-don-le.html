@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chạy chương trình mã nguồn đơn lẻ - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem & Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> > <a href="../index.html">Hướng dẫn</a> > Chạy chương trình mã
+                    nguồn đơn lẻ
+                </div>
+
+                <h1>Chạy chương trình mã nguồn đơn lẻ</h1>
+
+                <section id="launching">
+                    <h2>Thực thi chương trình mã nguồn đơn lẻ</h2>
+                    <p>Trong JDK 11, Java đã giới thiệu khả năng khởi chạy một chương trình mã nguồn tệp đơn lẻ bằng
+                        trình chạy <code>java</code>, và từ JDK 22 đã hỗ trợ đa tệp, mà không cần phải biên dịch mã
+                        nguồn một cách rõ ràng trước đó. Điều này hoạt động bằng cách trình chạy <code>java</code> tự
+                        động gọi trình biên dịch và lưu trữ mã đã biên dịch trong bộ nhớ.</p>
+                    <p>Đây là một cách tuyệt vời để học cách sử dụng Java hoặc khám phá các tính năng mới trong Java API
+                        mà không phải trải qua các bước biên dịch và thực thi mã phức tạp.</p>
+                </section>
+
+                <section id="example">
+                    <h2>Thực thi chương trình đầu tiên của bạn</h2>
+                    <p>Để thực thi một chương trình mã nguồn tệp đơn lẻ, lớp đầu tiên được định nghĩa trong tệp nguồn
+                        phải chứa phương thức <code>public static void main(String[])</code> như ví dụ
+                        <code>HelloWorld</code> dưới đây:</p>
+                    <div class="code-block">
+                        <button class="copy-btn">Copy</button>
+                        <pre><code>public class HelloWorld {
+    public static void main(String[] args) {
+        IO.println("Hello World!");
+    }
+}</code></pre>
+                    </div>
+                    <p>Từ dòng lệnh, <code>HelloWorld</code> có thể được khởi chạy bằng lệnh (giả sử tên tệp là
+                        <code>HelloWorld.java</code>):</p>
+                    <div class="code-block">
+                        <pre><code>$ java HelloWorld.java</code></pre>
+                    </div>
+                </section>
+
+                <section id="with-multiple-classes">
+                    <h2>Nhiều lớp trong cùng một tệp</h2>
+                    <p>Nhiều lớp có thể được định nghĩa trong cùng một tệp nguồn nếu cần thiết cho mục đích đóng gói,
+                        như trong ví dụ này:</p>
+                    <div class="code-block">
+                        <button class="copy-btn">Copy</button>
+                        <pre><code>public class MultipleClassesInSameFile {
+    public static void main(String[] args) {
+        IO.println(GenerateMessage.generateMessage());
+        IO.println(AnotherMessage.generateAnotherMessage());
+    }
+}
+
+class GenerateMessage {
+    static String generateMessage() {
+        return "Đây là một thông báo";
+    }
+}
+
+class AnotherMessage {
+    static String generateAnotherMessage() {
+        return "Đây là một thông báo khác";
+    }
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="multi-file">
+                    <h2>Khởi chạy chương trình đa tệp</h2>
+                    <p>Kể từ khi ra mắt JDK 22, bao gồm <a href="https://openjdk.org/jeps/458" target="_blank">JEP
+                            458</a>, trình chạy <code>java</code> hiện có thể khởi chạy một chương trình mã nguồn đa
+                        tệp. Điều này cung cấp một sự chuyển đổi dần dần từ các chương trình tệp đơn lẻ đơn giản sang
+                        các chương trình phức tạp hơn.</p>
+                    <p>Trình chạy <code>java</code> sẽ tự động tìm kiếm, biên dịch và tải các chương trình đa tệp miễn
+                        là vị trí của các tệp nguồn khớp với cấu trúc gói (package) của các lớp được nhập (imported).
+                    </p>
+                </section>
+
+                <section id="shebang">
+                    <h2>Thực thi như một tệp Shebang</h2>
+                    <p>Trên hệ điều hành giống Unix, một ứng dụng mã nguồn tệp đơn lẻ cũng có thể được khởi chạy như một
+                        tệp shebang giống như một tập lệnh (script). Thêm đường dẫn đến <code>java</code> và phiên bản
+                        nguồn vào dòng đầu tiên:</p>
+                    <div class="code-block">
+                        <pre><code>#!/path/to/your/bin/java --source 25
+public class HelloJava {
+    public static void main(String[] args) {
+        IO.println("Xin chào " + args[0]);
+    }
+}</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="bat-dau.html">
+                            < Bắt đầu với Java</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="jshell.html">JShell - Công cụ Shell của Java ></a>
+                    </div>
+                </div>
+            </article>
+
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#launching">Thực thi tệp đơn lẻ</a></li>
+                    <li><a href="#example">Ví dụ đầu tiên</a></li>
+                    <li><a href="#with-multiple-classes">Nhiều lớp cùng tệp</a></li>
+                    <li><a href="#multi-file">Chương trình đa tệp</a></li>
+                    <li><a href="#shebang">Tệp Shebang</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>
