@@ -1,10 +1,14 @@
+import dynamic from "next/dynamic";
 import { ColorPanel } from "./color-panel";
 import { MemoryPanel } from "./memory-panel";
 import { NumberPanel } from "./number-panel";
 import { ReactionPanel } from "./reaction-panel";
 import { RpsPanel } from "./rps-panel";
 import { ShakePanel } from "./shake-panel";
-import { RacingPanel } from "./racing-panel";
+
+const RacingPanel = dynamic(() => import("./racing-panel").then(mod => mod.RacingPanel), {
+  ssr: false,
+});
 import type { LiXiActionProps, LiXiGameType } from "./types";
 
 interface GamePanelSwitchProps extends LiXiActionProps {
