@@ -21,7 +21,8 @@
     "socket.io": "^4.8.1",
     "uuid": "^11.1.0",
     "zod": "^3.24.1",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "phaser": "^3.80.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

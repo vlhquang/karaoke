@@ -81,7 +81,7 @@ export const processGameStep = (
   const winnerId = (result as { winnerId?: string | null }).winnerId ?? null;
   const isDone = Boolean((result as { done?: boolean }).done);
 
-  if (room.currentGame === "rps" || room.currentGame === "number" || room.currentGame === "reaction") {
+  if (room.currentGame === "rps" || room.currentGame === "number" || room.currentGame === "reaction" || room.currentGame === "racing") {
     nsp.to(`lixi:${room.roomId}`).emit("game:update", {
       roomId: room.roomId,
       game: room.currentGame,
@@ -141,4 +141,7 @@ export const registerGameHandlers = (socket: AuthedSocket, roomService: RoomServ
   socket.on("number:found", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "number:found", payload));
   socket.on("shake:submit", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "shake:submit", payload));
   socket.on("color:tap", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "color:tap", payload));
+  socket.on("racing:lane_change", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "racing:lane_change", payload));
+  socket.on("racing:collision", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "racing:collision", payload));
+  socket.on("racing:answer", (payload: Record<string, unknown>) => handleGameAction(socket, roomService, "racing:answer", payload));
 };
