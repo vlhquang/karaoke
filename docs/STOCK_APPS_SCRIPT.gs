@@ -1,7 +1,7 @@
 /**
  * Google Apps Script backend for personal Vietnamese stock buy manager.
  * Sheets required:
- * - transactions: id | symbol | date | price | quantity | status
+ * - transactions: id | symbol | date | price | quantity | status | sellPrice | sellDate
  * - config: key | value (must include ACCESS_CODE)
  */
 
@@ -33,6 +33,9 @@ function doPost(e) {
     }
     if (action === "sell") {
       return handleSell(payload);
+    }
+    if (action === "delete") {
+      return handleDelete(payload);
     }
 
     return jsonResponse({ ok: false, message: "Unsupported action" });
@@ -73,7 +76,7 @@ function handleAdd(payload) {
 
   const id = Date.now();
   const sheet = getSheet(TRANSACTION_SHEET);
-  sheet.appendRow([id, symbol, date, price, quantity, "HOLD"]);
+  sheet.appendRow([id, symbol, date, price, quantity, "HOLD", "", ""]);
   return jsonResponse({ ok: true, data: { id } });
 }
 
@@ -84,45 +87,90 @@ function handleList() {
     return jsonResponse({ ok: true, data: [] });
   }
 
-  const values = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
-  const rows = values
-    .map(function (row) {
-      return {
-        id: Number(row[0]),
-        symbol: String(row[1] || "").toUpperCase(),
-        date: String(row[2] || ""),
-        price: Number(row[3]),
-        quantity: Number(row[4]),
-        status: String(row[5] || "HOLD").toUpperCase()
-      };
-    })
-    .filter(function (tx) {
-      return tx.status === "HOLD";
-    })
-    .sort(function (a, b) {
-      return b.id - a.id;
-    });
+  const values = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+  var rows = [];
+  for (var i = 0; i < values.length; i++) {
+    var row = values[i];
+    var status = String(row[5] || "HOLD").toUpperCase();
+    
+    // Skip if status is not HOLD or SOLD (e.g. DELETED, ARCHIVED)
+    if (status !== "HOLD" && status !== "SOLD") continue;
+
+    var tx = {
+      id: Number(row[0]),
+      symbol: String(row[1] || "").toUpperCase(),
+      date: String(row[2] || ""),
+      price: Number(row[3]),
+      quantity: Number(row[4]),
+      status: status
+    };
+    if (status === "SOLD") {
+      tx.sellPrice = Number(row[6]) || 0;
+      tx.sellDate = String(row[7] || "");
+    }
+    rows.push(tx);
+  }
+
+  rows.sort(function (a, b) {
+    return b.id - a.id;
+  });
 
   return jsonResponse({ ok: true, data: rows });
 }
 
 function handleSell(payload) {
-  const id = Number(payload.id);
+  var id = Number(payload.id);
+  var sellPrice = Number(payload.sellPrice);
   if (!isFinite(id)) {
     return jsonResponse({ ok: false, message: "ID khong hop le" });
   }
+  if (!isFinite(sellPrice) || sellPrice <= 0) {
+    return jsonResponse({ ok: false, message: "Gia ban khong hop le" });
+  }
 
-  const sheet = getSheet(TRANSACTION_SHEET);
-  const lastRow = sheet.getLastRow();
+  var sheet = getSheet(TRANSACTION_SHEET);
+  var lastRow = sheet.getLastRow();
   if (lastRow < 2) {
     return jsonResponse({ ok: false, message: "Khong tim thay giao dich" });
   }
 
-  const values = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+  var now = new Date();
+  var sellDate = now.getFullYear() + "-" +
+    String(now.getMonth() + 1).padStart(2, "0") + "-" +
+    String(now.getDate()).padStart(2, "0");
+
+  var values = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
   for (var i = 0; i < values.length; i++) {
-    const rowId = Number(values[i][0]);
+    var rowId = Number(values[i][0]);
     if (rowId === id) {
-      sheet.getRange(i + 2, 6).setValue("SOLD");
+      var rowIndex = i + 2;
+      sheet.getRange(rowIndex, 6).setValue("SOLD");
+      sheet.getRange(rowIndex, 7).setValue(sellPrice);
+      sheet.getRange(rowIndex, 8).setValue(sellDate);
+      return jsonResponse({ ok: true, data: { sellPrice: sellPrice, sellDate: sellDate } });
+    }
+  }
+
+  return jsonResponse({ ok: false, message: "Khong tim thay giao dich" });
+}
+
+function handleDelete(payload) {
+  var id = Number(payload.id);
+  if (!isFinite(id)) {
+    return jsonResponse({ ok: false, message: "ID khong hop le" });
+  }
+
+  var sheet = getSheet(TRANSACTION_SHEET);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return jsonResponse({ ok: false, message: "Khong tim thay giao dich" });
+  }
+
+  var values = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+  for (var i = 0; i < values.length; i++) {
+    var rowId = Number(values[i][0]);
+    if (rowId === id) {
+      sheet.deleteRow(i + 2);
       return jsonResponse({ ok: true });
     }
   }

@@ -9,6 +9,9 @@ interface Transaction {
     date: string;
     price: number;
     quantity: number;
+    status: "HOLD" | "SOLD";
+    sellPrice?: number;
+    sellDate?: string;
 }
 
 interface PriceInfo {
@@ -38,6 +41,10 @@ export default function StockPage() {
     const [priceInput, setPriceInput] = useState("");
     const [quantityInput, setQuantityInput] = useState("");
 
+    // Sell Dialog states
+    const [sellTx, setSellTx] = useState<Transaction | null>(null);
+    const [sellPriceInput, setSellPriceInput] = useState("");
+
     useEffect(() => {
         const savedCode = localStorage.getItem("stock_access_code");
         if (savedCode) {
@@ -60,16 +67,6 @@ export default function StockPage() {
     const showToast = (msg: string, type: "success" | "info" = "success") => {
         setNotification({ msg, type });
         setTimeout(() => setNotification(null), 3000);
-    };
-
-    const formatDateTime = (date: Date) => {
-        const d = date.getDate().toString().padStart(2, "0");
-        const m = (date.getMonth() + 1).toString().padStart(2, "0");
-        const y = date.getFullYear();
-        const hh = date.getHours().toString().padStart(2, "0");
-        const mm = date.getMinutes().toString().padStart(2, "0");
-        const ss = date.getSeconds().toString().padStart(2, "0");
-        return `${d}/${m}/${y} ${hh}:${mm}:${ss}`;
     };
 
     const fetchRealtimePrices = async (symbols: string[]) => {
@@ -117,7 +114,7 @@ export default function StockPage() {
                 const list = data.data || [];
                 setTransactions(list);
                 if (!isSilent) showToast("Tải dữ liệu từ Google Sheets xong");
-                const symbols = list.map((tx: Transaction) => tx.symbol);
+                const symbols = list.filter((tx: Transaction) => tx.status === "HOLD").map((tx: Transaction) => tx.symbol);
                 if (symbols.length > 0) {
                     fetchRealtimePrices(symbols);
                 }
@@ -190,7 +187,15 @@ export default function StockPage() {
             });
             const data = await res.json();
             if (data.ok) {
-                setTransactions([{ id: data.data?.id || Date.now(), symbol, date: dateInput, price: priceValue, quantity: quantityValue }, ...transactions]);
+                const newTx: Transaction = {
+                    id: data.data?.id || Date.now(),
+                    symbol,
+                    date: dateInput,
+                    price: priceValue,
+                    quantity: quantityValue,
+                    status: "HOLD"
+                };
+                setTransactions([newTx, ...transactions]);
                 setSymbolInput("");
                 setPriceInput("");
                 setQuantityInput("");
@@ -205,20 +210,67 @@ export default function StockPage() {
         }
     };
 
-    const handleSell = async (id: number) => {
-        if (!confirm("Xác nhận gỡ giao dịch này?")) return;
+    const handleDelete = async (id: number) => {
+        if (!confirm("Xác nhận XÓA VĨNH VIỄN giao dịch này?")) return;
         setIsLoading(true);
         try {
             const res = await fetch("/api/stocks", {
                 method: "POST",
                 headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify({ action: "sell", accessCode, id }),
+                body: JSON.stringify({ action: "delete", accessCode, id }),
             });
             const data = await res.json();
             if (data.ok) {
                 setTransactions(transactions.filter((tx) => tx.id !== id));
+                showToast("Đã xóa giao dịch");
             } else {
-                alert(data.message || "Gỡ thất bại");
+                alert(data.message || "Xóa thất bại");
+            }
+        } catch (err) {
+            alert("Lỗi kết nối server");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleOpenSellDialog = (tx: Transaction) => {
+        setSellTx(tx);
+        // Default sell price is current price if available, otherwise buy price
+        const current = currentPrices[tx.symbol]?.current || tx.price;
+        setSellPriceInput(current.toLocaleString("vi-VN"));
+    };
+
+    const handleConfirmSell = async () => {
+        if (!sellTx) return;
+        const sellPriceValue = parseFloat(sellPriceInput.replace(/\D/g, ""));
+        if (isNaN(sellPriceValue) || sellPriceValue <= 0) {
+            alert("Giá bán không hợp lệ");
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const res = await fetch("/api/stocks", {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({
+                    action: "sell",
+                    accessCode,
+                    id: sellTx.id,
+                    sellPrice: sellPriceValue
+                }),
+            });
+            const data = await res.json();
+            if (data.ok) {
+                setTransactions(transactions.map(tx =>
+                    tx.id === sellTx.id
+                        ? { ...tx, status: "SOLD", sellPrice: sellPriceValue, sellDate: data.data?.sellDate || new Date().toISOString().split("T")[0] }
+                        : tx
+                ));
+                setSellTx(null);
+                showToast("Đã ghi nhận bán thành công");
+            } else {
+                alert(data.message || "Bán thất bại");
             }
         } catch (err) {
             alert("Lỗi kết nối server");
@@ -230,15 +282,24 @@ export default function StockPage() {
     const totals = useMemo(() => {
         let totalInvested = 0;
         let totalCurrentValue = 0;
+
         transactions.forEach((tx) => {
-            totalInvested += tx.price * tx.quantity;
-            const currentPrice = currentPrices[tx.symbol]?.current || 0;
-            if (currentPrice > 0) {
-                totalCurrentValue += currentPrice * tx.quantity;
+            const cost = tx.price * tx.quantity;
+            totalInvested += cost;
+
+            if (tx.status === "SOLD") {
+                const proceed = (tx.sellPrice || 0) * tx.quantity;
+                totalCurrentValue += proceed;
             } else {
-                totalCurrentValue += tx.price * tx.quantity;
+                const currentPrice = currentPrices[tx.symbol]?.current || 0;
+                if (currentPrice > 0) {
+                    totalCurrentValue += currentPrice * tx.quantity;
+                } else {
+                    totalCurrentValue += cost;
+                }
             }
         });
+
         const profit = totalCurrentValue - totalInvested;
         const percent = totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
         return { totalInvested, totalCurrentValue, profit, percent };
@@ -311,8 +372,8 @@ export default function StockPage() {
                             {isRefreshingSheet ? "Đang tải..." : "Làm mới"}
                         </button>
                         <button
-                            onClick={() => fetchRealtimePrices(transactions.map(t => t.symbol))}
-                            disabled={isRefreshingPrices || transactions.length === 0}
+                            onClick={() => fetchRealtimePrices(transactions.filter(t => t.status === "HOLD").map(t => t.symbol))}
+                            disabled={isRefreshingPrices || transactions.filter(t => t.status === "HOLD").length === 0}
                             className="rounded-xl border border-emerald-900/30 bg-emerald-950/20 px-3 py-2 text-[10px] md:text-xs font-medium text-emerald-400 transition hover:bg-emerald-900/30 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                             {isRefreshingPrices ? "Đang cập nhật..." : "Làm mới giá"}
@@ -341,11 +402,11 @@ export default function StockPage() {
                                 <p className="text-xl font-bold">{formatMoney(totals.totalInvested)}</p>
                             </div>
                             <div>
-                                <p className="text-xs uppercase tracking-wider text-slate-500">Hiện tại</p>
+                                <p className="text-xs uppercase tracking-wider text-slate-500">Hiện tại + Đã bán</p>
                                 <p className="text-xl font-bold text-cyan-400">{formatMoney(totals.totalCurrentValue)}</p>
                             </div>
                             <div className="col-span-2 rounded-xl bg-slate-800/30 p-3 mt-1 flex items-center justify-between">
-                                <p className="text-xs uppercase tracking-wider text-slate-500">Lãi / Lỗ</p>
+                                <p className="text-xs uppercase tracking-wider text-slate-500">Tổng Lãi / Lỗ</p>
                                 <p className={`text-2xl font-black ${totals.profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                                     {totals.profit >= 0 ? "+" : ""}{formatMoney(totals.profit)}
                                 </p>
@@ -407,9 +468,20 @@ export default function StockPage() {
                             const txs = groupedData[symbol]!;
                             const priceInfo = currentPrices[symbol];
                             const currentPriceValue = priceInfo?.current || 0;
-                            let gInv = 0, gQty = 0;
-                            txs.forEach(t => { gInv += t.price * t.quantity; gQty += t.quantity; });
-                            const gProfit = currentPriceValue > 0 ? (currentPriceValue * gQty) - gInv : 0;
+
+                            let gInv = 0, gQty = 0, gProfit = 0;
+                            txs.forEach(t => {
+                                const cost = t.price * t.quantity;
+                                gInv += cost;
+                                if (t.status === "SOLD") {
+                                    gProfit += (t.sellPrice! * t.quantity) - cost;
+                                } else {
+                                    gQty += t.quantity;
+                                    if (currentPriceValue > 0) {
+                                        gProfit += (currentPriceValue * t.quantity) - cost;
+                                    }
+                                }
+                            });
                             const gPerc = gInv > 0 ? (gProfit / gInv) * 100 : 0;
 
                             return (
@@ -417,7 +489,7 @@ export default function StockPage() {
                                     <div className="bg-slate-800/40 px-4 py-3 flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 gap-3">
                                         <div className="flex items-center gap-2">
                                             <span className="text-xl font-black">{symbol}</span>
-                                            <span className="text-sm text-slate-500 font-mono">({gQty})</span>
+                                            {gQty > 0 && <span className="text-sm text-slate-500 font-mono">({gQty})</span>}
                                         </div>
 
                                         <div className="flex-1 md:text-right">
@@ -426,20 +498,6 @@ export default function StockPage() {
                                                 <span className="text-[10px] font-mono text-slate-500 leading-none mb-1">
                                                     Thời gian cập nhật: {priceInfo?.timestamp || "--/--/---- --:--:--"}
                                                 </span>
-
-                                                {priceInfo?.reference !== undefined && priceInfo?.reference !== null && (
-                                                    <div className="flex items-center md:justify-end gap-1 mb-1">
-                                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Giá tham chiếu:</span>
-                                                        <span className="text-[11px] font-mono text-slate-400">{formatMoney(priceInfo.reference)}</span>
-                                                    </div>
-                                                )}
-
-                                                {priceInfo?.opening !== undefined && priceInfo?.opening !== null && (
-                                                    <div className="flex items-center md:justify-end gap-1 mb-1">
-                                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Giá mở cửa:</span>
-                                                        <span className="text-[11px] font-mono text-slate-400">{formatMoney(priceInfo.opening)}</span>
-                                                    </div>
-                                                )}
 
                                                 <div className="flex items-baseline md:justify-end gap-2">
                                                     <span className={`text-2xl font-black ${currentPriceValue > 0 && priceInfo?.reference
@@ -463,7 +521,7 @@ export default function StockPage() {
                                         </div>
 
                                         <div className="md:ml-4 flex flex-col items-end justify-center border-l border-slate-800/50 pl-4">
-                                            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Lãi / Lỗ</p>
+                                            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Tổng Lãi / Lỗ</p>
                                             <p className={`text-lg font-black leading-none ${gProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                                                 {gProfit !== 0 ? (gProfit > 0 ? "+" : "") + formatMoney(gProfit) : "0"}
                                             </p>
@@ -478,30 +536,83 @@ export default function StockPage() {
                                         <table className="w-full text-sm text-left">
                                             <tbody className="divide-y divide-slate-800/30">
                                                 {txs.map((tx) => {
-                                                    const p = currentPriceValue > 0 ? (currentPriceValue - tx.price) * tx.quantity : 0;
+                                                    const isSold = tx.status === "SOLD";
+                                                    let p = 0;
+                                                    let pPerc = 0;
+                                                    if (isSold) {
+                                                        p = (tx.sellPrice! - tx.price) * tx.quantity;
+                                                        pPerc = ((tx.sellPrice! - tx.price) / tx.price) * 100;
+                                                    } else if (currentPriceValue > 0) {
+                                                        p = (currentPriceValue - tx.price) * tx.quantity;
+                                                        pPerc = ((currentPriceValue - tx.price) / tx.price) * 100;
+                                                    }
+
                                                     return (
-                                                        <tr key={tx.id} className="hover:bg-slate-800/20">
-                                                            <td className="px-4 py-2 text-slate-500">{new Date(tx.date).toLocaleDateString("vi-VN")}</td>
-                                                            <td className="px-4 py-2 text-right">Giá: <span className="text-slate-200">{formatMoney(tx.price)}</span></td>
-                                                            <td className="px-4 py-2 text-right">SL: <span className="text-slate-200">{tx.quantity}</span></td>
-                                                            <td className={`px-4 py-2 text-right font-bold ${p >= 0 ? "text-emerald-500/60" : "text-red-500/60"}`}>
-                                                                {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
-                                                                {p !== 0 && tx.price > 0 && (
-                                                                    <span className="ml-1 text-[11px] opacity-60">
-                                                                        ({(((currentPriceValue - tx.price) / tx.price) * 100).toFixed(1)}%)
-                                                                    </span>
-                                                                )}
+                                                        <tr key={tx.id} className={`hover:bg-slate-800/20 ${isSold ? "bg-slate-900/80 opacity-60" : ""}`}>
+                                                            <td className="px-4 py-2">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-slate-400">{new Date(tx.date).toLocaleDateString("vi-VN")}</span>
+                                                                    {isSold && <span className="text-[10px] font-bold text-emerald-500 uppercase">ĐÃ BÁN {tx.sellDate}</span>}
+                                                                </div>
                                                             </td>
                                                             <td className="px-4 py-2 text-right">
-                                                                <button
-                                                                    onClick={() => handleSell(tx.id)}
-                                                                    className="p-2 text-slate-600 hover:text-red-500 transition-colors"
-                                                                    title="Gỡ giao dịch"
-                                                                >
-                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                                    </svg>
-                                                                </button>
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-[10px] text-slate-500 uppercase font-bold">Mua</span>
+                                                                    <span className="text-slate-200">{formatMoney(tx.price)}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-right">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-[10px] text-slate-500 uppercase font-bold">SL</span>
+                                                                    <span className="text-slate-200">{tx.quantity}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-right">
+                                                                {isSold ? (
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-[10px] text-emerald-600 uppercase font-bold">Bán</span>
+                                                                        <span className="text-emerald-400 font-bold">{formatMoney(tx.sellPrice!)}</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-[10px] text-slate-500 uppercase font-bold">Đang giữ</span>
+                                                                        <span className="text-slate-400">HOLD</span>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td className={`px-4 py-2 text-right font-bold ${p >= 0 ? "text-emerald-500/60" : "text-red-500/60"}`}>
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-[10px] text-slate-500 uppercase font-bold">Lãi/Lỗ {isSold ? "thực" : "tính"}</span>
+                                                                    <span>
+                                                                        {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
+                                                                        {p !== 0 && tx.price > 0 && (
+                                                                            <span className="ml-1 text-[11px] opacity-60">
+                                                                                ({pPerc.toFixed(1)}%)
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-right">
+                                                                <div className="flex items-center justify-end gap-1">
+                                                                    {!isSold && (
+                                                                        <button
+                                                                            onClick={() => handleOpenSellDialog(tx)}
+                                                                            className="rounded-lg bg-emerald-600/20 px-3 py-1.5 text-[10px] font-bold text-emerald-400 hover:bg-emerald-600/40 transition-colors"
+                                                                        >
+                                                                            BÁN
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={() => handleDelete(tx.id)}
+                                                                        className="p-2 text-slate-700 hover:text-red-500 transition-colors"
+                                                                        title="Xóa vĩnh viễn"
+                                                                    >
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                        </svg>
+                                                                    </button>
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     );
@@ -510,33 +621,71 @@ export default function StockPage() {
                                         </table>
                                     </div>
 
-                                    {/* Mobile Compact View (No scroll) */}
+                                    {/* Mobile Compact View */}
                                     <div className="md:hidden divide-y divide-slate-800/30">
                                         {txs.map((tx) => {
-                                            const p = currentPriceValue > 0 ? (currentPriceValue - tx.price) * tx.quantity : 0;
+                                            const isSold = tx.status === "SOLD";
+                                            let p = 0;
+                                            let pPerc = 0;
+                                            if (isSold) {
+                                                p = (tx.sellPrice! - tx.price) * tx.quantity;
+                                                pPerc = ((tx.sellPrice! - tx.price) / tx.price) * 100;
+                                            } else if (currentPriceValue > 0) {
+                                                p = (currentPriceValue - tx.price) * tx.quantity;
+                                                pPerc = ((currentPriceValue - tx.price) / tx.price) * 100;
+                                            }
+
                                             return (
-                                                <div key={tx.id} className="px-4 py-2 flex items-center justify-between text-[13px]">
-                                                    <div className="flex-1 opacity-60">{new Date(tx.date).toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' })}</div>
-                                                    <div className="flex-[1.5] text-center">
-                                                        <span className="opacity-40">Giá:</span> {formatMoney(tx.price)}
-                                                        <span className="ml-1 text-slate-500">({tx.quantity})</span>
-                                                    </div>
-                                                    <div className={`flex-[1.5] text-right font-bold ${p >= 0 ? "text-emerald-500/80" : "text-red-500/80"}`}>
-                                                        {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
-                                                        {p !== 0 && tx.price > 0 && (
-                                                            <div className="text-[11px] font-normal opacity-60 leading-none">
-                                                                {(((currentPriceValue - tx.price) / tx.price) * 100).toFixed(1)}%
-                                                            </div>
+                                                <div key={tx.id} className={`px-4 py-3 flex flex-col gap-2 ${isSold ? "bg-slate-900/60 opacity-60" : ""}`}>
+                                                    <div className="flex items-center justify-between text-[11px] font-bold">
+                                                        <span className="text-slate-500 uppercase">{new Date(tx.date).toLocaleDateString("vi-VN")}</span>
+                                                        {isSold ? (
+                                                            <span className="text-emerald-500 uppercase">ĐÃ BÁN {tx.sellDate}</span>
+                                                        ) : (
+                                                            <span className="text-cyan-600 uppercase tracking-widest">ĐANG GIỮ</span>
                                                         )}
                                                     </div>
-                                                    <button
-                                                        onClick={() => handleSell(tx.id)}
-                                                        className="ml-2 p-3 text-slate-700 active:text-red-500"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                    </button>
+
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] text-slate-600 uppercase font-bold">Mua {tx.quantity}</span>
+                                                            <span className="text-sm font-medium">{formatMoney(tx.price)}</span>
+                                                        </div>
+
+                                                        {isSold && (
+                                                            <div className="flex flex-col items-center">
+                                                                <span className="text-[10px] text-emerald-700 uppercase font-bold text-center">Bán</span>
+                                                                <span className="text-sm font-bold text-emerald-400">{formatMoney(tx.sellPrice!)}</span>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-[10px] text-slate-600 uppercase font-bold">Lãi / Lỗ</span>
+                                                            <div className={`text-sm font-bold ${p >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                                {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
+                                                                <span className="ml-1 text-[10px] opacity-60">({pPerc.toFixed(1)}%)</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center justify-end gap-2 mt-1">
+                                                        {!isSold && (
+                                                            <button
+                                                                onClick={() => handleOpenSellDialog(tx)}
+                                                                className="flex-1 rounded-xl bg-emerald-600/20 py-2.5 text-xs font-bold text-emerald-400 active:bg-emerald-600/40"
+                                                            >
+                                                                BÁN GIAO DỊCH NÀY
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => handleDelete(tx.id)}
+                                                            className={`p-2.5 rounded-xl border border-slate-800 text-slate-600 hover:text-red-500 active:bg-red-500/10 ${!isSold ? "" : "flex-1"}`}
+                                                        >
+                                                            <svg className="mx-auto w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             );
                                         })}
@@ -548,9 +697,51 @@ export default function StockPage() {
                 </div>
             </div>
 
+            {/* Sell Dialog Modal */}
+            {sellTx && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setSellTx(null)}></div>
+                    <div className="relative w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+                        <h3 className="mb-1 text-xl font-bold text-white">Xác nhận bán</h3>
+                        <p className="mb-6 text-sm text-slate-400">
+                            Bán <span className="text-white font-bold">{sellTx.quantity}</span> cổ phiếu <span className="text-white font-bold">{sellTx.symbol}</span> mua ngày {new Date(sellTx.date).toLocaleDateString("vi-VN")}?
+                        </p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Giá bán thực tế</label>
+                                <input
+                                    autoFocus
+                                    value={sellPriceInput}
+                                    onChange={(e) => setSellPriceInput(formatInputNumber(e.target.value))}
+                                    className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-lg font-bold outline-none focus:border-emerald-500"
+                                    placeholder="0"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 pt-2">
+                                <button
+                                    onClick={() => setSellTx(null)}
+                                    className="rounded-2xl border border-slate-700 py-3 font-bold text-slate-400 transition hover:bg-slate-800"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    onClick={handleConfirmSell}
+                                    disabled={isLoading}
+                                    className="rounded-2xl bg-emerald-600 py-3 font-bold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                                >
+                                    {isLoading ? "Đang xử lý..." : "Xác nhận Bán"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Toast Notification */}
             {notification && (
-                <div className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 animate-bounce">
+                <div className="fixed bottom-8 left-1/2 z-[110] -translate-x-1/2 animate-bounce">
                     <div className={`flex items-center gap-3 rounded-full border px-6 py-3 shadow-2xl backdrop-blur-xl ${notification.type === "success"
                         ? "border-emerald-500/50 bg-emerald-950/80 text-emerald-300"
                         : "border-cyan-500/50 bg-cyan-950/80 text-cyan-300"
