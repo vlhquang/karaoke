@@ -68,7 +68,7 @@ export function RacingPanel({ disabled, onEmit, gameState, playerId, room, onClo
             });
         }
 
-        function drawMarkers(graphics: Phaser.Graphics, width: number, height: number) {
+        function drawMarkers(graphics: Phaser.GameObjects.Graphics, width: number, height: number) {
             graphics.clear();
             graphics.lineStyle(2, 0xffffff, 0.3);
             const laneWidth = 100;
