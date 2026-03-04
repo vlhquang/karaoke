@@ -1,6 +1,6 @@
 export type RoomStatus = "waiting" | "countdown" | "playing" | "finished";
 
-export type GameType = "reaction" | "memory" | "rps" | "number" | "shake" | "color";
+export type GameType = "reaction" | "memory" | "rps" | "number" | "shake" | "color" | "racing";
 export type MemoryTheme = "sports" | "animals" | "fruits" | "vehicles";
 
 export interface Player {
@@ -46,6 +46,9 @@ export interface StartGameOptions {
     targetCount?: number;
     itemLifetimeMs?: number;
     winCondition?: "unique" | "ranking";
+  };
+  racing?: {
+    lapCount?: number;
   };
 }
 

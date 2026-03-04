@@ -88,7 +88,8 @@ const games: Array<{ type: LiXiGameType; title: string; desc: string; color: str
   { type: "rps", title: "Kéo búa bao", desc: "Đấu BO1 ngay lập tức.", color: "bg-amber-500/20 border-amber-400/50" },
   { type: "number", title: "Săn số", desc: "Chạm đúng số mục tiêu trước.", color: "bg-violet-500/20 border-violet-400/50" },
   { type: "shake", title: "Lắc máy", desc: "Lắc mạnh trong 5 giây.", color: "bg-fuchsia-500/20 border-fuchsia-400/50" },
-  { type: "color", title: "Chạm màu", desc: "Chạm đúng màu mục tiêu.", color: "bg-rose-500/20 border-rose-400/50" }
+  { type: "color", title: "Chạm màu", desc: "Chạm đúng màu mục tiêu.", color: "bg-rose-500/20 border-rose-400/50" },
+  { type: "racing", title: "Đua xe", desc: "Bấm nhanh để xe về đích.", color: "bg-cyan-500/20 border-cyan-400/50" }
 ];
 
 const pretty = (value: unknown): string => {
