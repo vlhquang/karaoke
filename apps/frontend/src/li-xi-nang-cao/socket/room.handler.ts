@@ -232,7 +232,11 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
           number: parsed.options.number ? {
             ...(room.selectedGameOptions?.number ?? {}),
             ...parsed.options.number
-          } : room.selectedGameOptions?.number
+          } : room.selectedGameOptions?.number,
+          racing: parsed.options.racing ? {
+            ...(room.selectedGameOptions?.racing ?? {}),
+            ...parsed.options.racing
+          } : room.selectedGameOptions?.racing
         };
       }
       if (!roomService.areAllOnlinePlayersReady(room)) {

@@ -25,13 +25,19 @@ export const startGameSchema = z.object({
       targetCount: z.number().int().min(1).max(100).optional(),
       itemLifetimeMs: z.number().int().min(500).max(10000).optional(),
       winCondition: z.enum(["unique", "ranking"]).optional()
-    }).optional()
+    }).optional(),
+    racing: z.object({
+      trackLength: z.number().int().min(100).max(10000).optional(),
+      difficulty: z.number().int().min(1).max(10).optional()
+    }).optional(),
+    shake: z.object({}).optional(),
+    color: z.object({}).optional()
   }).optional()
 });
 
 export const selectGameSchema = z.object({
   roomId: z.string().trim().min(4).max(12),
-  gameType: z.enum(["reaction", "memory", "rps", "number", "shake", "color"]),
+  gameType: z.enum(["reaction", "memory", "rps", "number", "shake", "color", "racing"]),
   options: z.object({
     memory: z.object({
       boardLength: z.number().int().min(4).max(64).refine((value) => value % 2 === 0, "boardLength must be even"),
@@ -44,7 +50,13 @@ export const selectGameSchema = z.object({
       targetCount: z.number().int().min(1).max(100).optional(),
       itemLifetimeMs: z.number().int().min(500).max(10000).optional(),
       winCondition: z.enum(["unique", "ranking"]).optional()
-    }).optional()
+    }).optional(),
+    racing: z.object({
+      trackLength: z.number().int().min(100).max(10000).optional(),
+      difficulty: z.number().int().min(1).max(10).optional()
+    }).optional(),
+    shake: z.object({}).optional(),
+    color: z.object({}).optional()
   }).optional()
 });
 
