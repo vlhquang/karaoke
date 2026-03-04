@@ -1,6 +1,6 @@
 export type RoomStatus = "waiting" | "countdown" | "playing" | "finished";
 
-export type GameType = "reaction" | "memory" | "rps" | "number" | "shake" | "color";
+export type GameType = "reaction" | "memory" | "rps" | "number" | "shake" | "color" | "mathking";
 export type MemoryTheme = "sports" | "animals" | "fruits" | "vehicles";
 
 export interface Player {
@@ -46,6 +46,11 @@ export interface StartGameOptions {
     targetCount?: number;
     itemLifetimeMs?: number;
     winCondition?: "unique" | "ranking";
+  };
+  mathking?: {
+    grade?: "1" | "2" | "3" | "4" | "5";
+    targetScore?: 5 | 10 | 15 | 20;
+    answerTimeSec?: number;
   };
 }
 

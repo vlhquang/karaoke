@@ -1,4 +1,4 @@
-export type LiXiGameType = "reaction" | "memory" | "rps" | "number" | "shake" | "color";
+export type LiXiGameType = "reaction" | "memory" | "rps" | "number" | "shake" | "color" | "mathking";
 
 export interface LiXiActionProps {
   disabled: boolean;

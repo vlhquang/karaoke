@@ -104,6 +104,7 @@ const games: Array<{ type: LiXiGameType; title: string; desc: string; color: str
   { type: "memory", title: "Ghi nhớ", desc: "Hoàn thành bàn nhanh nhất.", color: "bg-emerald-500/20 border-emerald-400/50" },
   { type: "rps", title: "Kéo búa bao", desc: "Đấu BO1 ngay lập tức.", color: "bg-amber-500/20 border-amber-400/50" },
   { type: "number", title: "Săn số", desc: "Chạm đúng số mục tiêu trước.", color: "bg-violet-500/20 border-violet-400/50" },
+  { type: "mathking", title: "Vua toán học", desc: "Trắc nghiệm toán nhanh.", color: "bg-indigo-500/20 border-indigo-400/50" },
   { type: "shake", title: "Lắc máy", desc: "Lắc mạnh trong 5 giây.", color: "bg-fuchsia-500/20 border-fuchsia-400/50" },
   { type: "color", title: "Chạm màu", desc: "Chạm đúng màu mục tiêu.", color: "bg-rose-500/20 border-rose-400/50" },
 ];
@@ -400,6 +401,9 @@ export default function LiXiNangCaoPage() {
   const [numberTargetCount, setNumberTargetCount] = useState(10);
   const [numberItemLifetimeMs, setNumberItemLifetimeMs] = useState(2000);
   const [numberWinCondition, setNumberWinCondition] = useState<"unique" | "ranking">("unique");
+  const [mathGrade, setMathGrade] = useState<"1" | "2" | "3" | "4" | "5">("1");
+  const [mathTargetScore, setMathTargetScore] = useState<5 | 10 | 15 | 20>(10);
+  const [mathAnswerTimeSec, setMathAnswerTimeSec] = useState(15);
 
   const [gameState, setGameState] = useState<unknown>(null);
   const [resultState, setResultState] = useState<unknown>(null);
@@ -533,6 +537,20 @@ export default function LiXiNangCaoPage() {
       }
     }
   }, [room?.selectedGameOptions?.number]);
+
+  useEffect(() => {
+    if (room?.selectedGameOptions?.mathking) {
+      if (room.selectedGameOptions.mathking.grade) {
+        setMathGrade(room.selectedGameOptions.mathking.grade);
+      }
+      if (room.selectedGameOptions.mathking.targetScore) {
+        setMathTargetScore(room.selectedGameOptions.mathking.targetScore);
+      }
+      if (room.selectedGameOptions.mathking.answerTimeSec) {
+        setMathAnswerTimeSec(room.selectedGameOptions.mathking.answerTimeSec);
+      }
+    }
+  }, [room?.selectedGameOptions?.mathking]);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -841,6 +859,8 @@ export default function LiXiNangCaoPage() {
         ? { rps: { mode: rpsMode } }
         : gameType === "number"
           ? { number: { targetCount: numberTargetCount } }
+          : gameType === "mathking"
+            ? { mathking: { grade: mathGrade, targetScore: mathTargetScore, answerTimeSec: mathAnswerTimeSec } }
           : undefined);
     const res = await emitWithAck("host:selectGame", { roomId, gameType, options });
     if (!res.ok) setErrorText(res.message ?? "Không thể chọn trò chơi");
@@ -855,6 +875,8 @@ export default function LiXiNangCaoPage() {
         ? { rps: { mode: rpsMode } }
         : selectedGame === "number"
           ? { number: { targetCount: numberTargetCount } }
+          : selectedGame === "mathking"
+            ? { mathking: { grade: mathGrade, targetScore: mathTargetScore, answerTimeSec: mathAnswerTimeSec } }
           : undefined;
     const res = await emitWithAck("host:startGame", { roomId, options });
     if (!res.ok) setErrorText(res.message ?? "Không thể bắt đầu trò chơi");
@@ -990,7 +1012,13 @@ export default function LiXiNangCaoPage() {
               <span className="text-9xl font-black text-white italic drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">{countdownLeft}</span>
             </div>
             <p className="mt-8 text-xl font-black text-white uppercase italic tracking-wider">
-              {room?.selectedGame === "number" ? "Săn Số V6" : room?.selectedGame === "memory" ? "Board Nhớ" : "Bắt Đầu"}
+              {room?.selectedGame === "number"
+                ? "Săn Số V6"
+                : room?.selectedGame === "memory"
+                  ? "Board Nhớ"
+                  : room?.selectedGame === "mathking"
+                    ? "Vua Toán Học"
+                    : "Bắt Đầu"}
             </p>
           </div>
         </div>
@@ -1416,7 +1444,71 @@ export default function LiXiNangCaoPage() {
                     </div>
                   )}
 
-                  {selectedGame !== "rps" && selectedGame !== "memory" && selectedGame !== "number" && (
+                  {selectedGame === "mathking" && (
+                    <div className="space-y-6">
+                      <div className="space-y-3">
+                        <p className="text-xs text-slate-400">Cấp độ lớp:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {["1", "2", "3", "4", "5"].map((grade) => (
+                            <button
+                              key={grade}
+                              onClick={() => {
+                                const next = grade as "1" | "2" | "3" | "4" | "5";
+                                setMathGrade(next);
+                                void selectGame("mathking", { mathking: { grade: next, targetScore: mathTargetScore, answerTimeSec: mathAnswerTimeSec } });
+                              }}
+                              disabled={myReady}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${mathGrade === grade ? "bg-indigo-500 text-white" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                            >
+                              Lớp {grade}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-amber-300/90">Ưu tiên nội dung lớp 1, các lớp cao hơn đang mở rộng dần.</p>
+                      </div>
+
+                      <div className="space-y-3">
+                        <p className="text-xs text-slate-400">Điểm chiến thắng:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[5, 10, 15, 20].map((target) => (
+                            <button
+                              key={target}
+                              onClick={() => {
+                                const next = target as 5 | 10 | 15 | 20;
+                                setMathTargetScore(next);
+                                void selectGame("mathking", { mathking: { grade: mathGrade, targetScore: next, answerTimeSec: mathAnswerTimeSec } });
+                              }}
+                              disabled={myReady}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${mathTargetScore === target ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                            >
+                              {target} điểm
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <p className="text-xs text-slate-400">Thời gian trả lời mỗi câu (giây):</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[10, 15, 20, 30].map((sec) => (
+                            <button
+                              key={sec}
+                              onClick={() => {
+                                setMathAnswerTimeSec(sec);
+                                void selectGame("mathking", { mathking: { grade: mathGrade, targetScore: mathTargetScore, answerTimeSec: sec } });
+                              }}
+                              disabled={myReady}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${mathAnswerTimeSec === sec ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                            >
+                              {sec}s
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedGame !== "rps" && selectedGame !== "memory" && selectedGame !== "number" && selectedGame !== "mathking" && (
                     <p className="text-xs text-slate-500 italic">Trò chơi này không cần cấu hình thêm.</p>
                   )}
                 </div>

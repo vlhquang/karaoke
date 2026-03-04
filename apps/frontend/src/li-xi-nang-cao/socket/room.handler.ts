@@ -25,6 +25,7 @@ const toRoomPayload = (room: ReturnType<RoomService["getRoom"]>): Record<string,
   hostId: room.hostId,
   status: room.status,
   selectedGame: room.selectedGame,
+  selectedGameOptions: room.selectedGameOptions,
   countdownEndsAt: room.countdownEndsAt,
   currentGame: room.currentGame,
   players: [...room.players.values()].map((p) => ({
@@ -76,6 +77,16 @@ const clearCountdownTimer = (roomId: string): void => {
     clearTimeout(existing);
     countdownTimers.delete(roomId);
   }
+};
+
+const toPublicGameState = (room: ReturnType<RoomService["getRoom"]>): unknown => {
+  if (!room.currentGame) return room.gameState;
+  const engine = gameEngines[room.currentGame];
+  if (!engine) return room.gameState;
+  if (room.currentGame === "mathking") {
+    return engine.calculateResult(room);
+  }
+  return room.gameState;
 };
 
 export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomService): void => {
@@ -233,6 +244,10 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
             ...(room.selectedGameOptions?.number ?? {}),
             ...parsed.options.number
           } : room.selectedGameOptions?.number,
+          mathking: parsed.options.mathking ? {
+            ...(room.selectedGameOptions?.mathking ?? {}),
+            ...parsed.options.mathking
+          } : room.selectedGameOptions?.mathking,
         };
       }
       if (!roomService.areAllOnlinePlayersReady(room)) {
@@ -256,7 +271,7 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
           roomService.startGame(latestRoom, selectedGame, initialState);
           socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:started", {
             room: toRoomPayload(latestRoom),
-            gameState: latestRoom.gameState
+            gameState: toPublicGameState(latestRoom)
           });
           // Trigger bot simulation if solo
           processGameStep(socket.nsp, roomService, latestRoom);
@@ -328,7 +343,7 @@ export const registerRoomHandlers = (socket: AuthedSocket, roomService: RoomServ
 
       socket.nsp.to(`lixi:${parsed.roomId}`).emit("game:update", {
         room: toRoomPayload(room),
-        gameState: room.gameState
+        gameState: toPublicGameState(room)
       });
 
       // Trigger bot simulation if solo

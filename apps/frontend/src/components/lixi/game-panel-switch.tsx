@@ -4,6 +4,7 @@ import { NumberPanel } from "./number-panel";
 import { ReactionPanel } from "./reaction-panel";
 import { RpsPanel } from "./rps-panel";
 import { ShakePanel } from "./shake-panel";
+import { MathKingPanel } from "./math-king-panel";
 import type { LiXiActionProps, LiXiGameType } from "./types";
 
 interface GamePanelSwitchProps extends LiXiActionProps {
@@ -15,6 +16,7 @@ export function GamePanelSwitch({ game, disabled, onEmit, gameState, playerId, r
   if (game === "memory") return <MemoryPanel disabled={disabled} onEmit={onEmit} gameState={gameState} playerId={playerId} room={room} onClose={onClose} />;
   if (game === "rps") return <RpsPanel disabled={disabled} onEmit={onEmit} gameState={gameState} playerId={playerId} room={room} onClose={onClose} />;
   if (game === "number") return <NumberPanel disabled={disabled} onEmit={onEmit} gameState={gameState} playerId={playerId} room={room} onClose={onClose} />;
+  if (game === "mathking") return <MathKingPanel disabled={disabled} onEmit={onEmit} gameState={gameState} playerId={playerId} room={room} onClose={onClose} />;
   if (game === "shake") return <ShakePanel disabled={disabled} onEmit={onEmit} room={room} onClose={onClose} />;
   return <ColorPanel disabled={disabled} onEmit={onEmit} room={room} onClose={onClose} />;
 }
