@@ -28,7 +28,7 @@ export default function HomePage() {
     },
     {
       href: "/li-xi-nang-cao",
-      title: "Lì Xì Nâng Cao",
+      title: "Thư viện trò chơi",
       description: "Bộ mini game realtime (reaction, memory, rps, number, shake, color).",
       badge: "New"
     },

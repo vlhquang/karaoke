@@ -43,6 +43,18 @@ type CameraFilter =
 type FaceBox = { x: number; y: number; width: number; height: number };
 
 const LIXI_SESSION_KEY = "lixi_session_v6";
+const DORAEMON_PLAYER_NAMES = [
+  "Nobita",
+  "Shizuka",
+  "Suneo",
+  "Jaian",
+  "Dorami",
+  "Dekisugi",
+  "Sewashi",
+  "Mii-chan",
+  "Tamako",
+  "Nobisuke"
+] as const;
 
 interface LiXiSessionCache {
   roomId: string;
@@ -70,6 +82,11 @@ const loadLiXiSession = (): LiXiSessionCache | null => {
 const clearLiXiSession = (): void => {
   if (typeof window === "undefined") return;
   localStorage.removeItem(LIXI_SESSION_KEY);
+};
+
+const randomDoraemonName = (): string => {
+  const idx = Math.floor(Math.random() * DORAEMON_PLAYER_NAMES.length);
+  return DORAEMON_PLAYER_NAMES[idx] ?? "Nobita";
 };
 
 type BrowserFaceDetector = {
@@ -496,6 +513,7 @@ export default function LiXiNangCaoPage() {
     if (roomParam && roomParam !== roomIdInput) {
       setRoomIdInput(roomParam);
       setRole("player");
+      setName(randomDoraemonName());
     }
   }, [roomIdInput]);
 
@@ -800,6 +818,16 @@ export default function LiXiNangCaoPage() {
     }
   };
 
+  const chooseRole = (nextRole: "host" | "player"): void => {
+    setRole(nextRole);
+    setErrorText("");
+    if (nextRole === "host") {
+      setName("Chủ phòng");
+      return;
+    }
+    setName(randomDoraemonName());
+  };
+
   const selectGame = async (gameType: LiXiGameType, forceOptions?: any): Promise<void> => {
     if (!roomId || !isHost) return;
     if (myReady) {
@@ -1001,13 +1029,50 @@ export default function LiXiNangCaoPage() {
   );
 
   if (!roomId) {
+    if (!role) {
+      return (
+        <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-4 py-8 overflow-x-hidden">
+          {renderPopups()}
+          <section className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="text-center">
+              <h1 className="text-4xl font-black bg-gradient-to-br from-cyan-300 to-violet-400 bg-clip-text text-transparent">THƯ VIỆN TRÒ CHƠI</h1>
+              <p className="mt-2 text-slate-400 font-medium">Chọn vai trò để tiếp tục</p>
+            </div>
+
+            <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 backdrop-blur-xl shadow-2xl">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => chooseRole("host")}
+                  className="h-20 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 font-bold text-slate-950 shadow-lg shadow-cyan-950/20 hover:scale-[1.02] active:scale-95 transition-all text-sm sm:text-base"
+                >
+                  CHỦ PHÒNG
+                </button>
+                <button
+                  onClick={() => chooseRole("player")}
+                  className="h-20 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 font-bold text-emerald-300 hover:scale-[1.02] active:scale-95 transition-all text-sm sm:text-base"
+                >
+                  NGƯỜI CHƠI
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-center">
+              <Link href="/" className="text-sm font-semibold text-slate-500 hover:text-slate-300 transition-colors">
+                ← Quay lại Portal
+              </Link>
+            </div>
+          </section>
+        </main>
+      );
+    }
+
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-4 py-8 overflow-x-hidden">
         {renderPopups()}
         <section className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="text-center">
-            <h1 className="text-4xl font-black bg-gradient-to-br from-cyan-300 to-violet-400 bg-clip-text text-transparent">LÌ XÌ NÂNG CAO</h1>
-            <p className="mt-2 text-slate-400 font-medium">Phiên bản V6 • Trò chơi tương tác nhóm</p>
+            <h1 className="text-4xl font-black bg-gradient-to-br from-cyan-300 to-violet-400 bg-clip-text text-transparent">THƯ VIỆN TRÒ CHƠI</h1>
+            <p className="mt-2 text-slate-400 font-medium">Phiên bản V6 • Vai trò: {role === "host" ? "Chủ phòng" : "Người chơi"}</p>
           </div>
 
           <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 backdrop-blur-xl shadow-2xl">
@@ -1044,32 +1109,45 @@ export default function LiXiNangCaoPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2">
-                <button
-                  onClick={() => void createRoom()}
-                  className="h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 font-bold text-slate-950 shadow-lg shadow-cyan-950/20 hover:scale-[1.02] active:scale-95 transition-all text-sm sm:text-base"
-                >
-                  TẠO PHÒNG
-                </button>
-                <div className="relative group">
-                  <input
-                    className="h-14 w-full rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 font-bold text-emerald-300 uppercase placeholder:text-emerald-900 group-hover:border-emerald-500/50 transition-all focus:outline-none"
-                    value={roomIdInput}
-                    onChange={(e) => setRoomIdInput(e.target.value.toUpperCase())}
-                    placeholder="MÃ PHÒNG"
-                  />
-                  <button
-                    onClick={() => void joinRoom()}
-                    disabled={!roomIdInput.trim()}
-                    className="absolute right-2 top-2 h-10 px-4 rounded-xl bg-emerald-500 font-bold text-slate-950 disabled:hidden transition-all"
-                  >
-                    VÀO
-                  </button>
-                </div>
+                {role === "host" ? (
+                  <>
+                    <button
+                      onClick={() => void createRoom()}
+                      className="col-span-2 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 font-bold text-slate-950 shadow-lg shadow-cyan-950/20 hover:scale-[1.02] active:scale-95 transition-all text-sm sm:text-base"
+                    >
+                      TẠO PHÒNG
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="relative col-span-2 group">
+                      <input
+                        className="h-14 w-full rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 font-bold text-emerald-300 uppercase placeholder:text-emerald-900 group-hover:border-emerald-500/50 transition-all focus:outline-none"
+                        value={roomIdInput}
+                        onChange={(e) => setRoomIdInput(e.target.value.toUpperCase())}
+                        placeholder="MÃ PHÒNG"
+                      />
+                      <button
+                        onClick={() => void joinRoom()}
+                        disabled={!roomIdInput.trim()}
+                        className="absolute right-2 top-2 h-10 px-4 rounded-xl bg-emerald-500 font-bold text-slate-950 disabled:hidden transition-all"
+                      >
+                        VÀO
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="flex justify-center">
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => setRole(null)}
+              className="text-sm font-semibold text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              Đổi vai trò
+            </button>
             <Link href="/" className="text-sm font-semibold text-slate-500 hover:text-slate-300 transition-colors">
               ← Quay lại Portal
             </Link>
@@ -1084,7 +1162,7 @@ export default function LiXiNangCaoPage() {
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-cyan-500 font-black text-slate-900 shadow-lg shadow-cyan-500/20">L6</div>
-          <h1 className="text-2xl font-black tracking-tight text-white uppercase italic">Lì Xì V6</h1>
+          <h1 className="text-2xl font-black tracking-tight text-white uppercase italic">Thư viện trò chơi</h1>
         </div>
         <Link href="/" className="rounded-xl border border-slate-700 bg-slate-900/50 px-4 py-2 text-sm font-bold text-slate-300 hover:bg-slate-800 transition-all">
           ← Thoát

@@ -7,6 +7,12 @@ export default function LearningPage() {
             title: "Java Core",
             description: "Lộ trình học tập Java từ cơ bản đến nâng cao, được dịch từ trang web chính thức dev.java.",
             icon: "☕"
+        },
+        {
+            href: "/hoc-tap/tieng-anh",
+            title: "Học tiếng Anh",
+            description: "Luyện phát âm cơ bản như trẻ tiểu học và nắm cấu trúc câu (danh từ, tính từ, động từ...).",
+            icon: "🔤"
         }
     ];
 
