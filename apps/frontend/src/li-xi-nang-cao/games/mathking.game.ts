@@ -1,4 +1,6 @@
 import type { GameEngine, Room, StartGameOptions } from "../types";
+import { grade1Questions } from "../data/math-grade1-questions";
+import type { MathQ } from "../data/math-grade1-questions";
 
 type Grade = "1" | "2" | "3" | "4" | "5";
 
@@ -19,9 +21,11 @@ interface MathKingState {
   grade: Grade;
   targetScore: 5 | 10 | 15 | 20;
   answerTimeMs: number;
-  phase: "answer" | "reveal" | "finished";
+  phase: "answer" | "finished";
   phaseEndsAt: number;
-  questionIndex: number;
+  questionIndex: number;          // 1-based display index
+  deckIndex: number;              // current position in shuffled deck
+  deck: MathQ[];                  // shuffled question bank for this game
   currentQuestion: MathQuestion;
   answers: Record<string, MathAnswer>;
   firstCorrectPlayerId: string | null;
@@ -30,9 +34,28 @@ interface MathKingState {
   done: boolean;
 }
 
-const REVEAL_MS = 2_000;
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const randInt = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
+/** Fisher-Yates shuffle — returns a new shuffled array */
+function shuffle<T>(arr: readonly T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Also shuffle the options within one question, updating correctIndex */
+function shuffleOptions(raw: MathQ): MathQuestion {
+  const opts = shuffle(raw.options);
+  return {
+    prompt: raw.prompt,
+    options: opts,
+    correctIndex: opts.indexOf(raw.answer),
+    level: 1
+  };
+}
 
 const normalizeTargetScore = (value: unknown): 5 | 10 | 15 | 20 => {
   if (value === 5 || value === 10 || value === 15 || value === 20) return value;
@@ -47,44 +70,17 @@ const normalizeAnswerTimeSec = (value: unknown): number => {
   return num;
 };
 
-const buildQuestionGrade1 = (index: number): MathQuestion => {
-  const level = Math.max(1, Math.floor(index / 3) + 1);
-  const maxBase = level <= 2 ? 10 : level <= 4 ? 20 : 30;
-  const usePlus = Math.random() < 0.6;
-  let a = randInt(0, maxBase);
-  let b = randInt(0, maxBase);
-
-  if (!usePlus && b > a) {
-    [a, b] = [b, a];
-  }
-
-  const answer = usePlus ? a + b : a - b;
-  const prompt = usePlus ? `${a} + ${b} = ?` : `${a} - ${b} = ?`;
-  const candidates = new Set<number>([answer]);
-  while (candidates.size < 4) {
-    const delta = randInt(1, Math.max(3, Math.floor(maxBase / 3)));
-    const sign = Math.random() < 0.5 ? -1 : 1;
-    const value = Math.max(0, answer + sign * delta);
-    candidates.add(value);
-  }
-  const options = [...candidates].sort(() => Math.random() - 0.5);
-  const correctIndex = options.findIndex((v) => v === answer);
-  return { prompt, options, correctIndex, level };
-};
-
-const buildQuestion = (grade: Grade, questionIndex: number): MathQuestion => {
-  if (grade === "1") {
-    return buildQuestionGrade1(questionIndex);
-  }
-  // Placeholder for grade 2-5 in future iterations.
-  return buildQuestionGrade1(questionIndex);
-};
+/** Get the question bank for a given grade (extensible later) */
+function getBankForGrade(_grade: Grade): readonly MathQ[] {
+  // For now all grades use grade1 bank; add more banks here when built
+  return grade1Questions;
+}
 
 const onlinePlayerIds = (room: Room): string[] =>
   [...room.players.values()].filter((p) => p.isOnline).map((p) => p.playerId);
 
 const toPublicState = (state: MathKingState): Record<string, unknown> => {
-  const isReveal = state.phase === "reveal" || state.phase === "finished";
+  const isReveal = state.phase === "finished";
   return {
     grade: state.grade,
     targetScore: state.targetScore,
@@ -106,6 +102,8 @@ const toPublicState = (state: MathKingState): Record<string, unknown> => {
   };
 };
 
+// ── Game Engine ───────────────────────────────────────────────────────────────
+
 export const mathKingGame: GameEngine = {
   initGame: (room: Room, options?: StartGameOptions): MathKingState => {
     const grade = options?.mathking?.grade ?? "1";
@@ -113,7 +111,10 @@ export const mathKingGame: GameEngine = {
     const answerTimeMs = normalizeAnswerTimeSec(options?.mathking?.answerTimeSec) * 1000;
     const ids = onlinePlayerIds(room);
     const scores = Object.fromEntries(ids.map((id) => [id, 0]));
-    const currentQuestion = buildQuestion(grade, 1);
+
+    // Shuffle the question bank once for this game — no repeats within the game
+    const deck = shuffle(getBankForGrade(grade));
+    const currentQuestion = shuffleOptions(deck[0]);
 
     return {
       grade,
@@ -122,6 +123,8 @@ export const mathKingGame: GameEngine = {
       phase: "answer",
       phaseEndsAt: Date.now() + answerTimeMs,
       questionIndex: 1,
+      deckIndex: 0,
+      deck,
       currentQuestion,
       answers: {},
       firstCorrectPlayerId: null,
@@ -138,10 +141,7 @@ export const mathKingGame: GameEngine = {
     if (eventName !== "math:answer" || !playerId || state.done || state.phase !== "answer") {
       return state;
     }
-
-    if (state.answers[playerId]) {
-      return state;
-    }
+    if (state.answers[playerId]) return state;
 
     const selectedIndex = Number(payload.selectedIndex);
     if (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex >= state.currentQuestion.options.length) {
@@ -165,25 +165,22 @@ export const mathKingGame: GameEngine = {
 
   calculateResult: (room: Room): Record<string, unknown> => {
     const state = room.gameState as MathKingState;
-    if (state.done) {
-      return toPublicState(state);
-    }
+    if (state.done) return toPublicState(state);
 
     const now = Date.now();
     const ids = onlinePlayerIds(room);
     const allAnswered = ids.length > 0 && ids.every((id) => Boolean(state.answers[id]));
 
     if (state.phase === "answer" && (now >= state.phaseEndsAt || allAnswered)) {
-      state.phase = "reveal";
-      state.phaseEndsAt = now + REVEAL_MS;
-    } else if (state.phase === "reveal" && now >= state.phaseEndsAt) {
       if (state.winnerId) {
         state.phase = "finished";
         state.done = true;
       } else {
-        const nextIndex = state.questionIndex + 1;
-        state.questionIndex = nextIndex;
-        state.currentQuestion = buildQuestion(state.grade, nextIndex);
+        // Advance to next question in the shuffled deck (wrap around if exhausted)
+        const nextDeckIndex = (state.deckIndex + 1) % state.deck.length;
+        state.deckIndex = nextDeckIndex;
+        state.questionIndex += 1;
+        state.currentQuestion = shuffleOptions(state.deck[nextDeckIndex]);
         state.phase = "answer";
         state.phaseEndsAt = now + state.answerTimeMs;
         state.answers = {};

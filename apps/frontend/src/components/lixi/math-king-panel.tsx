@@ -7,7 +7,7 @@ interface MathKingPanelProps extends LiXiActionProps {
   room?: any;
 }
 
-type MathPhase = "prep" | "answer" | "reveal" | "finished";
+type MathPhase = "prep" | "answer" | "finished";
 
 interface MathQuestion {
   prompt: string;
@@ -121,7 +121,6 @@ export function MathKingPanel({ disabled, onEmit, gameState, playerId, room }: M
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
             {math.phase === "prep" && "Chuẩn bị"}
             {math.phase === "answer" && "Trả lời"}
-            {math.phase === "reveal" && "Đáp án"}
             {math.phase === "finished" && "Kết thúc"}
           </p>
           <p className="mt-1 text-2xl font-black text-amber-300">{timeLeft}s</p>
@@ -138,15 +137,14 @@ export function MathKingPanel({ disabled, onEmit, gameState, playerId, room }: M
                 key={`${math.questionIndex}-${index}`}
                 onClick={() => submitAnswer(index)}
                 disabled={disabled || math.phase !== "answer" || myAnswered}
-                className={`rounded-2xl border px-3 py-5 text-2xl font-black transition-all ${
-                  revealCorrect
+                className={`rounded-2xl border px-3 py-5 text-2xl font-black transition-all ${revealCorrect
                     ? "border-emerald-400 bg-emerald-500/20 text-emerald-300"
                     : revealWrong
                       ? "border-rose-400 bg-rose-500/20 text-rose-300"
                       : selectedByMe
                         ? "border-cyan-400 bg-cyan-500/20 text-cyan-200"
                         : "border-slate-700 bg-slate-900/60 text-white hover:border-slate-500"
-                } disabled:opacity-60 disabled:cursor-not-allowed`}
+                  } disabled:opacity-60 disabled:cursor-not-allowed`}
               >
                 {value}
               </button>
