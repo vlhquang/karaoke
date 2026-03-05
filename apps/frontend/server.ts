@@ -2,7 +2,9 @@ import { createServer } from "node:http";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import next from "next";
+import express from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
@@ -41,6 +43,18 @@ import type {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const require = createRequire(import.meta.url);
+const RacingGameRoom = require(resolve(__dirname, "../../racing-game/server/GameRoom.js"));
+const racingConfigCache = require(resolve(__dirname, "../../racing-game/server/configCache.js"));
+
+const resolveExistingPath = (candidates: string[]): string | null => {
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+};
 const envCandidates = [
   resolve(__dirname, ".env"),
   resolve(__dirname, ".env.local"),
@@ -107,6 +121,7 @@ type KaraokeSocket = Parameters<Server<ClientToServerEvents, ServerToClientEvent
   : never;
 
 const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const racingChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 const generateRoomCode = (): string => {
   let code = "";
@@ -114,6 +129,14 @@ const generateRoomCode = (): string => {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
+};
+
+const generateRacingRoomCode = (): string => {
+  let code = "";
+  for (let i = 0; i < 4; i += 1) {
+    code += racingChars.charAt(Math.floor(Math.random() * racingChars.length));
+  }
+  return racingRooms.has(code) ? generateRacingRoomCode() : code;
 };
 
 interface InternalRoom {
@@ -127,6 +150,7 @@ interface InternalRoom {
 }
 
 const rooms = new Map<string, InternalRoom>();
+const racingRooms = new Map<string, any>();
 
 const roomState = (room: InternalRoom): RoomState => ({
   roomCode: room.roomCode,
@@ -234,7 +258,58 @@ const liXiRoomService = new LiXiRoomService();
 
 app.prepare().then(() => {
   const expressApp = createLiXiExpressApp(liXiRoomService);
+  const racingPublicPath =
+    resolveExistingPath([
+      resolve(__dirname, "../../racing-game/public"),
+      resolve(process.cwd(), "racing-game/public")
+    ]) ?? resolve(__dirname, "../../racing-game/public");
+  const phaserDistPath =
+    resolveExistingPath([
+      resolve(__dirname, "node_modules/phaser/dist"),
+      resolve(__dirname, "../../node_modules/phaser/dist"),
+      resolve(process.cwd(), "node_modules/phaser/dist"),
+      resolve(process.cwd(), "apps/frontend/node_modules/phaser/dist")
+    ]) ?? resolve(__dirname, "../../node_modules/phaser/dist");
+
   expressApp.get("/health", (req, res) => res.send("OK"));
+  expressApp.get("/api/racing/config", (req, res) => {
+    res.json({ config: racingConfigCache.getConfig() });
+  });
+  expressApp.get("/api/config", (req, res, next) => {
+    if (!String(req.headers.referer ?? "").includes("/racing-game")) {
+      next();
+      return;
+    }
+    res.json({ config: racingConfigCache.getConfig() });
+  });
+  expressApp.post("/api/racing/config", (req, res) => {
+    try {
+      const patch = req.body && req.body.config;
+      const nextConfig = racingConfigCache.updateConfig(patch || {});
+      res.json({ ok: true, config: nextConfig });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Invalid config payload" });
+    }
+  });
+  expressApp.post("/api/config", (req, res, next) => {
+    if (!String(req.headers.referer ?? "").includes("/racing-game")) {
+      next();
+      return;
+    }
+    try {
+      const patch = req.body && req.body.config;
+      const nextConfig = racingConfigCache.updateConfig(patch || {});
+      res.json({ ok: true, config: nextConfig });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Invalid config payload" });
+    }
+  });
+  expressApp.get("/racing-game", (_req, res) => {
+    res.redirect("/racing-game/index.html");
+  });
+  expressApp.use("/racing-game", express.static(racingPublicPath));
+  expressApp.use("/vendor/phaser", express.static(phaserDistPath));
+  expressApp.use("/racing-game/vendor/phaser", express.static(phaserDistPath));
   expressApp.all("*", (req, res) => handle(req, res));
   const httpServer = createServer(expressApp);
 
@@ -260,6 +335,7 @@ app.prepare().then(() => {
   };
 
   io.on("connection", (socket: KaraokeSocket) => {
+    const anySocket = socket as any;
     socket.on("create_room", (payload, ack) => {
       try {
         const parsed = createRoomSchema.parse(payload);
@@ -944,6 +1020,97 @@ app.prepare().then(() => {
       }
     });
 
+    // Racing game (integrated from /racing-game module)
+    anySocket.on("create-room", ({ playerName, vehicleType }: { playerName: string; vehicleType: string }) => {
+      const roomCode = generateRacingRoomCode();
+      const room = new RacingGameRoom(roomCode, io as any);
+      racingRooms.set(roomCode, room);
+      room.addPlayer(anySocket, playerName, vehicleType);
+      anySocket.join(roomCode);
+      anySocket.emit("room-created", {
+        roomCode,
+        playerId: anySocket.id,
+        players: room.getPlayersInfo()
+      });
+    });
+
+    anySocket.on("join-room", ({ roomCode, playerName, vehicleType }: { roomCode: string; playerName: string; vehicleType: string }) => {
+      const code = String(roomCode ?? "").trim().toUpperCase();
+      const room = racingRooms.get(code);
+      if (!room) {
+        anySocket.emit("error-msg", { message: "Phòng không tồn tại!" });
+        return;
+      }
+      if (room.state !== "WAITING" && room.state !== "FINISHED") {
+        anySocket.emit("error-msg", { message: "Trận đấu đã bắt đầu!" });
+        return;
+      }
+      if (room.getPlayerCount() >= room.config.maxPlayers) {
+        anySocket.emit("error-msg", { message: "Phòng đã đầy!" });
+        return;
+      }
+      room.addPlayer(anySocket, playerName, vehicleType);
+      anySocket.join(code);
+      anySocket.emit("room-joined", {
+        roomCode: code,
+        playerId: anySocket.id,
+        players: room.getPlayersInfo()
+      });
+      anySocket.to(code).emit("player-joined", {
+        players: room.getPlayersInfo()
+      });
+    });
+
+    anySocket.on("set-vehicle", ({ roomCode, vehicleType }: { roomCode: string; vehicleType: string }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      if (room.state === "RACING" || room.state === "QUESTION" || room.state === "COUNTDOWN") return;
+      room.setPlayerVehicle(anySocket.id, vehicleType);
+      io.to(room.roomCode).emit("player-updated", { players: room.getPlayersInfo() });
+    });
+
+    anySocket.on("start-game", ({ roomCode }: { roomCode: string }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      if (room.getPlayerCount() < 1) return;
+      if (room.hostId !== anySocket.id) return;
+      room.startGame();
+    });
+
+    anySocket.on("restart-game", ({ roomCode, vehicleType }: { roomCode: string; vehicleType?: string }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      if (room.hostId !== anySocket.id) return;
+      if (vehicleType) {
+        room.setPlayerVehicle(anySocket.id, vehicleType);
+      }
+      room.startGame();
+    });
+
+    anySocket.on("player-input", ({ roomCode, direction }: { roomCode: string; direction: "left" | "right" }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      room.handleInput(anySocket.id, direction);
+    });
+
+    anySocket.on("obstacle-hit", ({ roomCode, obstacle }: { roomCode: string; obstacle: any }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      room.onObstacleHit(anySocket.id, obstacle);
+    });
+
+    anySocket.on("answer-question", ({ roomCode, answerIndex }: { roomCode: string; answerIndex: number }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      room.handleAnswer(anySocket.id, answerIndex);
+    });
+
+    anySocket.on("question-ready", ({ roomCode, questionId }: { roomCode: string; questionId: string }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      room.handleQuestionReady(anySocket.id, questionId);
+    });
+
     socket.on("disconnect", () => {
       const user = socket.data.user;
       if (user && (user.role === "host" || user.role === "guest")) {
@@ -957,6 +1124,22 @@ app.prepare().then(() => {
             emitLotoState(roomCode);
           }
         }
+      }
+    });
+
+    anySocket.on("disconnect", () => {
+      for (const [code, room] of racingRooms.entries()) {
+        if (!room.hasPlayer(anySocket.id)) continue;
+        room.removePlayer(anySocket.id);
+        if (room.getPlayerCount() === 0) {
+          room.stop();
+          racingRooms.delete(code);
+        } else {
+          io.to(code).emit("player-left", {
+            players: room.getPlayersInfo()
+          });
+        }
+        break;
       }
     });
   });

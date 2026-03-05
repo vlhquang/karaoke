@@ -1330,6 +1330,14 @@ export default function LiXiNangCaoPage() {
                         <p className={`text-xs font-bold leading-tight ${selectedGame === g.type ? "text-cyan-300" : "text-slate-400"}`}>{g.title}</p>
                       </button>
                     ))}
+                    <a
+                      href="/racing-game/index.html"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-3 rounded-2xl border border-amber-700/40 bg-amber-500/10 hover:bg-amber-500/20 transition-all"
+                    >
+                      <p className="text-xs font-bold leading-tight text-amber-300">Đua xe (module riêng)</p>
+                    </a>
                   </div>
                 </div>
 
