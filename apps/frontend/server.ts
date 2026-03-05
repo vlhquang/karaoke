@@ -151,6 +151,47 @@ interface InternalRoom {
 
 const rooms = new Map<string, InternalRoom>();
 const racingRooms = new Map<string, any>();
+const racingPlayerSessionByRoom = new Map<string, Map<string, string>>();
+const racingSocketToSession = new Map<string, { roomCode: string; sessionToken: string }>();
+const racingDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const RACING_RECONNECT_GRACE_MS = 60_000;
+
+const getRacingSessionMap = (roomCode: string): Map<string, string> => {
+  const code = roomCode.toUpperCase();
+  const existing = racingPlayerSessionByRoom.get(code);
+  if (existing) return existing;
+  const next = new Map<string, string>();
+  racingPlayerSessionByRoom.set(code, next);
+  return next;
+};
+
+const racingTimerKey = (roomCode: string, sessionToken: string): string => `${roomCode.toUpperCase()}:${sessionToken}`;
+
+const clearRacingDisconnectTimer = (roomCode: string, sessionToken: string): void => {
+  const key = racingTimerKey(roomCode, sessionToken);
+  const timer = racingDisconnectTimers.get(key);
+  if (timer) {
+    clearTimeout(timer);
+    racingDisconnectTimers.delete(key);
+  }
+};
+
+const cleanupRacingRoomSessionRefs = (roomCode: string): void => {
+  const code = roomCode.toUpperCase();
+  racingPlayerSessionByRoom.delete(code);
+  for (const [socketId, ref] of racingSocketToSession.entries()) {
+    if (ref.roomCode === code) {
+      racingSocketToSession.delete(socketId);
+    }
+  }
+  for (const key of racingDisconnectTimers.keys()) {
+    if (key.startsWith(`${code}:`)) {
+      const timer = racingDisconnectTimers.get(key);
+      if (timer) clearTimeout(timer);
+      racingDisconnectTimers.delete(key);
+    }
+  }
+};
 
 const roomState = (room: InternalRoom): RoomState => ({
   roomCode: room.roomCode,
@@ -1021,24 +1062,63 @@ app.prepare().then(() => {
     });
 
     // Racing game (integrated from /racing-game module)
-    anySocket.on("create-room", ({ playerName, vehicleType }: { playerName: string; vehicleType: string }) => {
+    anySocket.on("create-room", ({ playerName, vehicleType, sessionToken }: { playerName: string; vehicleType: string; sessionToken?: string }) => {
       const roomCode = generateRacingRoomCode();
       const room = new RacingGameRoom(roomCode, io as any);
       racingRooms.set(roomCode, room);
       room.addPlayer(anySocket, playerName, vehicleType);
       anySocket.join(roomCode);
+      const token = String(sessionToken || randomUUID());
+      const sessions = getRacingSessionMap(roomCode);
+      sessions.set(token, anySocket.id);
+      racingSocketToSession.set(anySocket.id, { roomCode, sessionToken: token });
+      clearRacingDisconnectTimer(roomCode, token);
       anySocket.emit("room-created", {
         roomCode,
         playerId: anySocket.id,
-        players: room.getPlayersInfo()
+        players: room.getPlayersInfo(),
+        role: "host",
+        sessionToken: token
       });
     });
 
-    anySocket.on("join-room", ({ roomCode, playerName, vehicleType }: { roomCode: string; playerName: string; vehicleType: string }) => {
+    anySocket.on("join-room", ({ roomCode, playerName, vehicleType, sessionToken }: { roomCode: string; playerName: string; vehicleType: string; sessionToken?: string }) => {
       const code = String(roomCode ?? "").trim().toUpperCase();
       const room = racingRooms.get(code);
       if (!room) {
         anySocket.emit("error-msg", { message: "Phòng không tồn tại!" });
+        return;
+      }
+      const token = String(sessionToken || randomUUID());
+      const sessions = getRacingSessionMap(code);
+      const existingPlayerId = sessions.get(token);
+      if (existingPlayerId && room.players?.has(existingPlayerId)) {
+        clearRacingDisconnectTimer(code, token);
+        const existingPlayer = room.players.get(existingPlayerId);
+        room.players.delete(existingPlayerId);
+        existingPlayer.id = anySocket.id;
+        if (playerName && String(playerName).trim()) {
+          existingPlayer.name = String(playerName).trim();
+        }
+        if (vehicleType) {
+          existingPlayer.vehicleType = vehicleType;
+        }
+        room.players.set(anySocket.id, existingPlayer);
+        if (room.hostId === existingPlayerId) {
+          room.hostId = anySocket.id;
+        }
+        sessions.set(token, anySocket.id);
+        racingSocketToSession.set(anySocket.id, { roomCode: code, sessionToken: token });
+        anySocket.join(code);
+        const role = room.hostId === anySocket.id ? "host" : "guest";
+        anySocket.emit("room-joined", {
+          roomCode: code,
+          playerId: anySocket.id,
+          players: room.getPlayersInfo(),
+          role,
+          sessionToken: token
+        });
+        io.to(code).emit("player-updated", { players: room.getPlayersInfo() });
         return;
       }
       if (room.state !== "WAITING" && room.state !== "FINISHED") {
@@ -1051,10 +1131,15 @@ app.prepare().then(() => {
       }
       room.addPlayer(anySocket, playerName, vehicleType);
       anySocket.join(code);
+      sessions.set(token, anySocket.id);
+      racingSocketToSession.set(anySocket.id, { roomCode: code, sessionToken: token });
+      clearRacingDisconnectTimer(code, token);
       anySocket.emit("room-joined", {
         roomCode: code,
         playerId: anySocket.id,
-        players: room.getPlayersInfo()
+        players: room.getPlayersInfo(),
+        role: room.hostId === anySocket.id ? "host" : "guest",
+        sessionToken: token
       });
       anySocket.to(code).emit("player-joined", {
         players: room.getPlayersInfo()
@@ -1111,6 +1196,44 @@ app.prepare().then(() => {
       room.handleQuestionReady(anySocket.id, questionId);
     });
 
+    anySocket.on("leave-room", ({ roomCode }: { roomCode: string }) => {
+      const code = String(roomCode ?? "").trim().toUpperCase();
+      const room = racingRooms.get(code);
+      if (!room) return;
+      const sessionRef = racingSocketToSession.get(anySocket.id);
+      if (sessionRef) {
+        clearRacingDisconnectTimer(sessionRef.roomCode, sessionRef.sessionToken);
+        const sessionMap = getRacingSessionMap(sessionRef.roomCode);
+        sessionMap.delete(sessionRef.sessionToken);
+        racingSocketToSession.delete(anySocket.id);
+      }
+      if (!room.hasPlayer(anySocket.id)) return;
+      room.removePlayer(anySocket.id);
+      anySocket.leave(code);
+      if (room.getPlayerCount() === 0) {
+        room.stop();
+        racingRooms.delete(code);
+        cleanupRacingRoomSessionRefs(code);
+      } else {
+        io.to(code).emit("player-left", { players: room.getPlayersInfo() });
+      }
+      anySocket.emit("left-room", { roomCode: code });
+    });
+
+    anySocket.on("close-room", ({ roomCode }: { roomCode: string }) => {
+      const code = String(roomCode ?? "").trim().toUpperCase();
+      const room = racingRooms.get(code);
+      if (!room) return;
+      if (room.hostId !== anySocket.id) {
+        anySocket.emit("error-msg", { message: "Chỉ chủ phòng mới có thể đóng phòng." });
+        return;
+      }
+      room.stop();
+      io.to(code).emit("room-closed", { roomCode: code, message: "Chủ phòng đã đóng phòng." });
+      racingRooms.delete(code);
+      cleanupRacingRoomSessionRefs(code);
+    });
+
     socket.on("disconnect", () => {
       const user = socket.data.user;
       if (user && (user.role === "host" || user.role === "guest")) {
@@ -1128,12 +1251,47 @@ app.prepare().then(() => {
     });
 
     anySocket.on("disconnect", () => {
+      const sessionRef = racingSocketToSession.get(anySocket.id);
+      if (sessionRef) {
+        racingSocketToSession.delete(anySocket.id);
+        const { roomCode, sessionToken } = sessionRef;
+        const key = racingTimerKey(roomCode, sessionToken);
+        clearRacingDisconnectTimer(roomCode, sessionToken);
+        const timer = setTimeout(() => {
+          const room = racingRooms.get(roomCode);
+          if (!room) {
+            cleanupRacingRoomSessionRefs(roomCode);
+            return;
+          }
+          const sessionMap = getRacingSessionMap(roomCode);
+          const playerId = sessionMap.get(sessionToken);
+          if (!playerId || !room.hasPlayer(playerId)) {
+            return;
+          }
+          room.removePlayer(playerId);
+          sessionMap.delete(sessionToken);
+          if (room.getPlayerCount() === 0) {
+            room.stop();
+            racingRooms.delete(roomCode);
+            cleanupRacingRoomSessionRefs(roomCode);
+          } else {
+            io.to(roomCode).emit("player-left", {
+              players: room.getPlayersInfo()
+            });
+          }
+          racingDisconnectTimers.delete(key);
+        }, RACING_RECONNECT_GRACE_MS);
+        racingDisconnectTimers.set(key, timer);
+        return;
+      }
+
       for (const [code, room] of racingRooms.entries()) {
         if (!room.hasPlayer(anySocket.id)) continue;
         room.removePlayer(anySocket.id);
         if (room.getPlayerCount() === 0) {
           room.stop();
           racingRooms.delete(code);
+          cleanupRacingRoomSessionRefs(code);
         } else {
           io.to(code).emit("player-left", {
             players: room.getPlayersInfo()
