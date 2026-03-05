@@ -73,21 +73,25 @@ export default function StockPage() {
         if (symbols.length === 0) return;
         setIsRefreshingPrices(true);
         const uniqueSymbols = Array.from(new Set(symbols));
-        const newPriceMap: Record<string, PriceInfo> = { ...currentPrices };
 
-        await Promise.all(
+        // Start all fetches concurrently
+        await Promise.allSettled(
             uniqueSymbols.map(async (symbol) => {
                 try {
                     const res = await fetch(`/api/stocks/price?symbol=${symbol}`);
                     const data = await res.json();
                     if (data.ok) {
-                        newPriceMap[symbol] = {
-                            current: data.price,
-                            opening: data.openingPrice,
-                            reference: data.referencePrice,
-                            previous: currentPrices[symbol]?.current || null,
-                            timestamp: data.timestamp
-                        };
+                        // Update state IMMEDIATELY for this specific symbol
+                        setCurrentPrices(prev => ({
+                            ...prev,
+                            [symbol]: {
+                                current: data.price,
+                                opening: data.openingPrice,
+                                reference: data.referencePrice,
+                                previous: prev[symbol]?.current || null,
+                                timestamp: data.timestamp
+                            }
+                        }));
                     }
                 } catch (err) {
                     console.error(`Failed to fetch price for ${symbol}`, err);
@@ -95,7 +99,6 @@ export default function StockPage() {
             })
         );
 
-        setCurrentPrices(newPriceMap);
         setIsRefreshingPrices(false);
         showToast("Cập nhật giá mới nhất thành công", "info");
     };
