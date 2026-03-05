@@ -46,6 +46,8 @@ export interface StartGameOptions {
     targetCount?: number;
     itemLifetimeMs?: number;
     winCondition?: "unique" | "ranking";
+    noiseMimicRate?: number;
+    bombMimicRate?: number;
   };
   mathking?: {
     grade?: "1" | "2" | "3" | "4" | "5";

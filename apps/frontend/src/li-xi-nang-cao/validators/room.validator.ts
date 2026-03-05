@@ -24,7 +24,9 @@ export const startGameSchema = z.object({
     number: z.object({
       targetCount: z.number().int().min(1).max(100).optional(),
       itemLifetimeMs: z.number().int().min(500).max(10000).optional(),
-      winCondition: z.enum(["unique", "ranking"]).optional()
+      winCondition: z.enum(["unique", "ranking"]).optional(),
+      noiseMimicRate: z.number().int().min(0).max(100).optional(),
+      bombMimicRate: z.number().int().min(0).max(100).optional()
     }).optional(),
     shake: z.object({}).optional(),
     color: z.object({}).optional(),
@@ -50,7 +52,9 @@ export const selectGameSchema = z.object({
     number: z.object({
       targetCount: z.number().int().min(1).max(100).optional(),
       itemLifetimeMs: z.number().int().min(500).max(10000).optional(),
-      winCondition: z.enum(["unique", "ranking"]).optional()
+      winCondition: z.enum(["unique", "ranking"]).optional(),
+      noiseMimicRate: z.number().int().min(0).max(100).optional(),
+      bombMimicRate: z.number().int().min(0).max(100).optional()
     }).optional(),
     shake: z.object({}).optional(),
     color: z.object({}).optional(),

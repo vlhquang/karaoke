@@ -14,6 +14,7 @@ interface PopItem {
   id: string;
   type: "target" | "noise" | "bomb";
   value: number;
+  mimicTargetStyle: boolean;
   x: number;
   y: number;
   scale: number;
@@ -75,6 +76,7 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room, onClo
       const rand4 = rng ? rng() : Math.random();
       const rand5 = rng ? rng() : Math.random();
       const rand6 = rng ? rng() : Math.random();
+      const rand7 = rng ? rng() : Math.random();
 
       let type: "target" | "noise" | "bomb" = "noise";
       if (rand1 < 0.1) {
@@ -84,16 +86,29 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room, onClo
       } else {
         type = "noise";
       }
+      // Ensure only one target item can exist on screen at the same time.
+      if (type === "target" && items.some((item) => item.type === "target")) {
+        type = rand2 < 0.45 ? "bomb" : "noise";
+      }
 
       spawnCounterRef.current += 1;
+      const noiseMimicRate = Math.max(0, Math.min(100, Number(state?.noiseMimicRate ?? 30)));
+      const bombMimicRate = Math.max(0, Math.min(100, Number(state?.bombMimicRate ?? 20)));
+      const mimicTargetStyle =
+        type === "noise"
+          ? rand2 < noiseMimicRate / 100
+          : type === "bomb"
+            ? rand2 < bombMimicRate / 100
+            : true;
       const newItem: PopItem = {
         id: `item-${state?.round ?? 0}-${spawnCounterRef.current}`,
         type,
-        value: type === "target" ? state.targetNumber : Math.floor(rand2 * 99) + 1,
-        x: 10 + rand3 * 80,
-        y: 10 + rand4 * 80,
-        scale: 0.8 + rand5 * 0.4,
-        expiresAt: now + (state.itemLifetimeMs ?? 2000) * (0.8 + rand6 * 0.4)
+        value: type === "target" ? state.targetNumber : Math.floor(rand3 * 99) + 1,
+        mimicTargetStyle,
+        x: 10 + rand4 * 80,
+        y: 10 + rand5 * 80,
+        scale: 0.8 + rand6 * 0.4,
+        expiresAt: now + (state.itemLifetimeMs ?? 2000) * (0.8 + rand7 * 0.4)
       };
 
       setItems((prev: PopItem[]) => [...prev.filter((item: PopItem) => item.expiresAt > now), newItem]);
@@ -254,7 +269,7 @@ export function NumberPanel({ disabled, onEmit, gameState, playerId, room, onClo
                     transform: `translate(-50%, -50%) scale(${item.scale})`,
                   }}
                   className={`absolute flex h-16 w-16 items-center justify-center rounded-2xl border-2 font-black transition-all active:scale-90
-                    ${item.type === "target"
+                    ${item.type === "target" || item.mimicTargetStyle
                       ? "border-amber-300 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-[0_0_30px_rgba(251,191,36,0.8)] z-30 animate-pulse scale-110"
                       : item.type === "bomb"
                         ? "border-red-500 bg-slate-900 shadow-lg z-20"

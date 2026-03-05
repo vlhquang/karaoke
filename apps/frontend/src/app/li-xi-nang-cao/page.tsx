@@ -401,6 +401,8 @@ export default function LiXiNangCaoPage() {
   const [numberTargetCount, setNumberTargetCount] = useState(10);
   const [numberItemLifetimeMs, setNumberItemLifetimeMs] = useState(2000);
   const [numberWinCondition, setNumberWinCondition] = useState<"unique" | "ranking">("unique");
+  const [numberNoiseMimicRate, setNumberNoiseMimicRate] = useState(30);
+  const [numberBombMimicRate, setNumberBombMimicRate] = useState(20);
   const [mathGrade, setMathGrade] = useState<"1" | "2" | "3" | "4" | "5">("1");
   const [mathTargetScore, setMathTargetScore] = useState<5 | 10 | 15 | 20>(10);
   const [mathAnswerTimeSec, setMathAnswerTimeSec] = useState(15);
@@ -534,6 +536,15 @@ export default function LiXiNangCaoPage() {
       }
       if (room.selectedGameOptions.number.itemLifetimeMs) {
         setNumberItemLifetimeMs(room.selectedGameOptions.number.itemLifetimeMs);
+      }
+      if (room.selectedGameOptions.number.winCondition) {
+        setNumberWinCondition(room.selectedGameOptions.number.winCondition);
+      }
+      if (typeof room.selectedGameOptions.number.noiseMimicRate === "number") {
+        setNumberNoiseMimicRate(room.selectedGameOptions.number.noiseMimicRate);
+      }
+      if (typeof room.selectedGameOptions.number.bombMimicRate === "number") {
+        setNumberBombMimicRate(room.selectedGameOptions.number.bombMimicRate);
       }
     }
   }, [room?.selectedGameOptions?.number]);
@@ -858,7 +869,15 @@ export default function LiXiNangCaoPage() {
       : gameType === "rps"
         ? { rps: { mode: rpsMode } }
         : gameType === "number"
-          ? { number: { targetCount: numberTargetCount } }
+          ? {
+            number: {
+              targetCount: numberTargetCount,
+              itemLifetimeMs: numberItemLifetimeMs,
+              winCondition: numberWinCondition,
+              noiseMimicRate: numberNoiseMimicRate,
+              bombMimicRate: numberBombMimicRate
+            }
+          }
           : gameType === "mathking"
             ? { mathking: { grade: mathGrade, targetScore: mathTargetScore, answerTimeSec: mathAnswerTimeSec } }
           : undefined);
@@ -874,7 +893,15 @@ export default function LiXiNangCaoPage() {
       : selectedGame === "rps"
         ? { rps: { mode: rpsMode } }
         : selectedGame === "number"
-          ? { number: { targetCount: numberTargetCount } }
+          ? {
+            number: {
+              targetCount: numberTargetCount,
+              itemLifetimeMs: numberItemLifetimeMs,
+              winCondition: numberWinCondition,
+              noiseMimicRate: numberNoiseMimicRate,
+              bombMimicRate: numberBombMimicRate
+            }
+          }
           : selectedGame === "mathking"
             ? { mathking: { grade: mathGrade, targetScore: mathTargetScore, answerTimeSec: mathAnswerTimeSec } }
           : undefined;
@@ -1390,7 +1417,15 @@ export default function LiXiNangCaoPage() {
                             onChange={(e) => {
                               const val = Number(e.target.value);
                               setNumberTargetCount(val);
-                              void selectGame("number", { number: { targetCount: val, itemLifetimeMs: numberItemLifetimeMs, winCondition: numberWinCondition } });
+                              void selectGame("number", {
+                                number: {
+                                  targetCount: val,
+                                  itemLifetimeMs: numberItemLifetimeMs,
+                                  winCondition: numberWinCondition,
+                                  noiseMimicRate: numberNoiseMimicRate,
+                                  bombMimicRate: numberBombMimicRate
+                                }
+                              });
                             }}
                             disabled={myReady}
                             className="flex-1 accent-cyan-500"
@@ -1411,7 +1446,15 @@ export default function LiXiNangCaoPage() {
                             onChange={(e) => {
                               const val = Number(e.target.value);
                               setNumberItemLifetimeMs(val);
-                              void selectGame("number", { number: { targetCount: numberTargetCount, itemLifetimeMs: val, winCondition: numberWinCondition } });
+                              void selectGame("number", {
+                                number: {
+                                  targetCount: numberTargetCount,
+                                  itemLifetimeMs: val,
+                                  winCondition: numberWinCondition,
+                                  noiseMimicRate: numberNoiseMimicRate,
+                                  bombMimicRate: numberBombMimicRate
+                                }
+                              });
                             }}
                             disabled={myReady}
                             className="flex-1 accent-violet-500"
@@ -1431,7 +1474,15 @@ export default function LiXiNangCaoPage() {
                               key={c.id}
                               onClick={() => {
                                 setNumberWinCondition(c.id as any);
-                                void selectGame("number", { number: { targetCount: numberTargetCount, itemLifetimeMs: numberItemLifetimeMs, winCondition: c.id as any } });
+                                void selectGame("number", {
+                                  number: {
+                                    targetCount: numberTargetCount,
+                                    itemLifetimeMs: numberItemLifetimeMs,
+                                    winCondition: c.id as any,
+                                    noiseMimicRate: numberNoiseMimicRate,
+                                    bombMimicRate: numberBombMimicRate
+                                  }
+                                });
                               }}
                               disabled={myReady}
                               className={`flex-1 px-4 py-2.5 rounded-xl text-[10px] font-bold transition-all ${numberWinCondition === c.id ? "bg-violet-500 text-white" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
@@ -1439,6 +1490,64 @@ export default function LiXiNangCaoPage() {
                               {c.label}
                             </button>
                           ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <p className="text-xs text-slate-400">Tỉ lệ số gây nhiễu giả dạng mục tiêu (%):</p>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={5}
+                            value={numberNoiseMimicRate}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setNumberNoiseMimicRate(val);
+                              void selectGame("number", {
+                                number: {
+                                  targetCount: numberTargetCount,
+                                  itemLifetimeMs: numberItemLifetimeMs,
+                                  winCondition: numberWinCondition,
+                                  noiseMimicRate: val,
+                                  bombMimicRate: numberBombMimicRate
+                                }
+                              });
+                            }}
+                            disabled={myReady}
+                            className="flex-1 accent-amber-500"
+                          />
+                          <span className="w-12 h-10 flex items-center justify-center rounded-xl bg-slate-800 font-bold text-amber-300 border border-slate-700">{numberNoiseMimicRate}%</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <p className="text-xs text-slate-400">Tỉ lệ bom giả dạng mục tiêu (%):</p>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={5}
+                            value={numberBombMimicRate}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setNumberBombMimicRate(val);
+                              void selectGame("number", {
+                                number: {
+                                  targetCount: numberTargetCount,
+                                  itemLifetimeMs: numberItemLifetimeMs,
+                                  winCondition: numberWinCondition,
+                                  noiseMimicRate: numberNoiseMimicRate,
+                                  bombMimicRate: val
+                                }
+                              });
+                            }}
+                            disabled={myReady}
+                            className="flex-1 accent-red-500"
+                          />
+                          <span className="w-12 h-10 flex items-center justify-center rounded-xl bg-slate-800 font-bold text-rose-300 border border-slate-700">{numberBombMimicRate}%</span>
                         </div>
                       </div>
                     </div>

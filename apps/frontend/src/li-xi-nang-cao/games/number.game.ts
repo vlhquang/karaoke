@@ -10,6 +10,8 @@ interface NumberPlayerState {
 interface NumberState {
   targetCountToWin: number;
   winCondition: "unique" | "ranking";
+  noiseMimicRate: number;
+  bombMimicRate: number;
   targetNumber: number;
   roundSeed: number;
   round: number;
@@ -26,6 +28,8 @@ export const numberGame: GameEngine = {
     const targetCountToWin = options?.number?.targetCount ?? 10;
     const itemLifetimeMs = options?.number?.itemLifetimeMs ?? 2000;
     const winCondition = options?.number?.winCondition ?? "unique";
+    const noiseMimicRate = Math.max(0, Math.min(100, options?.number?.noiseMimicRate ?? 30));
+    const bombMimicRate = Math.max(0, Math.min(100, options?.number?.bombMimicRate ?? 20));
     const playerStates: Record<string, NumberPlayerState> = {};
     [...room.players.keys()].forEach((pid) => {
       playerStates[pid] = { foundCount: 0, totalTimeMs: 0, roundFinished: false, lastActionAt: 0 };
@@ -34,6 +38,8 @@ export const numberGame: GameEngine = {
     return {
       targetCountToWin,
       winCondition,
+      noiseMimicRate,
+      bombMimicRate,
       targetNumber: Math.floor(Math.random() * 99) + 1,
       roundSeed: Math.floor(Math.random() * 1_000_000),
       round: 1,
