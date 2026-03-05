@@ -13,6 +13,12 @@ export default function LearningPage() {
             title: "Học tiếng Anh",
             description: "Luyện phát âm cơ bản như trẻ tiểu học và nắm cấu trúc câu (danh từ, tính từ, động từ...).",
             icon: "🔤"
+        },
+        {
+            href: "/hoc-tap/bai-viet",
+            title: "Bài viết",
+            description: "Lưu trữ và đọc lại các bài viết học tập, tài liệu tham khảo theo dạng HTML hoặc link.",
+            icon: "📝"
         }
     ];
 
