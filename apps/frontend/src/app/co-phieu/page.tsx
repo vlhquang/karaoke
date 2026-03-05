@@ -44,6 +44,7 @@ export default function StockPage() {
     // Sell Dialog states
     const [sellTx, setSellTx] = useState<Transaction | null>(null);
     const [sellPriceInput, setSellPriceInput] = useState("");
+    const [analysisSymbol, setAnalysisSymbol] = useState<string | null>(null);
 
     useEffect(() => {
         const savedCode = localStorage.getItem("stock_access_code");
@@ -282,6 +283,14 @@ export default function StockPage() {
         }
     };
 
+    const openAnalysisPopup = (symbol: string) => {
+        setAnalysisSymbol(symbol.toUpperCase());
+    };
+
+    const analysisUrl = analysisSymbol
+        ? `https://finance.vietstock.vn/${encodeURIComponent(analysisSymbol)}/phan-tich-ky-thuat.htm`
+        : "";
+
     const totals = useMemo(() => {
         let totalInvested = 0;
         let totalCurrentValue = 0;
@@ -491,7 +500,14 @@ export default function StockPage() {
                                 <div key={symbol} className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden">
                                     <div className="bg-slate-800/40 px-4 py-3 flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 gap-3">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xl font-black">{symbol}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => openAnalysisPopup(symbol)}
+                                                className="text-xl font-black text-cyan-300 underline decoration-dotted underline-offset-4 hover:text-cyan-200"
+                                                title={`Mở phân tích kỹ thuật ${symbol}`}
+                                            >
+                                                {symbol}
+                                            </button>
                                             {gQty > 0 && <span className="text-sm text-slate-500 font-mono">({gQty})</span>}
                                         </div>
 
@@ -754,6 +770,43 @@ export default function StockPage() {
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Symbol Analysis Popup */}
+            {analysisSymbol && (
+                <div className="fixed inset-0 z-[105] flex items-center justify-center p-2 sm:p-4">
+                    <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm" onClick={() => setAnalysisSymbol(null)}></div>
+                    <div className="relative w-full max-w-6xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden">
+                        <div className="flex items-center justify-between gap-2 border-b border-slate-800 px-3 py-2 sm:px-4 sm:py-3">
+                            <p className="text-xs sm:text-sm font-bold text-white">
+                                Phân tích kỹ thuật: <span className="text-cyan-300">{analysisSymbol}</span>
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <a
+                                    href={analysisUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="rounded-lg border border-cyan-700/40 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-bold text-cyan-300 hover:bg-cyan-500/20"
+                                >
+                                    Mở tab mới
+                                </a>
+                                <button
+                                    type="button"
+                                    onClick={() => setAnalysisSymbol(null)}
+                                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-bold text-slate-300 hover:bg-slate-800"
+                                >
+                                    Đóng
+                                </button>
+                            </div>
+                        </div>
+                        <iframe
+                            src={analysisUrl}
+                            title={`Vietstock ${analysisSymbol}`}
+                            className="h-[78vh] w-full bg-slate-950"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                        />
                     </div>
                 </div>
             )}
