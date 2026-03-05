@@ -496,7 +496,7 @@ export default function StockPage() {
                                             <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Giá hiện tại</p>
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] font-mono text-slate-500 leading-none mb-1">
-                                                    Thời gian cập nhật: {priceInfo?.timestamp || "--/--/---- --:--:--"}
+                                                    Cập nhật: {priceInfo?.timestamp || "--/--/---- --:--:--"}
                                                 </span>
 
                                                 <div className="flex items-baseline md:justify-end gap-2">
@@ -517,6 +517,22 @@ export default function StockPage() {
                                                         </span>
                                                     )}
                                                 </div>
+
+                                                {/* Giá tham chiếu & Giá mở cửa */}
+                                                {priceInfo && (
+                                                    <div className="flex gap-3 md:justify-end mt-1">
+                                                        {priceInfo.reference !== null && (
+                                                            <span className="text-[10px] font-mono text-slate-500">
+                                                                TC: <span className="text-yellow-500 font-bold">{formatMoney(priceInfo.reference)}</span>
+                                                            </span>
+                                                        )}
+                                                        {priceInfo.opening !== null && (
+                                                            <span className="text-[10px] font-mono text-slate-500">
+                                                                MO: <span className="text-sky-400 font-bold">{formatMoney(priceInfo.opening)}</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
