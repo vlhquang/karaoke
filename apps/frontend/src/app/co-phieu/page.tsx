@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, FormEvent } from "react";
 import Link from "next/link";
 
 interface Transaction {
@@ -46,6 +46,11 @@ export default function StockPage() {
     const [sellPriceInput, setSellPriceInput] = useState("");
     const [analysisSymbol, setAnalysisSymbol] = useState<string | null>(null);
 
+    // Auto-refresh states
+    const [autoRefreshMinutes, setAutoRefreshMinutes] = useState(5);
+    const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(false);
+    const [countdown, setCountdown] = useState(5 * 60);
+
     useEffect(() => {
         const savedCode = localStorage.getItem("stock_access_code");
         if (savedCode) {
@@ -55,6 +60,35 @@ export default function StockPage() {
         }
         setIsInitialized(true);
     }, []);
+
+    // Countdown and Auto-refresh logic
+    useEffect(() => {
+        let timer: any;
+        if (isAutoRefreshEnabled && countdown > 0) {
+            timer = setInterval(() => {
+                setCountdown((prev: number) => prev - 1);
+            }, 1000);
+        } else if (isAutoRefreshEnabled && countdown <= 0) {
+            // Trigger refresh
+            const symbols = transactions
+                .filter((t: Transaction) => t.status === "HOLD")
+                .map((t: Transaction) => t.symbol);
+            if (symbols.length > 0) {
+                fetchRealtimePrices(symbols, true);
+            }
+            // Reset countdown
+            setCountdown(autoRefreshMinutes * 60);
+        }
+
+        return () => {
+            if (timer) clearInterval(timer);
+        };
+    }, [isAutoRefreshEnabled, countdown, autoRefreshMinutes, transactions]);
+
+    // Reset countdown when minutes change
+    useEffect(() => {
+        setCountdown(autoRefreshMinutes * 60);
+    }, [autoRefreshMinutes]);
 
     const formatMoney = (value: number) => {
         return Math.round(value).toLocaleString("vi-VN");
@@ -70,7 +104,7 @@ export default function StockPage() {
         setTimeout(() => setNotification(null), 3000);
     };
 
-    const fetchRealtimePrices = async (symbols: string[]) => {
+    const fetchRealtimePrices = async (symbols: string[], isRefresh = false) => {
         if (symbols.length === 0) return;
         setIsRefreshingPrices(true);
         const uniqueSymbols = Array.from(new Set(symbols));
@@ -79,11 +113,13 @@ export default function StockPage() {
         await Promise.allSettled(
             uniqueSymbols.map(async (symbol) => {
                 try {
-                    const res = await fetch(`/api/stocks/price?symbol=${symbol}`);
+                    const cacheBuster = isRefresh ? `&_t=${Date.now()}` : "";
+                    const refreshParam = isRefresh ? "&refresh=true" : "";
+                    const res = await fetch(`/api/stocks/price?symbol=${symbol}${refreshParam}${cacheBuster}`);
                     const data = await res.json();
                     if (data.ok) {
                         // Update state IMMEDIATELY for this specific symbol
-                        setCurrentPrices(prev => ({
+                        setCurrentPrices((prev: Record<string, PriceInfo>) => ({
                             ...prev,
                             [symbol]: {
                                 current: data.price,
@@ -101,7 +137,9 @@ export default function StockPage() {
         );
 
         setIsRefreshingPrices(false);
-        showToast("Cập nhật giá mới nhất thành công", "info");
+        if (isRefresh) {
+            showToast("Cập nhật giá mới nhất thành công", "info");
+        }
     };
 
     const loadTransactions = async (code: string, isSilent = false) => {
@@ -133,7 +171,7 @@ export default function StockPage() {
         }
     };
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleLogin = async (e: FormEvent) => {
         e.preventDefault();
         setLoginError("");
         setIsLoading(true);
@@ -163,7 +201,7 @@ export default function StockPage() {
         window.location.href = "/";
     };
 
-    const handleAdd = async (e: React.FormEvent) => {
+    const handleAdd = async (e: FormEvent) => {
         e.preventDefault();
         setAddError("");
         const priceValue = parseFloat(priceInput.replace(/\D/g, ""));
@@ -319,12 +357,12 @@ export default function StockPage() {
 
     const groupedData = useMemo(() => {
         const groups: Record<string, Transaction[]> = {};
-        transactions.forEach((tx) => {
+        transactions.forEach((tx: Transaction) => {
             if (!groups[tx.symbol]) groups[tx.symbol] = [];
             groups[tx.symbol].push(tx);
         });
-        Object.keys(groups).forEach((symbol) => {
-            groups[symbol].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        Object.keys(groups).forEach((symbol: string) => {
+            groups[symbol].sort((a: Transaction, b: Transaction) => new Date(b.date).getTime() - new Date(a.date).getTime());
         });
         return groups;
     }, [transactions]);
@@ -384,12 +422,43 @@ export default function StockPage() {
                             {isRefreshingSheet ? "Đang tải..." : "Làm mới"}
                         </button>
                         <button
-                            onClick={() => fetchRealtimePrices(transactions.filter(t => t.status === "HOLD").map(t => t.symbol))}
+                            onClick={() => fetchRealtimePrices(transactions.filter(t => t.status === "HOLD").map(t => t.symbol), true)}
                             disabled={isRefreshingPrices || transactions.filter(t => t.status === "HOLD").length === 0}
                             className="rounded-xl border border-emerald-900/30 bg-emerald-950/20 px-3 py-2 text-[10px] md:text-xs font-medium text-emerald-400 transition hover:bg-emerald-900/30 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                             {isRefreshingPrices ? "Đang cập nhật..." : "Làm mới giá"}
                         </button>
+
+                        <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/50 px-3 py-1.5">
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="checkbox"
+                                    id="auto-refresh"
+                                    checked={isAutoRefreshEnabled}
+                                    onChange={(e) => setIsAutoRefreshEnabled(e.target.checked)}
+                                    className="h-3 w-3 rounded accent-cyan-500"
+                                />
+                                <label htmlFor="auto-refresh" className="text-[10px] md:text-xs text-slate-400 cursor-pointer select-none">Auto</label>
+                            </div>
+
+                            <input
+                                type="number"
+                                min="1"
+                                max="60"
+                                value={autoRefreshMinutes}
+                                onChange={(e) => setAutoRefreshMinutes(parseInt(e.target.value) || 1)}
+                                className="w-8 border-none bg-transparent p-0 text-center text-[10px] md:text-xs font-bold text-cyan-400 outline-none"
+                            />
+                            <span className="text-[10px] md:text-xs text-slate-600">phút</span>
+
+                            {isAutoRefreshEnabled && (
+                                <div className="ml-1 flex items-center gap-1 border-l border-slate-700 pl-2">
+                                    <span className="text-[10px] md:text-xs font-mono text-cyan-500/80">
+                                        {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, "0")}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
                         <button
                             onClick={handleBackToPortal}
                             className="ml-2 text-xs text-slate-500 hover:text-cyan-400"
@@ -482,7 +551,7 @@ export default function StockPage() {
                             const currentPriceValue = priceInfo?.current || 0;
 
                             let gInv = 0, gQty = 0, gProfit = 0;
-                            txs.forEach(t => {
+                            txs.forEach((t: Transaction) => {
                                 const cost = t.price * t.quantity;
                                 gInv += cost;
                                 if (t.status === "SOLD") {
@@ -656,9 +725,8 @@ export default function StockPage() {
                                         </table>
                                     </div>
 
-                                    {/* Mobile Compact View */}
                                     <div className="md:hidden divide-y divide-slate-800/30">
-                                        {txs.map((tx) => {
+                                        {txs.map((tx: Transaction) => {
                                             const isSold = tx.status === "SOLD";
                                             let p = 0;
                                             let pPerc = 0;

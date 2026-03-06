@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
-    const symbol = searchParams.get("symbol")?.toUpperCase();
+    const isRefresh = searchParams.get("refresh") === "true";
 
     if (!symbol) {
         return NextResponse.json({ ok: false, message: "Missing symbol" }, { status: 400 });
@@ -24,10 +24,16 @@ export async function GET(request: Request) {
 
     for (const url of urls) {
         try {
-            const response = await fetch(url, {
+            const fetchOptions: RequestInit = {
                 headers,
-                next: { revalidate: 60 }, // Cache for 60 seconds
-            });
+                next: { revalidate: isRefresh ? 0 : 60 },
+            };
+
+            if (isRefresh) {
+                (fetchOptions as any).cache = "no-store";
+            }
+
+            const response = await fetch(url, fetchOptions);
 
             if (!response.ok) {
                 lastError = `Vietstock returned ${response.status} for ${url}`;
@@ -103,6 +109,10 @@ export async function GET(request: Request) {
                         openingPrice,
                         referencePrice,
                         timestamp: dateValue || new Date().toLocaleString("vi-VN")
+                    }, {
+                        headers: {
+                            "Cache-Control": "no-store, max-age=0"
+                        }
                     });
                 }
             }
