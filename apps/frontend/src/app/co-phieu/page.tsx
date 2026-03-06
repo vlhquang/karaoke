@@ -46,10 +46,11 @@ export default function StockPage() {
     const [sellPriceInput, setSellPriceInput] = useState("");
     const [analysisSymbol, setAnalysisSymbol] = useState<string | null>(null);
 
-    // Auto-refresh states
-    const [autoRefreshMinutes, setAutoRefreshMinutes] = useState(5);
+    // Server-side refresh configuration states
     const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(false);
-    const [countdown, setCountdown] = useState(5 * 60);
+    const [autoRefreshMinutes, setAutoRefreshMinutes] = useState(5);
+    const [isSavingConfig, setIsSavingConfig] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
     useEffect(() => {
         const savedCode = localStorage.getItem("stock_access_code");
@@ -57,38 +58,76 @@ export default function StockPage() {
             setAccessCode(savedCode);
             setIsLoggedIn(true);
             loadTransactions(savedCode, true);
+            loadServerData(savedCode);
         }
         setIsInitialized(true);
     }, []);
 
-    // Countdown and Auto-refresh logic
-    useEffect(() => {
-        let timer: any;
-        if (isAutoRefreshEnabled && countdown > 0) {
-            timer = setInterval(() => {
-                setCountdown((prev: number) => prev - 1);
-            }, 1000);
-        } else if (isAutoRefreshEnabled && countdown <= 0) {
-            // Trigger refresh
-            const symbols = transactions
-                .filter((t: Transaction) => t.status === "HOLD")
-                .map((t: Transaction) => t.symbol);
-            if (symbols.length > 0) {
-                fetchRealtimePrices(symbols, true);
+    const loadServerData = async (code: string) => {
+        try {
+            // Load prices from server
+            const pRes = await fetch("/api/stocks", {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({ action: "get_prices", accessCode: code }),
+            });
+            const pData = await pRes.json();
+            if (pData.ok && pData.data) {
+                const mappedPrices: Record<string, PriceInfo> = {};
+                let latestTs: string | null = null;
+                for (const symbol in pData.data) {
+                    const p = pData.data[symbol];
+                    mappedPrices[symbol] = {
+                        current: p.price,
+                        opening: p.openingPrice,
+                        reference: p.referencePrice,
+                        previous: null,
+                        timestamp: p.timestamp
+                    };
+                    if (!latestTs || p.timestamp > latestTs) latestTs = p.timestamp;
+                }
+                setCurrentPrices(mappedPrices);
+                setLastUpdated(latestTs);
             }
-            // Reset countdown
-            setCountdown(autoRefreshMinutes * 60);
+
+            // Load config from server
+            const cRes = await fetch("/api/stocks", {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({ action: "get_config", accessCode: code }),
+            });
+            const cData = await cRes.json();
+            if (cData.ok && cData.data) {
+                if (cData.data.AUTO_REFRESH_ENABLED !== undefined) {
+                    setIsAutoRefreshEnabled(cData.data.AUTO_REFRESH_ENABLED === "true");
+                }
+                if (cData.data.AUTO_REFRESH_MINUTES !== undefined) {
+                    setAutoRefreshMinutes(parseInt(cData.data.AUTO_REFRESH_MINUTES) || 5);
+                }
+            }
+        } catch (err) {
+            console.error("Failed to load server data", err);
         }
+    };
 
-        return () => {
-            if (timer) clearInterval(timer);
-        };
-    }, [isAutoRefreshEnabled, countdown, autoRefreshMinutes, transactions]);
-
-    // Reset countdown when minutes change
-    useEffect(() => {
-        setCountdown(autoRefreshMinutes * 60);
-    }, [autoRefreshMinutes]);
+    const saveServerConfig = async (key: string, value: string) => {
+        setIsSavingConfig(true);
+        try {
+            const res = await fetch("/api/stocks", {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({ action: "save_config", accessCode, key, value }),
+            });
+            const data = await res.json();
+            if (data.ok) {
+                showToast(`Đã lưu cấu hình ${key}`, "info");
+            }
+        } catch (err) {
+            showToast("Lỗi lưu cấu hình", "info");
+        } finally {
+            setIsSavingConfig(false);
+        }
+    };
 
     const formatMoney = (value: number) => {
         return Math.round(value).toLocaleString("vi-VN");
@@ -428,33 +467,39 @@ export default function StockPage() {
                         >
                             {isRefreshingPrices ? "Đang cập nhật..." : "Làm mới giá"}
                         </button>
-
                         <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/50 px-3 py-1.5">
                             <div className="flex items-center gap-1">
                                 <input
                                     type="checkbox"
                                     id="auto-refresh"
+                                    disabled={isSavingConfig}
                                     checked={isAutoRefreshEnabled}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setIsAutoRefreshEnabled(e.target.checked)}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                        const val = e.target.checked;
+                                        setIsAutoRefreshEnabled(val);
+                                        saveServerConfig("AUTO_REFRESH_ENABLED", String(val));
+                                    }}
                                     className="h-3 w-3 rounded accent-cyan-500"
                                 />
-                                <label htmlFor="auto-refresh" className="text-[10px] md:text-xs text-slate-400 cursor-pointer select-none">Auto</label>
+                                <label htmlFor="auto-refresh" className="text-[10px] md:text-xs text-slate-400 cursor-pointer select-none">Cron</label>
                             </div>
 
                             <input
                                 type="number"
                                 min="1"
                                 max="60"
+                                disabled={isSavingConfig}
                                 value={autoRefreshMinutes}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setAutoRefreshMinutes(parseInt(e.target.value) || 1)}
+                                onBlur={(e: ChangeEvent<HTMLInputElement>) => saveServerConfig("AUTO_REFRESH_MINUTES", e.target.value)}
                                 className="w-8 border-none bg-transparent p-0 text-center text-[10px] md:text-xs font-bold text-cyan-400 outline-none"
                             />
                             <span className="text-[10px] md:text-xs text-slate-600">phút</span>
 
-                            {isAutoRefreshEnabled && (
+                            {lastUpdated && (
                                 <div className="ml-1 flex items-center gap-1 border-l border-slate-700 pl-2">
-                                    <span className="text-[10px] md:text-xs font-mono text-cyan-500/80">
-                                        {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, "0")}
+                                    <span className="text-[8px] md:text-[10px] text-slate-500 whitespace-nowrap">
+                                        Server: {lastUpdated.split(',')[1] || lastUpdated}
                                     </span>
                                 </div>
                             )}
@@ -798,98 +843,104 @@ export default function StockPage() {
                         })
                     )}
                 </div>
-            </div>
+            </div >
 
             {/* Sell Dialog Modal */}
-            {sellTx && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setSellTx(null)}></div>
-                    <div className="relative w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-                        <h3 className="mb-1 text-xl font-bold text-white">Xác nhận bán</h3>
-                        <p className="mb-6 text-sm text-slate-400">
-                            Bán <span className="text-white font-bold">{sellTx.quantity}</span> cổ phiếu <span className="text-white font-bold">{sellTx.symbol}</span> mua ngày {new Date(sellTx.date).toLocaleDateString("vi-VN")}?
-                        </p>
+            {
+                sellTx && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setSellTx(null)}></div>
+                        <div className="relative w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+                            <h3 className="mb-1 text-xl font-bold text-white">Xác nhận bán</h3>
+                            <p className="mb-6 text-sm text-slate-400">
+                                Bán <span className="text-white font-bold">{sellTx.quantity}</span> cổ phiếu <span className="text-white font-bold">{sellTx.symbol}</span> mua ngày {new Date(sellTx.date).toLocaleDateString("vi-VN")}?
+                            </p>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Giá bán thực tế</label>
-                                <input
-                                    autoFocus
-                                    value={sellPriceInput}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setSellPriceInput(formatInputNumber(e.target.value))}
-                                    className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-lg font-bold outline-none focus:border-emerald-500"
-                                    placeholder="0"
-                                />
-                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Giá bán thực tế</label>
+                                    <input
+                                        autoFocus
+                                        value={sellPriceInput}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setSellPriceInput(formatInputNumber(e.target.value))}
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-lg font-bold outline-none focus:border-emerald-500"
+                                        placeholder="0"
+                                    />
+                                </div>
 
-                            <div className="grid grid-cols-2 gap-3 pt-2">
-                                <button
-                                    onClick={() => setSellTx(null)}
-                                    className="rounded-2xl border border-slate-700 py-3 font-bold text-slate-400 transition hover:bg-slate-800"
-                                >
-                                    Hủy
-                                </button>
-                                <button
-                                    onClick={handleConfirmSell}
-                                    disabled={isLoading}
-                                    className="rounded-2xl bg-emerald-600 py-3 font-bold text-white transition hover:bg-emerald-500 disabled:opacity-50"
-                                >
-                                    {isLoading ? "Đang xử lý..." : "Xác nhận Bán"}
-                                </button>
+                                <div className="grid grid-cols-2 gap-3 pt-2">
+                                    <button
+                                        onClick={() => setSellTx(null)}
+                                        className="rounded-2xl border border-slate-700 py-3 font-bold text-slate-400 transition hover:bg-slate-800"
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button
+                                        onClick={handleConfirmSell}
+                                        disabled={isLoading}
+                                        className="rounded-2xl bg-emerald-600 py-3 font-bold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                                    >
+                                        {isLoading ? "Đang xử lý..." : "Xác nhận Bán"}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Symbol Analysis Popup */}
-            {analysisSymbol && (
-                <div className="fixed inset-0 z-[105] flex items-center justify-center p-2 sm:p-4">
-                    <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm" onClick={() => setAnalysisSymbol(null)}></div>
-                    <div className="relative w-full max-w-6xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden">
-                        <div className="flex items-center justify-between gap-2 border-b border-slate-800 px-3 py-2 sm:px-4 sm:py-3">
-                            <p className="text-xs sm:text-sm font-bold text-white">
-                                Chi tiết mã: <span className="text-cyan-300">{analysisSymbol}</span>
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <a
-                                    href={analysisUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="rounded-lg border border-cyan-700/40 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-bold text-cyan-300 hover:bg-cyan-500/20"
-                                >
-                                    Mở tab mới
-                                </a>
-                                <button
-                                    type="button"
-                                    onClick={() => setAnalysisSymbol(null)}
-                                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-bold text-slate-300 hover:bg-slate-800"
-                                >
-                                    Đóng
-                                </button>
+            {
+                analysisSymbol && (
+                    <div className="fixed inset-0 z-[105] flex items-center justify-center p-2 sm:p-4">
+                        <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm" onClick={() => setAnalysisSymbol(null)}></div>
+                        <div className="relative w-full max-w-6xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden">
+                            <div className="flex items-center justify-between gap-2 border-b border-slate-800 px-3 py-2 sm:px-4 sm:py-3">
+                                <p className="text-xs sm:text-sm font-bold text-white">
+                                    Chi tiết mã: <span className="text-cyan-300">{analysisSymbol}</span>
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <a
+                                        href={analysisUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="rounded-lg border border-cyan-700/40 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-bold text-cyan-300 hover:bg-cyan-500/20"
+                                    >
+                                        Mở tab mới
+                                    </a>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAnalysisSymbol(null)}
+                                        className="rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-bold text-slate-300 hover:bg-slate-800"
+                                    >
+                                        Đóng
+                                    </button>
+                                </div>
                             </div>
+                            <iframe
+                                src={analysisUrl}
+                                title={`Fireant ${analysisSymbol}`}
+                                className="h-[78vh] w-full bg-slate-950"
+                                referrerPolicy="strict-origin-when-cross-origin"
+                            />
                         </div>
-                        <iframe
-                            src={analysisUrl}
-                            title={`Fireant ${analysisSymbol}`}
-                            className="h-[78vh] w-full bg-slate-950"
-                            referrerPolicy="strict-origin-when-cross-origin"
-                        />
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Toast Notification */}
-            {notification && (
-                <div className="fixed bottom-8 left-1/2 z-[110] -translate-x-1/2 animate-bounce">
-                    <div className={`flex items-center gap-3 rounded-full border px-6 py-3 shadow-2xl backdrop-blur-xl ${notification.type === "success"
-                        ? "border-emerald-500/50 bg-emerald-950/80 text-emerald-300"
-                        : "border-cyan-500/50 bg-cyan-950/80 text-cyan-300"
-                        }`}>
-                        <span className="text-xs font-bold uppercase tracking-widest leading-none">{notification.msg}</span>
+            {
+                notification && (
+                    <div className="fixed bottom-8 left-1/2 z-[110] -translate-x-1/2 animate-bounce">
+                        <div className={`flex items-center gap-3 rounded-full border px-6 py-3 shadow-2xl backdrop-blur-xl ${notification.type === "success"
+                            ? "border-emerald-500/50 bg-emerald-950/80 text-emerald-300"
+                            : "border-cyan-500/50 bg-cyan-950/80 text-cyan-300"
+                            }`}>
+                            <span className="text-xs font-bold uppercase tracking-widest leading-none">{notification.msg}</span>
+                        </div>
                     </div>
-                </div>
-            )}
-        </main>
+                )
+            }
+        </main >
     );
 }

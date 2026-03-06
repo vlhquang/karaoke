@@ -7,6 +7,7 @@
 
 const TRANSACTION_SHEET = "transactions";
 const CONFIG_SHEET = "config";
+const PRICES_SHEET = "prices";
 
 function doPost(e) {
   try {
@@ -25,18 +26,16 @@ function doPost(e) {
       return jsonResponse({ ok: false, message: "Invalid access code" });
     }
 
-    if (action === "add") {
-      return handleAdd(payload);
-    }
-    if (action === "list") {
-      return handleList();
-    }
-    if (action === "sell") {
-      return handleSell(payload);
-    }
-    if (action === "delete") {
-      return handleDelete(payload);
-    }
+    if (action === "add") return handleAdd(payload);
+    if (action === "list") return handleList();
+    if (action === "sell") return handleSell(payload);
+    if (action === "delete") return handleDelete(payload);
+    
+    // New actions for server-side auto-refresh
+    if (action === "get_prices") return handleGetPrices();
+    if (action === "update_prices") return handleUpdatePrices(payload);
+    if (action === "get_config") return handleGetConfig();
+    if (action === "save_config") return handleSaveConfig(payload);
 
     return jsonResponse({ ok: false, message: "Unsupported action" });
   } catch (error) {
@@ -202,11 +201,110 @@ function getAccessCode() {
 
 function getSheet(name) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(name);
+  var sheet = ss.getSheetByName(name);
   if (!sheet) {
-    throw new Error("Missing sheet: " + name);
+    // Auto-create sheets if they don't exist
+    if (name === PRICES_SHEET) {
+      sheet = ss.insertSheet(PRICES_SHEET);
+      sheet.appendRow(["symbol", "price", "openingPrice", "referencePrice", "timestamp"]);
+    } else if (name === CONFIG_SHEET) {
+      sheet = ss.insertSheet(CONFIG_SHEET);
+      sheet.appendRow(["key", "value"]);
+    } else {
+      throw new Error("Missing sheet: " + name);
+    }
   }
   return sheet;
+}
+
+function handleGetPrices() {
+  const sheet = getSheet(PRICES_SHEET);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return jsonResponse({ ok: true, data: {} });
+  
+  const values = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+  const prices = {};
+  for (var i = 0; i < values.length; i++) {
+    const symbol = String(values[i][0]);
+    prices[symbol] = {
+      price: Number(values[i][1]),
+      openingPrice: Number(values[i][2]),
+      referencePrice: Number(values[i][3]),
+      timestamp: String(values[i][4])
+    };
+  }
+  return jsonResponse({ ok: true, data: prices });
+}
+
+function handleUpdatePrices(payload) {
+  const prices = payload.prices; // Expecting { "VND": { price, openingPrice, referencePrice, timestamp }, ... }
+  if (!prices) return jsonResponse({ ok: false, message: "Missing prices data" });
+
+  const sheet = getSheet(PRICES_SHEET);
+  const lastRow = sheet.getLastRow();
+  const dataRange = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 5) : null;
+  const values = dataRange ? dataRange.getValues() : [];
+  
+  for (const symbol in prices) {
+    const p = prices[symbol];
+    var found = false;
+    for (var i = 0; i < values.length; i++) {
+      if (values[i][0] === symbol) {
+        values[i][1] = p.price;
+        values[i][2] = p.openingPrice;
+        values[i][3] = p.referencePrice;
+        values[i][4] = p.timestamp;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      values.push([symbol, p.price, p.openingPrice, p.referencePrice, p.timestamp]);
+    }
+  }
+
+  if (values.length > 0) {
+    sheet.getRange(2, 1, values.length, 5).setValues(values);
+  }
+  return jsonResponse({ ok: true });
+}
+
+function handleGetConfig() {
+  const sheet = getSheet(CONFIG_SHEET);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 1) return jsonResponse({ ok: true, data: {} });
+  
+  const values = sheet.getDataRange().getValues();
+  const config = {};
+  for (var i = 0; i < values.length; i++) {
+    const key = String(values[i][0]).trim();
+    if (key) config[key] = String(values[i][1]).trim();
+  }
+  return jsonResponse({ ok: true, data: config });
+}
+
+function handleSaveConfig(payload) {
+  const key = String(payload.key || "").trim();
+  const value = String(payload.value || "").trim();
+  if (!key) return jsonResponse({ ok: false, message: "Missing key" });
+
+  const sheet = getSheet(CONFIG_SHEET);
+  const lastRow = sheet.getLastRow();
+  const dataRange = lastRow > 0 ? sheet.getDataRange() : null;
+  const values = dataRange ? dataRange.getValues() : [];
+  
+  var found = false;
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][0]).trim() === key) {
+      sheet.getRange(i + 1, 2).setValue(value);
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    sheet.appendRow([key, value]);
+  }
+  return jsonResponse({ ok: true });
 }
 
 function jsonResponse(data) {
