@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const isRefresh = searchParams.get("refresh") === "true";
+    const symbol = searchParams.get("symbol")?.toUpperCase();
 
     if (!symbol) {
         return NextResponse.json({ ok: false, message: "Missing symbol" }, { status: 400 });

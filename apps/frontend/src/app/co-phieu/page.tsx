@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, FormEvent } from "react";
+import { useState, useMemo, useEffect, FormEvent, ChangeEvent } from "react";
 import Link from "next/link";
 
 interface Transaction {
@@ -263,7 +263,7 @@ export default function StockPage() {
             });
             const data = await res.json();
             if (data.ok) {
-                setTransactions(transactions.filter((tx) => tx.id !== id));
+                setTransactions(transactions.filter((tx: Transaction) => tx.id !== id));
                 showToast("Đã cập nhật trạng thái DELETED");
             } else {
                 alert(data.message || "Xóa thất bại");
@@ -304,7 +304,7 @@ export default function StockPage() {
             });
             const data = await res.json();
             if (data.ok) {
-                setTransactions(transactions.map(tx =>
+                setTransactions(transactions.map((tx: Transaction) =>
                     tx.id === sellTx.id
                         ? { ...tx, status: "SOLD", sellPrice: sellPriceValue, sellDate: data.data?.sellDate || new Date().toISOString().split("T")[0] }
                         : tx
@@ -333,7 +333,7 @@ export default function StockPage() {
         let totalInvested = 0;
         let totalCurrentValue = 0;
 
-        transactions.forEach((tx) => {
+        transactions.forEach((tx: Transaction) => {
             const cost = tx.price * tx.quantity;
             totalInvested += cost;
 
@@ -381,7 +381,7 @@ export default function StockPage() {
                         <input
                             type="password"
                             value={accessCode}
-                            onChange={(e) => setAccessCode(e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setAccessCode(e.target.value)}
                             placeholder="Mã truy cập"
                             className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-5 py-4 text-center text-lg outline-none transition focus:border-cyan-500/50"
                             required
@@ -422,7 +422,7 @@ export default function StockPage() {
                             {isRefreshingSheet ? "Đang tải..." : "Làm mới"}
                         </button>
                         <button
-                            onClick={() => fetchRealtimePrices(transactions.filter(t => t.status === "HOLD").map(t => t.symbol), true)}
+                            onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
                             disabled={isRefreshingPrices || transactions.filter(t => t.status === "HOLD").length === 0}
                             className="rounded-xl border border-emerald-900/30 bg-emerald-950/20 px-3 py-2 text-[10px] md:text-xs font-medium text-emerald-400 transition hover:bg-emerald-900/30 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
@@ -435,7 +435,7 @@ export default function StockPage() {
                                     type="checkbox"
                                     id="auto-refresh"
                                     checked={isAutoRefreshEnabled}
-                                    onChange={(e) => setIsAutoRefreshEnabled(e.target.checked)}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setIsAutoRefreshEnabled(e.target.checked)}
                                     className="h-3 w-3 rounded accent-cyan-500"
                                 />
                                 <label htmlFor="auto-refresh" className="text-[10px] md:text-xs text-slate-400 cursor-pointer select-none">Auto</label>
@@ -446,7 +446,7 @@ export default function StockPage() {
                                 min="1"
                                 max="60"
                                 value={autoRefreshMinutes}
-                                onChange={(e) => setAutoRefreshMinutes(parseInt(e.target.value) || 1)}
+                                onChange={(e: ChangeEvent<HTMLInputElement>) => setAutoRefreshMinutes(parseInt(e.target.value) || 1)}
                                 className="w-8 border-none bg-transparent p-0 text-center text-[10px] md:text-xs font-bold text-cyan-400 outline-none"
                             />
                             <span className="text-[10px] md:text-xs text-slate-600">phút</span>
@@ -502,28 +502,28 @@ export default function StockPage() {
                         <input
                             placeholder="Mã CP"
                             value={symbolInput}
-                            onChange={(e) => setSymbolInput(e.target.value.toUpperCase())}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setSymbolInput(e.target.value.toUpperCase())}
                             className="flex-1 min-w-[70px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-cyan-500"
                             required
                         />
                         <input
                             type="date"
                             value={dateInput}
-                            onChange={(e) => setDateInput(e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setDateInput(e.target.value)}
                             className="flex-[1.5] min-w-[110px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-cyan-500"
                             required
                         />
                         <input
                             placeholder="Giá mua"
                             value={priceInput}
-                            onChange={(e) => setPriceInput(formatInputNumber(e.target.value))}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setPriceInput(formatInputNumber(e.target.value))}
                             className="flex-1 min-w-[90px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-cyan-500"
                             required
                         />
                         <input
                             placeholder="SL"
                             value={quantityInput}
-                            onChange={(e) => setQuantityInput(formatInputNumber(e.target.value))}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setQuantityInput(formatInputNumber(e.target.value))}
                             className="flex-[0.5] min-w-[60px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-cyan-500"
                             required
                         />
@@ -639,7 +639,7 @@ export default function StockPage() {
                                     <div className="hidden md:block overflow-x-auto">
                                         <table className="w-full text-sm text-left">
                                             <tbody className="divide-y divide-slate-800/30">
-                                                {txs.map((tx) => {
+                                                {txs.map((tx: Transaction) => {
                                                     const isSold = tx.status === "SOLD";
                                                     let p = 0;
                                                     let pPerc = 0;
@@ -816,7 +816,7 @@ export default function StockPage() {
                                 <input
                                     autoFocus
                                     value={sellPriceInput}
-                                    onChange={(e) => setSellPriceInput(formatInputNumber(e.target.value))}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setSellPriceInput(formatInputNumber(e.target.value))}
                                     className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-lg font-bold outline-none focus:border-emerald-500"
                                     placeholder="0"
                                 />
