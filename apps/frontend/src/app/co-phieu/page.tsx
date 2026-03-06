@@ -288,7 +288,7 @@ export default function StockPage() {
     };
 
     const analysisUrl = analysisSymbol
-        ? `https://finance.vietstock.vn/${encodeURIComponent(analysisSymbol)}/phan-tich-ky-thuat.htm`
+        ? `https://fireant.vn/ma-chung-khoan/${encodeURIComponent(analysisSymbol)}`
         : "";
 
     const totals = useMemo(() => {
@@ -619,26 +619,6 @@ export default function StockPage() {
                                                                 <div className="flex flex-col">
                                                                     <span className="text-[10px] text-slate-500 uppercase font-bold">Lãi/Lỗ {isSold ? "thực" : "tính"}</span>
                                                                     <span>
-                                                                        {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
-                                                                        {p !== 0 && tx.price > 0 && (
-                                                                            <span className="ml-1 text-[11px] opacity-60">
-                                                                                ({pPerc.toFixed(1)}%)
-                                                                            </span>
-                                                                        )}
-                                                                    </span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-4 py-2 text-right">
-                                                                <div className="flex items-center justify-end gap-1">
-                                                                    {!isSold && (
-                                                                        <button
-                                                                            onClick={() => handleOpenSellDialog(tx)}
-                                                                            className="rounded-lg bg-emerald-600/20 px-3 py-1.5 text-[10px] font-bold text-emerald-400 hover:bg-emerald-600/40 transition-colors"
-                                                                        >
-                                                                            BÁN
-                                                                        </button>
-                                                                    )}
-                                                                    <button
                                                                         onClick={() => handleDelete(tx.id)}
                                                                         className="p-2 text-slate-700 hover:text-red-500 transition-colors"
                                                                         title="Xóa vĩnh viễn"
@@ -781,7 +761,7 @@ export default function StockPage() {
                     <div className="relative w-full max-w-6xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden">
                         <div className="flex items-center justify-between gap-2 border-b border-slate-800 px-3 py-2 sm:px-4 sm:py-3">
                             <p className="text-xs sm:text-sm font-bold text-white">
-                                Phân tích kỹ thuật: <span className="text-cyan-300">{analysisSymbol}</span>
+                                Chi tiết mã: <span className="text-cyan-300">{analysisSymbol}</span>
                             </p>
                             <div className="flex items-center gap-2">
                                 <a
@@ -803,7 +783,7 @@ export default function StockPage() {
                         </div>
                         <iframe
                             src={analysisUrl}
-                            title={`Vietstock ${analysisSymbol}`}
+                            title={`Fireant ${analysisSymbol}`}
                             className="h-[78vh] w-full bg-slate-950"
                             referrerPolicy="strict-origin-when-cross-origin"
                         />
