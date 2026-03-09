@@ -37,6 +37,12 @@ export default function HomePage() {
       title: "Học tập",
       description: "Tài liệu học tập, Java core và các kiến thức lập trình khác.",
       badge: "New"
+    },
+    {
+      href: "/tao-video",
+      title: "Tạo video",
+      description: "AI tạo nội dung Shorts: kịch bản, prompt video, tiêu đề, mô tả, caption, hashtag.",
+      badge: "New"
     }
   ];
 

@@ -47,7 +47,6 @@ export async function scrapeStockPrice(symbol: string, isRefresh: boolean = fals
             let priceValue: string | null = null;
             let openValue: string | null = null;
             let changeValue: string | null = null;
-            let dateValue: string | null = null;
 
             if (tradeMatch) {
                 const tradeJson = tradeMatch[1];
@@ -55,12 +54,10 @@ export async function scrapeStockPrice(symbol: string, isRefresh: boolean = fals
                 const p = tradeJson.match(/"LastPrice":"(?:\\"|[^"])*?([\d,.]+)\s*(?:\\u003c|<)/);
                 const o = tradeJson.match(/"OpenPrice":"([\d,.]+)"/);
                 const c = tradeJson.match(/"Change":"(?:\\"|[^"])*?([+-]?[\d,.]+)\s*(?:\\u003c|<)/);
-                const d = tradeJson.match(/"TradingDate":"([^"]+)"/);
 
                 if (p) priceValue = p[1];
                 if (o) openValue = o[1];
                 if (c) changeValue = c[1];
-                if (d) dateValue = d[1];
             }
 
             // Extraction strategy 2: ID-based patterns (Original Fallback)
@@ -76,11 +73,6 @@ export async function scrapeStockPrice(symbol: string, isRefresh: boolean = fals
                 const m = html.match(/id="stockchange"[^>]*>\s*([+-]?[\d,.]+)\s*\(/i);
                 if (m) changeValue = m[1];
             }
-            if (!dateValue) {
-                const m = html.match(/id="tradedate"[^>]*>\s*([^<]+)\s*<\/div>/i);
-                if (m) dateValue = m[1];
-            }
-
             // Extraction strategy 3: CSS-like patterns suggested by User (Additional Fallback)
             if (!priceValue) {
                 const m = html.match(/class="[^"]*stock-info[^"]*"[^>]*>\s*<span[^>]*class="[^"]*price[^"]*"[^>]*>\s*([\d,.]+)\s*<\/span>/is);
@@ -105,7 +97,7 @@ export async function scrapeStockPrice(symbol: string, isRefresh: boolean = fals
                         price,
                         openingPrice,
                         referencePrice,
-                        timestamp: dateValue || new Date().toLocaleString("vi-VN")
+                        timestamp: formatDateTimeGmt7(new Date())
                     };
                 }
             }
@@ -115,4 +107,20 @@ export async function scrapeStockPrice(symbol: string, isRefresh: boolean = fals
     }
 
     return null;
+}
+
+function formatDateTimeGmt7(date: Date): string {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Ho_Chi_Minh",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+    }).formatToParts(date);
+
+    const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+    return `${get("day")}/${get("month")}/${get("year")} ${get("hour")}:${get("minute")}:${get("second")}`;
 }

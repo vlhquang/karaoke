@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { scrapeStockPrice } from "@/lib/stock-scraper";
+import { scrapeStockPrice } from "../../../../lib/stock-scraper";
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const isRefresh = searchParams.get("refresh") === "true";
-    const symbol = searchParams.get("symbol")?.toUpperCase();
+    const symbol = searchParams.get("symbol")?.trim().toUpperCase();
 
     if (!symbol) {
         return NextResponse.json({ ok: false, message: "Missing symbol" }, { status: 400 });

@@ -8,7 +8,9 @@ import type { RoomService } from "./services/room.service";
 export const createLiXiExpressApp = (roomService: RoomService): Express => {
   const app = express();
   app.use(cors());
-  app.use(express.json({ limit: "1mb" }));
+  // IMPORTANT: only parse JSON for LiXi routes.
+  // Global body parsing can consume request streams used by Next.js route handlers (/api/*).
+  app.use("/api/li-xi-nang-cao", express.json({ limit: "1mb" }));
   app.use(requestLogger);
   app.use("/api/li-xi-nang-cao", createRoomRoutes(roomService));
   app.use(errorHandler);

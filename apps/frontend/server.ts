@@ -13,6 +13,7 @@ import { createLiXiExpressApp } from "./src/li-xi-nang-cao/app";
 import { RoomService as LiXiRoomService } from "./src/li-xi-nang-cao/services/room.service";
 import { registerLiXiNamespace } from "./src/li-xi-nang-cao/socket";
 import { startKeepAlive } from "./src/lib/keep-alive";
+import { getStockAutoRefreshStatus, startStockAutoRefreshWorker } from "./src/lib/stock-auto-refresh";
 import type {
   AddSongPayload,
   ClientToServerEvents,
@@ -351,11 +352,18 @@ app.prepare().then(() => {
   expressApp.use("/racing-game", express.static(racingPublicPath));
   expressApp.use("/vendor/phaser", express.static(phaserDistPath));
   expressApp.use("/racing-game/vendor/phaser", express.static(phaserDistPath));
+  expressApp.get("/api/stocks/worker-status", (_req, res) => {
+    res.json({
+      ok: true,
+      data: getStockAutoRefreshStatus()
+    });
+  });
   expressApp.all("*", (req, res) => handle(req, res));
   const httpServer = createServer(expressApp);
 
   // Start Render Keep-Alive cron (14 mins)
   startKeepAlive();
+  startStockAutoRefreshWorker();
 
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     cors: { origin: true, methods: ["GET", "POST"] },

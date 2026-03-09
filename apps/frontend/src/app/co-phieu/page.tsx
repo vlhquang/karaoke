@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, FormEvent, ChangeEvent } from "react";
+import { useState, useMemo, useEffect, useRef, FormEvent, ChangeEvent } from "react";
 import Link from "next/link";
 
 interface Transaction {
@@ -20,6 +20,15 @@ interface PriceInfo {
     opening: number | null;
     reference: number | null;
     timestamp: string | null;
+}
+
+interface WorkerStatus {
+    running: boolean;
+    intervalMinutes: number;
+    lastRunAt: string | null;
+    nextRunAt: string | null;
+    lastStatus: "idle" | "updated" | "skipped" | "error";
+    lastMessage: string;
 }
 
 export default function StockPage() {
@@ -47,10 +56,13 @@ export default function StockPage() {
     const [analysisSymbol, setAnalysisSymbol] = useState<string | null>(null);
 
     // Server-side refresh configuration states
-    const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(false);
-    const [autoRefreshMinutes, setAutoRefreshMinutes] = useState(5);
-    const [isSavingConfig, setIsSavingConfig] = useState(false);
+    const [autoRefreshMinutes, setAutoRefreshMinutes] = useState(1);
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+    const [workerStatus, setWorkerStatus] = useState<WorkerStatus | null>(null);
+    const [recentlyUpdatedSymbols, setRecentlyUpdatedSymbols] = useState<Record<string, boolean>>({});
+    const isSyncingPricesRef = useRef(false);
+    const lastWorkerSignalRef = useRef<string>("");
+    const highlightTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
     useEffect(() => {
         const savedCode = localStorage.getItem("stock_access_code");
@@ -63,9 +75,36 @@ export default function StockPage() {
         setIsInitialized(true);
     }, []);
 
-    const loadServerData = async (code: string) => {
+    useEffect(() => {
+        return () => {
+            Object.values(highlightTimersRef.current).forEach((timer) => clearTimeout(timer));
+        };
+    }, []);
+
+    const markSymbolRecentlyUpdated = (symbol: string) => {
+        const normalizedSymbol = symbol.trim().toUpperCase();
+        if (!normalizedSymbol) return;
+
+        if (highlightTimersRef.current[normalizedSymbol]) {
+            clearTimeout(highlightTimersRef.current[normalizedSymbol]);
+        }
+
+        setRecentlyUpdatedSymbols((prev) => ({ ...prev, [normalizedSymbol]: true }));
+
+        highlightTimersRef.current[normalizedSymbol] = setTimeout(() => {
+            setRecentlyUpdatedSymbols((prev) => {
+                const next = { ...prev };
+                delete next[normalizedSymbol];
+                return next;
+            });
+            delete highlightTimersRef.current[normalizedSymbol];
+        }, 5000);
+    };
+
+    const syncPricesFromServer = async (code: string) => {
+        if (isSyncingPricesRef.current) return;
+        isSyncingPricesRef.current = true;
         try {
-            // Load prices from server
             const pRes = await fetch("/api/stocks", {
                 method: "POST",
                 headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -75,20 +114,61 @@ export default function StockPage() {
             if (pData.ok && pData.data) {
                 const mappedPrices: Record<string, PriceInfo> = {};
                 let latestTs: string | null = null;
+                let latestTsMs = Number.NEGATIVE_INFINITY;
+                const changedSymbols: string[] = [];
                 for (const symbol in pData.data) {
+                    const normalizedSymbol = symbol.trim().toUpperCase();
                     const p = pData.data[symbol];
-                    mappedPrices[symbol] = {
+                    const ts = typeof p.timestamp === "string" ? p.timestamp : null;
+                    mappedPrices[normalizedSymbol] = {
                         current: p.price,
                         opening: p.openingPrice,
                         reference: p.referencePrice,
                         previous: null,
-                        timestamp: p.timestamp
+                        timestamp: ts
                     };
-                    if (!latestTs || p.timestamp > latestTs) latestTs = p.timestamp;
+                    const tsMs = parseTimestampToMs(ts);
+                    if (tsMs !== null && tsMs > latestTsMs) {
+                        latestTsMs = tsMs;
+                        latestTs = ts;
+                    } else if (latestTs === null && ts) {
+                        latestTs = ts;
+                    }
                 }
-                setCurrentPrices(mappedPrices);
+                setCurrentPrices((prev) => {
+                    const next = { ...prev };
+                    for (const symbol in mappedPrices) {
+                        const incoming = mappedPrices[symbol];
+                        const prevItem = prev[symbol];
+                        const hasChanged =
+                            !prevItem ||
+                            prevItem.current !== incoming.current ||
+                            prevItem.reference !== incoming.reference ||
+                            prevItem.opening !== incoming.opening ||
+                            prevItem.timestamp !== incoming.timestamp;
+                        if (hasChanged) {
+                            changedSymbols.push(symbol);
+                        }
+                        next[symbol] = {
+                            ...incoming,
+                            previous: prevItem?.current ?? incoming.previous
+                        };
+                    }
+                    return next;
+                });
+                changedSymbols.forEach(markSymbolRecentlyUpdated);
                 setLastUpdated(latestTs);
             }
+        } catch (err) {
+            console.error("Failed to sync stock prices from server", err);
+        } finally {
+            isSyncingPricesRef.current = false;
+        }
+    };
+
+    const loadServerData = async (code: string) => {
+        try {
+            await syncPricesFromServer(code);
 
             // Load config from server
             const cRes = await fetch("/api/stocks", {
@@ -97,35 +177,27 @@ export default function StockPage() {
                 body: JSON.stringify({ action: "get_config", accessCode: code }),
             });
             const cData = await cRes.json();
-            if (cData.ok && cData.data) {
-                if (cData.data.AUTO_REFRESH_ENABLED !== undefined) {
-                    setIsAutoRefreshEnabled(cData.data.AUTO_REFRESH_ENABLED === "true");
+                if (cData.ok && cData.data) {
+                    if (cData.data.AUTO_REFRESH_MINUTES !== undefined) {
+                        setAutoRefreshMinutes(parseInt(cData.data.AUTO_REFRESH_MINUTES) || 1);
+                    }
                 }
-                if (cData.data.AUTO_REFRESH_MINUTES !== undefined) {
-                    setAutoRefreshMinutes(parseInt(cData.data.AUTO_REFRESH_MINUTES) || 5);
-                }
-            }
         } catch (err) {
             console.error("Failed to load server data", err);
         }
     };
 
-    const saveServerConfig = async (key: string, value: string) => {
-        setIsSavingConfig(true);
+    const loadWorkerStatus = async (code: string) => {
         try {
-            const res = await fetch("/api/stocks", {
-                method: "POST",
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify({ action: "save_config", accessCode, key, value }),
+            const res = await fetch(`/api/stocks/worker-status`, {
+                cache: "no-store"
             });
             const data = await res.json();
-            if (data.ok) {
-                showToast(`Đã lưu cấu hình ${key}`, "info");
+            if (data?.ok && data?.data) {
+                setWorkerStatus(data.data as WorkerStatus);
             }
         } catch (err) {
-            showToast("Lỗi lưu cấu hình", "info");
-        } finally {
-            setIsSavingConfig(false);
+            console.error("Failed to load worker status", err);
         }
     };
 
@@ -146,7 +218,7 @@ export default function StockPage() {
     const fetchRealtimePrices = async (symbols: string[], isRefresh = false) => {
         if (symbols.length === 0) return;
         setIsRefreshingPrices(true);
-        const uniqueSymbols = Array.from(new Set(symbols));
+        const uniqueSymbols = Array.from(new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean)));
 
         // Start all fetches concurrently
         await Promise.allSettled(
@@ -168,6 +240,7 @@ export default function StockPage() {
                                 timestamp: data.timestamp
                             }
                         }));
+                        markSymbolRecentlyUpdated(symbol);
                     }
                 } catch (err) {
                     console.error(`Failed to fetch price for ${symbol}`, err);
@@ -192,7 +265,11 @@ export default function StockPage() {
             });
             const data = await res.json();
             if (data.ok) {
-                const list = data.data || [];
+                const list = (data.data || []).map((tx: Transaction) => ({
+                    ...tx,
+                    symbol: String(tx.symbol || "").trim().toUpperCase(),
+                    status: String(tx.status || "").trim().toUpperCase() as "HOLD" | "SOLD"
+                }));
                 setTransactions(list);
                 if (!isSilent) showToast("Tải dữ liệu từ Google Sheets xong");
                 const symbols = list.filter((tx: Transaction) => tx.status === "HOLD").map((tx: Transaction) => tx.symbol);
@@ -225,6 +302,8 @@ export default function StockPage() {
                 setIsLoggedIn(true);
                 localStorage.setItem("stock_access_code", accessCode);
                 loadTransactions(accessCode, true);
+                loadServerData(accessCode);
+                loadWorkerStatus(accessCode);
             } else {
                 setLoginError(data.message || "Mã truy cập không hợp lệ");
             }
@@ -368,6 +447,41 @@ export default function StockPage() {
         ? `https://fireant.vn/ma-chung-khoan/${encodeURIComponent(analysisSymbol)}`
         : "";
 
+    useEffect(() => {
+        if (!isLoggedIn || !accessCode) return;
+        loadWorkerStatus(accessCode);
+        syncPricesFromServer(accessCode);
+        const timer = setInterval(() => {
+            loadWorkerStatus(accessCode);
+            syncPricesFromServer(accessCode);
+        }, workerStatus?.running ? 3000 : 10000);
+        return () => clearInterval(timer);
+    }, [isLoggedIn, accessCode, workerStatus?.running]);
+
+    useEffect(() => {
+        if (!isLoggedIn || !accessCode || !workerStatus) return;
+        const signal = [
+            workerStatus.lastRunAt ?? "",
+            workerStatus.lastStatus ?? "",
+            workerStatus.lastMessage ?? ""
+        ].join("|");
+        if (signal !== lastWorkerSignalRef.current) {
+            lastWorkerSignalRef.current = signal;
+            syncPricesFromServer(accessCode);
+        }
+    }, [isLoggedIn, accessCode, workerStatus]);
+
+    const nextCronLabel = useMemo(() => {
+        if (!workerStatus?.nextRunAt) return null;
+        return formatDateTime(workerStatus.nextRunAt);
+    }, [workerStatus]);
+
+    const lastUpdatedLabel = useMemo(() => formatDateTime(lastUpdated), [lastUpdated]);
+    const cronIntervalLabel = useMemo(
+        () => `${workerStatus?.intervalMinutes ?? autoRefreshMinutes} phút/lần`,
+        [workerStatus, autoRefreshMinutes]
+    );
+
     const totals = useMemo(() => {
         let totalInvested = 0;
         let totalCurrentValue = 0;
@@ -468,41 +582,30 @@ export default function StockPage() {
                             {isRefreshingPrices ? "Đang cập nhật..." : "Làm mới giá"}
                         </button>
                         <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/50 px-3 py-1.5">
-                            <div className="flex items-center gap-1">
-                                <input
-                                    type="checkbox"
-                                    id="auto-refresh"
-                                    disabled={isSavingConfig}
-                                    checked={isAutoRefreshEnabled}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                        const val = e.target.checked;
-                                        setIsAutoRefreshEnabled(val);
-                                        saveServerConfig("AUTO_REFRESH_ENABLED", String(val));
-                                    }}
-                                    className="h-3 w-3 rounded accent-cyan-500"
-                                />
-                                <label htmlFor="auto-refresh" className="text-[10px] md:text-xs text-slate-400 cursor-pointer select-none">Cron</label>
-                            </div>
+                            <span className="text-[10px] md:text-xs text-slate-400 select-none">Auto</span>
+                            <span className="text-[10px] md:text-xs text-cyan-400 font-bold whitespace-nowrap">
+                                {cronIntervalLabel}
+                            </span>
 
-                            <input
-                                type="number"
-                                min="1"
-                                max="60"
-                                disabled={isSavingConfig}
-                                value={autoRefreshMinutes}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) => setAutoRefreshMinutes(parseInt(e.target.value) || 1)}
-                                onBlur={(e: ChangeEvent<HTMLInputElement>) => saveServerConfig("AUTO_REFRESH_MINUTES", e.target.value)}
-                                className="w-8 border-none bg-transparent p-0 text-center text-[10px] md:text-xs font-bold text-cyan-400 outline-none"
-                            />
-                            <span className="text-[10px] md:text-xs text-slate-600">phút</span>
-
-                            {lastUpdated && (
+                            {lastUpdatedLabel && (
                                 <div className="ml-1 flex items-center gap-1 border-l border-slate-700 pl-2">
                                     <span className="text-[8px] md:text-[10px] text-slate-500 whitespace-nowrap">
-                                        Server: {lastUpdated.split(',')[1] || lastUpdated}
+                                        Cập nhật: {lastUpdatedLabel}
                                     </span>
                                 </div>
                             )}
+
+                            <div className="ml-1 flex items-center gap-1 border-l border-slate-700 pl-2">
+                                <span className="text-[8px] md:text-[10px] text-slate-500 whitespace-nowrap">
+                                    Config: Google Sheet
+                                </span>
+                            </div>
+
+                            <div className="ml-1 flex items-center gap-1 border-l border-slate-700 pl-2">
+                                <span className="text-[8px] md:text-[10px] text-slate-500 whitespace-nowrap">
+                                    Cron kế: {nextCronLabel || workerStatus?.lastMessage || "đang tính..."}
+                                </span>
+                            </div>
                         </div>
                         <button
                             onClick={handleBackToPortal}
@@ -594,6 +697,7 @@ export default function StockPage() {
                             const txs = groupedData[symbol]!;
                             const priceInfo = currentPrices[symbol];
                             const currentPriceValue = priceInfo?.current || 0;
+                            const isRecentlyUpdated = Boolean(recentlyUpdatedSymbols[symbol]);
 
                             let gInv = 0, gQty = 0, gProfit = 0;
                             txs.forEach((t: Transaction) => {
@@ -611,7 +715,13 @@ export default function StockPage() {
                             const gPerc = gInv > 0 ? (gProfit / gInv) * 100 : 0;
 
                             return (
-                                <div key={symbol} className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+                                <div
+                                    key={symbol}
+                                    className={`rounded-2xl border overflow-hidden transition-all duration-300 ${isRecentlyUpdated
+                                        ? "border-emerald-500/80 bg-emerald-500/5 ring-1 ring-emerald-400/60"
+                                        : "border-slate-800 bg-slate-900/40"
+                                        }`}
+                                >
                                     <div className="bg-slate-800/40 px-4 py-3 flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 gap-3">
                                         <div className="flex items-center gap-2">
                                             <button
@@ -622,6 +732,11 @@ export default function StockPage() {
                                             >
                                                 {symbol}
                                             </button>
+                                            {isRecentlyUpdated && (
+                                                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300 animate-pulse">
+                                                    Vừa cập nhật
+                                                </span>
+                                            )}
                                             {gQty > 0 && <span className="text-sm text-slate-500 font-mono">({gQty})</span>}
                                         </div>
 
@@ -686,12 +801,13 @@ export default function StockPage() {
                                             <tbody className="divide-y divide-slate-800/30">
                                                 {txs.map((tx: Transaction) => {
                                                     const isSold = tx.status === "SOLD";
+                                                    const hasLivePrice = currentPriceValue > 0;
                                                     let p = 0;
                                                     let pPerc = 0;
                                                     if (isSold) {
                                                         p = (tx.sellPrice! - tx.price) * tx.quantity;
                                                         pPerc = ((tx.sellPrice! - tx.price) / tx.price) * 100;
-                                                    } else if (currentPriceValue > 0) {
+                                                    } else if (hasLivePrice) {
                                                         p = (currentPriceValue - tx.price) * tx.quantity;
                                                         pPerc = ((currentPriceValue - tx.price) / tx.price) * 100;
                                                     }
@@ -733,8 +849,8 @@ export default function StockPage() {
                                                                 <div className="flex flex-col">
                                                                     <span className="text-[10px] text-slate-500 uppercase font-bold">Lãi/Lỗ {isSold ? "thực" : "tính"}</span>
                                                                     <span>
-                                                                        {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
-                                                                        {p !== 0 && tx.price > 0 && (
+                                                                        {(p > 0 ? "+" : "") + formatMoney(p)}
+                                                                        {(isSold || hasLivePrice) && p !== 0 && tx.price > 0 && (
                                                                             <span className="ml-1 text-[11px] opacity-60">
                                                                                 ({pPerc.toFixed(1)}%)
                                                                             </span>
@@ -773,12 +889,13 @@ export default function StockPage() {
                                     <div className="md:hidden divide-y divide-slate-800/30">
                                         {txs.map((tx: Transaction) => {
                                             const isSold = tx.status === "SOLD";
+                                            const hasLivePrice = currentPriceValue > 0;
                                             let p = 0;
                                             let pPerc = 0;
                                             if (isSold) {
                                                 p = (tx.sellPrice! - tx.price) * tx.quantity;
                                                 pPerc = ((tx.sellPrice! - tx.price) / tx.price) * 100;
-                                            } else if (currentPriceValue > 0) {
+                                            } else if (hasLivePrice) {
                                                 p = (currentPriceValue - tx.price) * tx.quantity;
                                                 pPerc = ((currentPriceValue - tx.price) / tx.price) * 100;
                                             }
@@ -810,8 +927,10 @@ export default function StockPage() {
                                                         <div className="flex flex-col items-end">
                                                             <span className="text-[10px] text-slate-600 uppercase font-bold">Lãi / Lỗ</span>
                                                             <div className={`text-sm font-bold ${p >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                                                {p !== 0 ? (p > 0 ? "+" : "") + formatMoney(p) : "-"}
-                                                                <span className="ml-1 text-[10px] opacity-60">({pPerc.toFixed(1)}%)</span>
+                                                                {(p > 0 ? "+" : "") + formatMoney(p)}
+                                                                {(isSold || hasLivePrice) && p !== 0 && (
+                                                                    <span className="ml-1 text-[10px] opacity-60">({pPerc.toFixed(1)}%)</span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -943,4 +1062,43 @@ export default function StockPage() {
             }
         </main >
     );
+}
+
+function formatDateTime(input: string | null): string | null {
+    if (!input) return null;
+    const date = new Date(input);
+    if (Number.isNaN(date.getTime())) {
+        return input;
+    }
+    return date.toLocaleString("vi-VN", {
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+    });
+}
+
+function parseTimestampToMs(input: string | null): number | null {
+    if (!input) return null;
+
+    const nativeMs = Date.parse(input);
+    if (!Number.isNaN(nativeMs)) return nativeMs;
+
+    const match = input.match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})$/);
+    if (!match) return null;
+
+    const [, dd, mm, yyyy, hh, mi, ss] = match;
+    const utcMs = Date.UTC(
+        Number(yyyy),
+        Number(mm) - 1,
+        Number(dd),
+        Number(hh) - 7,
+        Number(mi),
+        Number(ss),
+        0
+    );
+
+    return Number.isNaN(utcMs) ? null : utcMs;
 }
