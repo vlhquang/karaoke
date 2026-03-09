@@ -581,7 +581,7 @@ export default function StockPage() {
                         >
                             {isRefreshingPrices ? "Đang cập nhật..." : "Làm mới giá"}
                         </button>
-                        <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/50 px-3 py-1.5">
+                        {/* <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/50 px-3 py-1.5">
                             <span className="text-[10px] md:text-xs text-slate-400 select-none">Auto</span>
                             <span className="text-[10px] md:text-xs text-cyan-400 font-bold whitespace-nowrap">
                                 {cronIntervalLabel}
@@ -606,7 +606,7 @@ export default function StockPage() {
                                     Cron kế: {nextCronLabel || workerStatus?.lastMessage || "đang tính..."}
                                 </span>
                             </div>
-                        </div>
+                        </div> */}
                         <button
                             onClick={handleBackToPortal}
                             className="ml-2 text-xs text-slate-500 hover:text-cyan-400"
