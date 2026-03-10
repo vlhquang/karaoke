@@ -907,7 +907,7 @@ export default function StockPage() {
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-[10px] font-black text-slate-500 uppercase">{new Date(tx.date).toLocaleDateString("vi-VN")}</span>
                                                     <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${isSold ? "bg-emerald-950 text-emerald-500" : "bg-cyan-950 text-cyan-500"}`}>
-                                                        {isSold ? `ĐÃ BÁN ${formatSellDate(tx.sellDate)} - {formatMoney(tx.sellPrice!)}` : "ĐANG GIỮ"}
+                                                        {isSold ? `ĐÃ BÁN ${formatSellDate(tx.sellDate)} - ${formatMoney(tx.sellPrice!)}` : "ĐANG GIỮ"}
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center justify-between">
@@ -1156,7 +1156,7 @@ function formatSellDate(input: string | undefined | null): string {
     if (!input) return "N/A";
 
     // Check if it's already in dd/MM/yyyy HH:mm:ss format
-    const longFormatRegex = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/;
+    const longFormatRegex = /^\d{2}\/\d{2}\/\d{4}$/;
     if (longFormatRegex.test(input)) return input;
 
     // Try to parse as date
@@ -1167,9 +1167,9 @@ function formatSellDate(input: string | undefined | null): string {
     const d = pad(date.getDate());
     const m = pad(date.getMonth() + 1);
     const y = date.getFullYear();
-    const h = pad(date.getHours());
-    const min = pad(date.getMinutes());
-    const s = pad(date.getSeconds());
+    // const h = pad(date.getHours());
+    // const min = pad(date.getMinutes());
+    // const s = pad(date.getSeconds());
 
-    return `${d}/${m}/${y} ${h}:${min}:${s}`;
+    return `${d}/${m}/${y}`;
 }
