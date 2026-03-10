@@ -55,11 +55,16 @@ export default function StockPage() {
     const [sellPriceInput, setSellPriceInput] = useState("");
     const [analysisSymbol, setAnalysisSymbol] = useState<string | null>(null);
 
+    // Profit/Loss target states
+    const [profitTarget, setProfitTarget] = useState<number>(10);
+    const [lossTarget, setLossTarget] = useState<number>(5);
+
     // Server-side refresh configuration states
     const [autoRefreshMinutes, setAutoRefreshMinutes] = useState(1);
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
     const [workerStatus, setWorkerStatus] = useState<WorkerStatus | null>(null);
     const [recentlyUpdatedSymbols, setRecentlyUpdatedSymbols] = useState<Record<string, boolean>>({});
+
     const isSyncingPricesRef = useRef(false);
     const lastWorkerSignalRef = useRef<string>("");
     const highlightTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -72,8 +77,15 @@ export default function StockPage() {
             loadTransactions(savedCode, true);
             loadServerData(savedCode);
         }
+
+        const savedProfit = localStorage.getItem("stock_profit_target");
+        const savedLoss = localStorage.getItem("stock_loss_target");
+        if (savedProfit) setProfitTarget(parseFloat(savedProfit));
+        if (savedLoss) setLossTarget(parseFloat(savedLoss));
+
         setIsInitialized(true);
     }, []);
+
 
     useEffect(() => {
         return () => {
@@ -177,11 +189,11 @@ export default function StockPage() {
                 body: JSON.stringify({ action: "get_config", accessCode: code }),
             });
             const cData = await cRes.json();
-                if (cData.ok && cData.data) {
-                    if (cData.data.AUTO_REFRESH_MINUTES !== undefined) {
-                        setAutoRefreshMinutes(parseInt(cData.data.AUTO_REFRESH_MINUTES) || 1);
-                    }
+            if (cData.ok && cData.data) {
+                if (cData.data.AUTO_REFRESH_MINUTES !== undefined) {
+                    setAutoRefreshMinutes(parseInt(cData.data.AUTO_REFRESH_MINUTES) || 1);
                 }
+            }
         } catch (err) {
             console.error("Failed to load server data", err);
         }
@@ -567,21 +579,8 @@ export default function StockPage() {
                 <header className="mb-6 flex items-center justify-between gap-4">
                     <h1 className="text-2xl font-bold md:text-3xl uppercase tracking-tight">HOLDING</h1>
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => loadTransactions(accessCode)}
-                            disabled={isRefreshingSheet}
-                            className="rounded-xl border border-slate-700 bg-slate-900/50 px-3 py-2 text-[10px] md:text-xs font-medium transition hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                            {isRefreshingSheet ? "Đang tải..." : "Làm mới"}
-                        </button>
-                        <button
-                            onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
-                            disabled={isRefreshingPrices || transactions.filter(t => t.status === "HOLD").length === 0}
-                            className="rounded-xl border border-emerald-900/30 bg-emerald-950/20 px-3 py-2 text-[10px] md:text-xs font-medium text-emerald-400 transition hover:bg-emerald-900/30 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                            {isRefreshingPrices ? "Đang cập nhật..." : "Làm mới giá"}
-                        </button>
                         {/* <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/50 px-3 py-1.5">
+
                             <span className="text-[10px] md:text-xs text-slate-400 select-none">Auto</span>
                             <span className="text-[10px] md:text-xs text-cyan-400 font-bold whitespace-nowrap">
                                 {cronIntervalLabel}
@@ -615,6 +614,41 @@ export default function StockPage() {
                         </button>
                     </div>
                 </header>
+
+                {/* Cấu hình mục tiêu Lãi/Lỗ */}
+                <section className="mb-6 grid grid-cols-2 gap-4">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 backdrop-blur-md">
+                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-emerald-500">Mục tiêu Lãi (%)</label>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                value={profitTarget}
+                                onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setProfitTarget(val);
+                                    localStorage.setItem("stock_profit_target", val.toString());
+                                }}
+                                className="w-full rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                            />
+                        </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 backdrop-blur-md">
+                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-red-500">Mục tiêu Lỗ (%)</label>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                value={lossTarget}
+                                onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setLossTarget(val);
+                                    localStorage.setItem("stock_loss_target", val.toString());
+                                }}
+                                className="w-full rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-red-500"
+                            />
+                        </div>
+                    </div>
+                </section>
+
 
                 {/* Tổng quan - Single Card */}
                 <section className="mb-6">
@@ -814,12 +848,6 @@ export default function StockPage() {
 
                                                     return (
                                                         <tr key={tx.id} className={`hover:bg-slate-800/20 ${isSold ? "bg-slate-900/80 opacity-60" : ""}`}>
-                                                            <td className="px-4 py-2">
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-slate-400">{new Date(tx.date).toLocaleDateString("vi-VN")}</span>
-                                                                    {isSold && <span className="text-[10px] font-bold text-emerald-500 uppercase">ĐÃ BÁN {tx.sellDate}</span>}
-                                                                </div>
-                                                            </td>
                                                             <td className="px-4 py-2 text-right">
                                                                 <div className="flex flex-col">
                                                                     <span className="text-[10px] text-slate-500 uppercase font-bold">Mua</span>
@@ -831,6 +859,14 @@ export default function StockPage() {
                                                                     <span className="text-[10px] text-slate-500 uppercase font-bold">SL</span>
                                                                     <span className="text-slate-200">{tx.quantity}</span>
                                                                 </div>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-right">
+                                                                {!isSold && (
+                                                                    <div className="flex flex-col text-[10px]">
+                                                                        <span className="text-emerald-500 font-bold">Target: {formatMoney(tx.price * (1 + profitTarget / 100))}</span>
+                                                                        <span className="text-red-500 font-bold">Cut: {formatMoney(tx.price * (1 - lossTarget / 100))}</span>
+                                                                    </div>
+                                                                )}
                                                             </td>
                                                             <td className="px-4 py-2 text-right">
                                                                 {isSold ? (
@@ -886,6 +922,7 @@ export default function StockPage() {
                                         </table>
                                     </div>
 
+
                                     <div className="md:hidden divide-y divide-slate-800/30">
                                         {txs.map((tx: Transaction) => {
                                             const isSold = tx.status === "SOLD";
@@ -915,7 +952,14 @@ export default function StockPage() {
                                                         <div className="flex flex-col">
                                                             <span className="text-[10px] text-slate-600 uppercase font-bold">Mua {tx.quantity}</span>
                                                             <span className="text-sm font-medium">{formatMoney(tx.price)}</span>
+                                                            {!isSold && (
+                                                                <div className="mt-1 flex gap-2 text-[9px] font-bold">
+                                                                    <span className="text-emerald-500">T: {formatMoney(tx.price * (1 + profitTarget / 100))}</span>
+                                                                    <span className="text-red-500">C: {formatMoney(tx.price * (1 - lossTarget / 100))}</span>
+                                                                </div>
+                                                            )}
                                                         </div>
+
 
                                                         {isSold && (
                                                             <div className="flex flex-col items-center">
@@ -957,109 +1001,154 @@ export default function StockPage() {
                                             );
                                         })}
                                     </div>
+
+                                    {/* Sell Dialog Modal */}
+                                    {sellTx && (
+                                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                                            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setSellTx(null)}></div>
+                                            <div className="relative w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+                                                <h3 className="mb-1 text-xl font-bold text-white">Xác nhận bán</h3>
+                                                <p className="mb-6 text-sm text-slate-400">
+                                                    Bán <span className="text-white font-bold">{sellTx.quantity}</span> cổ phiếu <span className="text-white font-bold">{sellTx.symbol}</span> mua ngày {new Date(sellTx.date).toLocaleDateString("vi-VN")}?
+                                                </p>
+
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Giá bán thực tế</label>
+                                                        <input
+                                                            autoFocus
+                                                            value={sellPriceInput}
+                                                            onChange={(e: ChangeEvent<HTMLInputElement>) => setSellPriceInput(formatInputNumber(e.target.value))}
+                                                            className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-lg font-bold outline-none focus:border-emerald-500"
+                                                            placeholder="0"
+                                                        />
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                                        <button
+                                                            onClick={() => setSellTx(null)}
+                                                            className="rounded-2xl border border-slate-700 py-3 font-bold text-slate-400 transition hover:bg-slate-800"
+                                                        >
+                                                            Hủy
+                                                        </button>
+                                                        <button
+                                                            onClick={handleConfirmSell}
+                                                            disabled={isLoading}
+                                                            className="rounded-2xl bg-emerald-600 py-3 font-bold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                                                        >
+                                                            {isLoading ? "Đang xử lý..." : "Xác nhận Bán"}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            );
-                        })
-                    )}
+                    </div>
+                );
+            })
+        )}
+            </div>
+        </div>
+
+
+                {/* Symbol Analysis Popup */ }
+    {
+        analysisSymbol && (
+            <div className="fixed inset-0 z-[105] flex items-center justify-center p-2 sm:p-4">
+                <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm" onClick={() => setAnalysisSymbol(null)}></div>
+                <div className="relative w-full max-w-6xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden">
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-800 px-3 py-2 sm:px-4 sm:py-3">
+                        <p className="text-xs sm:text-sm font-bold text-white">
+                            Chi tiết mã: <span className="text-cyan-300">{analysisSymbol}</span>
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <a
+                                href={analysisUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded-lg border border-cyan-700/40 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-bold text-cyan-300 hover:bg-cyan-500/20"
+                            >
+                                Mở tab mới
+                            </a>
+                            <button
+                                type="button"
+                                onClick={() => setAnalysisSymbol(null)}
+                                className="rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-bold text-slate-300 hover:bg-slate-800"
+                            >
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                    <iframe
+                        src={analysisUrl}
+                        title={`Fireant ${analysisSymbol}`}
+                        className="h-[78vh] w-full bg-slate-950"
+                        referrerPolicy="strict-origin-when-cross-origin"
+                    />
                 </div>
-            </div >
+            </div>
+        )
+    }
 
-            {/* Sell Dialog Modal */}
-            {
-                sellTx && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setSellTx(null)}></div>
-                        <div className="relative w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-                            <h3 className="mb-1 text-xl font-bold text-white">Xác nhận bán</h3>
-                            <p className="mb-6 text-sm text-slate-400">
-                                Bán <span className="text-white font-bold">{sellTx.quantity}</span> cổ phiếu <span className="text-white font-bold">{sellTx.symbol}</span> mua ngày {new Date(sellTx.date).toLocaleDateString("vi-VN")}?
-                            </p>
+    {/* Bubble Buttons at Bottom */ }
+    <div className="fixed bottom-6 right-6 z-[90] flex flex-col gap-3 md:flex-row md:bottom-8 md:right-8">
+        <button
+            onClick={() => loadTransactions(accessCode)}
+            disabled={isRefreshingSheet}
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-2xl transition hover:scale-110 active:scale-95 disabled:opacity-50 md:h-auto md:w-auto md:px-6 md:py-3 md:rounded-2xl md:text-sm md:font-bold"
+            title="Làm mới dữ liệu từ Sheets"
+        >
+            {isRefreshingSheet ? (
+                <svg className="h-6 w-6 animate-spin" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            ) : (
+                <div className="flex items-center gap-2">
+                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span className="hidden md:block">Làm mới Sheet</span>
+                </div>
+            )}
+        </button>
+        <button
+            onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
+            disabled={isRefreshingPrices || transactions.filter(t => t.status === "HOLD").length === 0}
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-2xl transition hover:scale-110 active:scale-95 disabled:opacity-50 md:h-auto md:w-auto md:px-6 md:py-3 md:rounded-2xl md:text-sm md:font-bold"
+            title="Làm mới giá thị trường"
+        >
+            {isRefreshingPrices ? (
+                <svg className="h-6 w-6 animate-spin" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            ) : (
+                <div className="flex items-center gap-2">
+                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                    <span className="hidden md:block">Làm mới giá</span>
+                </div>
+            )}
+        </button>
+    </div>
 
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Giá bán thực tế</label>
-                                    <input
-                                        autoFocus
-                                        value={sellPriceInput}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setSellPriceInput(formatInputNumber(e.target.value))}
-                                        className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-lg font-bold outline-none focus:border-emerald-500"
-                                        placeholder="0"
-                                    />
-                                </div>
+    {/* Toast Notification */ }
 
-                                <div className="grid grid-cols-2 gap-3 pt-2">
-                                    <button
-                                        onClick={() => setSellTx(null)}
-                                        className="rounded-2xl border border-slate-700 py-3 font-bold text-slate-400 transition hover:bg-slate-800"
-                                    >
-                                        Hủy
-                                    </button>
-                                    <button
-                                        onClick={handleConfirmSell}
-                                        disabled={isLoading}
-                                        className="rounded-2xl bg-emerald-600 py-3 font-bold text-white transition hover:bg-emerald-500 disabled:opacity-50"
-                                    >
-                                        {isLoading ? "Đang xử lý..." : "Xác nhận Bán"}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Symbol Analysis Popup */}
-            {
-                analysisSymbol && (
-                    <div className="fixed inset-0 z-[105] flex items-center justify-center p-2 sm:p-4">
-                        <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm" onClick={() => setAnalysisSymbol(null)}></div>
-                        <div className="relative w-full max-w-6xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden">
-                            <div className="flex items-center justify-between gap-2 border-b border-slate-800 px-3 py-2 sm:px-4 sm:py-3">
-                                <p className="text-xs sm:text-sm font-bold text-white">
-                                    Chi tiết mã: <span className="text-cyan-300">{analysisSymbol}</span>
-                                </p>
-                                <div className="flex items-center gap-2">
-                                    <a
-                                        href={analysisUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="rounded-lg border border-cyan-700/40 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-bold text-cyan-300 hover:bg-cyan-500/20"
-                                    >
-                                        Mở tab mới
-                                    </a>
-                                    <button
-                                        type="button"
-                                        onClick={() => setAnalysisSymbol(null)}
-                                        className="rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-bold text-slate-300 hover:bg-slate-800"
-                                    >
-                                        Đóng
-                                    </button>
-                                </div>
-                            </div>
-                            <iframe
-                                src={analysisUrl}
-                                title={`Fireant ${analysisSymbol}`}
-                                className="h-[78vh] w-full bg-slate-950"
-                                referrerPolicy="strict-origin-when-cross-origin"
-                            />
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Toast Notification */}
-            {
-                notification && (
-                    <div className="fixed bottom-8 left-1/2 z-[110] -translate-x-1/2 animate-bounce">
-                        <div className={`flex items-center gap-3 rounded-full border px-6 py-3 shadow-2xl backdrop-blur-xl ${notification.type === "success"
-                            ? "border-emerald-500/50 bg-emerald-950/80 text-emerald-300"
-                            : "border-cyan-500/50 bg-cyan-950/80 text-cyan-300"
-                            }`}>
-                            <span className="text-xs font-bold uppercase tracking-widest leading-none">{notification.msg}</span>
-                        </div>
-                    </div>
-                )
-            }
+    {
+        notification && (
+            <div className="fixed bottom-8 left-1/2 z-[110] -translate-x-1/2 animate-bounce">
+                <div className={`flex items-center gap-3 rounded-full border px-6 py-3 shadow-2xl backdrop-blur-xl ${notification.type === "success"
+                    ? "border-emerald-500/50 bg-emerald-950/80 text-emerald-300"
+                    : "border-cyan-500/50 bg-cyan-950/80 text-cyan-300"
+                    }`}>
+                    <span className="text-xs font-bold uppercase tracking-widest leading-none">{notification.msg}</span>
+                </div>
+            </div>
+        )
+    }
         </main >
     );
 }
