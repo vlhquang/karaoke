@@ -496,7 +496,7 @@ export default function StockPage() {
         return groups;
     }, [transactions]);
 
-    const analysisUrl = analysisSymbol ? `https://fireant.vn/dashboard/symbol/${analysisSymbol}` : "";
+    const analysisUrl = analysisSymbol ? `https://fireant.vn/ma-chung-khoan/${analysisSymbol}` : "";
 
     if (!isInitialized) return null;
 
