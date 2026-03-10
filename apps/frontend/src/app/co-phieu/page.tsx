@@ -737,7 +737,7 @@ export default function StockPage() {
 
                         return (
                             <div key={symbol} className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/40 shadow-sm transition-all hover:bg-slate-900/60">
-                                <div className={`flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/50 px-6 py-4 transition-colors duration-1000 ${isRecentlyChanged ? "bg-cyan-500/5" : "bg-transparent"}`}>
+                                <div className={`flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/50 px-6 py-4 transition-colors duration-[2000ms] ${isRecentlyChanged ? "price-update-flash" : "bg-transparent"}`}>
                                     <div className="flex items-center gap-4">
                                         <button
                                             onClick={() => openAnalysisPopup(symbol)}
@@ -748,7 +748,15 @@ export default function StockPage() {
                                         </button>
                                         <div className="h-8 w-px bg-slate-800 mx-2 hidden sm:block"></div>
                                         <div className="flex flex-col">
-                                            <span className="text-[10px] text-slate-500 uppercase font-black">Thị giá</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-slate-500 uppercase font-black">Thị giá</span>
+                                                {isRecentlyChanged && (
+                                                    <span className="animate-pulse flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[8px] font-black text-emerald-500">
+                                                        <span className="h-1 w-1 rounded-full bg-emerald-500"></span>
+                                                        VỪA CẬP NHẬT
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="flex items-center gap-1.5">
                                                 <span className={`text-xl font-black ${!price ? 'text-slate-600' : (price.current >= (price.reference || price.opening || 0) ? "text-emerald-400" : "text-red-400")}`}>
                                                     {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "Đang chờ..."}
