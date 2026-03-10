@@ -320,7 +320,13 @@
             list.innerHTML = '';
 
             vehiclesInfo.forEach((v, id) => {
-                const timeAgo = Math.floor((new Date() - new Date(v.data.timestamp)) / 1000);
+                const rxDiff = Math.floor((Date.now() - v.localReceivedTime) / 1000);
+                let timeStr = `Vừa xong (${rxDiff}s)`;
+                if (v.isOffline) {
+                    const dt = new Date(v.data.timestamp);
+                    timeStr = `lúc ${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')}`;
+                }
+
                 const statusStr = v.isOffline ? 'Offline' : 'Online';
                 const card = document.createElement('div');
                 card.className = 'vehicle-card';
@@ -329,7 +335,7 @@
             <div class="v-id">Xe ${id.substring(0, 6)}</div>
             <div class="v-meta">
               <span class="v-status ${v.isOffline ? 'offline' : 'online'}">• ${statusStr}</span>
-              <span>Cập nhật: ${timeAgo}s trước</span>
+              <span>Cập nhật: ${timeStr}</span>
             </div>
           </div>
           <div class="v-speed">${parseFloat(v.data.speed).toFixed(1)} <span style="font-size:10px">km/h</span></div>
@@ -345,11 +351,12 @@
 
         // Process Vehicle Status Loops
         setInterval(() => {
-            const now = new Date();
+            const now = Date.now();
             vehiclesInfo.forEach((v, id) => {
-                const timeDiff = (now - new Date(v.data.timestamp)) / 1000;
+                const timeDiff = (now - v.localReceivedTime) / 1000;
                 const wasOffline = v.isOffline;
-                // iOS and background tracking could delay updates. Increase threshold to 60s
+
+                // Track online/offline strictly by local package receipt interval, immune to device clock drift
                 v.isOffline = timeDiff > 60;
 
                 if (!wasOffline && v.isOffline) {
@@ -381,8 +388,17 @@
             if (!targetIds.includes(data.trackingId) && targetIds.length > 0) return;
 
             const isNew = !vehiclesInfo.has(data.trackingId);
-            let v = vehiclesInfo.get(data.trackingId) || { isOffline: false, data: null, polyline: null, stops: [] };
-            vehiclesInfo.set(data.trackingId, v);
+            let v = vehiclesInfo.get(data.trackingId);
+            if (!v) {
+                // Initialize timestamp. Backdate if data is very old (initial sheet load to prevent false online)
+                const timestampDiff = (Date.now() - new Date(data.timestamp).getTime()) / 1000;
+                let initialRecv = Date.now();
+                if (timestampDiff > 120) {
+                    initialRecv = Date.now() - (timestampDiff * 1000);
+                }
+                v = { isOffline: (timestampDiff > 120), data: null, polyline: null, stops: [], localReceivedTime: initialRecv };
+                vehiclesInfo.set(data.trackingId, v);
+            }
 
             if (isNew) showToast(`Xe mới tham gia: ${data.trackingId.substring(0, 4)}`);
 
@@ -403,7 +419,12 @@
             }
 
             v.data = data;
-            v.isOffline = false;
+            // Only update local rx if this is a live fresh packet (prevent historic packets from marking online)
+            if (!isNew || (Date.now() - v.localReceivedTime) < 1000) {
+                v.localReceivedTime = Date.now();
+                v.isOffline = false;
+            }
+
             updateVehicleMarker(v);
 
             if (selectedVehicleId === data.trackingId) {
