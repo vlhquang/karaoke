@@ -147,7 +147,7 @@ export default function StockPage() {
                         latestTs = ts;
                     }
                 }
-                setCurrentPrices((prev) => {
+                setCurrentPrices((prev: Record<string, PriceInfo>) => {
                     const next = { ...prev };
                     for (const symbol in mappedPrices) {
                         const incoming = mappedPrices[symbol];
@@ -254,7 +254,7 @@ export default function StockPage() {
 
                         // Update global lastUpdated if this fetch is newer
                         if (data.timestamp) {
-                            setLastUpdated(prev => {
+                            setLastUpdated((prev: string | null) => {
                                 if (!prev) return data.timestamp;
                                 const currentT = parseTimestampToMs(prev);
                                 const newT = parseTimestampToMs(data.timestamp);
@@ -490,6 +490,15 @@ export default function StockPage() {
             .reduce((sum: number, tx: Transaction) => sum + (tx.sellPrice! - tx.price) * tx.quantity, 0);
     }, [transactions]);
 
+    const totalSoldInvestment = useMemo(() => {
+        return transactions
+            .filter((tx: Transaction) => tx.status === "SOLD" && tx.sellPrice !== undefined)
+            .reduce((sum: number, tx: Transaction) => sum + tx.price * tx.quantity, 0);
+    }, [transactions]);
+
+    const overallTotalProfit = totalProfitLossManual + totalProfitValueSold;
+    const overallTotalInvestment = totalInvestment + totalSoldInvestment;
+
     const groupedTransactions = useMemo(() => {
         const groups: Record<string, Transaction[]> = {};
         transactions.forEach((tx: Transaction) => {
@@ -607,21 +616,16 @@ export default function StockPage() {
 
             <div className="mx-auto max-w-6xl px-4 py-8 space-y-8">
                 {/* Summary Section moved here */}
-                <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg shadow-cyan-950/10">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tổng đầu tư</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Đang đầu tư (Hold)</p>
                         <p className="mt-1 text-2xl font-black text-white">{formatMoney(totalInvestment)}</p>
+                        <div className="mt-1 text-[10px] font-bold text-slate-600 uppercase border-t border-slate-800/50 pt-1">
+                            Giá trị TT: <span className="text-white">{formatMoney(totalMarketValue)}</span>
+                        </div>
                     </div>
                     <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg shadow-emerald-950/10">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Giá trị hiện tại</p>
-                        <p className={`mt-1 text-2xl font-black ${totalMarketValue >= totalInvestment ? "text-emerald-400" : "text-red-400 text-opacity-80"}`}>
-                            {formatMoney(totalMarketValue)}
-                        </p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg shadow-slate-950/10">
-                        <div className="flex items-center justify-between">
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Lãi / Lỗ tạm tính</p>
-                        </div>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Lãi / Lỗ tạm tính</p>
                         <div className="mt-1 flex items-baseline gap-2">
                             <p className={`text-2xl font-black ${totalProfitLossManual >= 0 ? "text-emerald-400" : "text-red-400 text-opacity-80"}`}>
                                 {(totalProfitLossManual > 0 ? "+" : "") + formatMoney(totalProfitLossManual)}
@@ -630,8 +634,27 @@ export default function StockPage() {
                                 ({totalInvestment > 0 ? ((totalProfitLossManual / totalInvestment) * 100).toFixed(2) : "0.00"}%)
                             </span>
                         </div>
-                        <div className="mt-1 text-[10px] font-bold text-slate-600 uppercase border-t border-slate-800/50 pt-1">
-                            Chốt lời (Sold): <span className={totalProfitValueSold >= 0 ? "text-emerald-500" : "text-red-500"}>{formatMoney(totalProfitValueSold)}</span>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg shadow-slate-950/10">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Lợi nhuận chốt (Sold)</p>
+                        <div className="mt-1 flex items-baseline gap-2">
+                            <p className={`text-2xl font-black ${totalProfitValueSold >= 0 ? "text-emerald-400" : "text-red-400 text-opacity-80"}`}>
+                                {(totalProfitValueSold > 0 ? "+" : "") + formatMoney(totalProfitValueSold)}
+                            </p>
+                            <span className={`text-xs font-bold ${totalProfitValueSold >= 0 ? "text-emerald-500/60" : "text-red-500/60"}`}>
+                                ({totalSoldInvestment > 0 ? ((totalProfitValueSold / totalSoldInvestment) * 100).toFixed(2) : "0.00"}%)
+                            </span>
+                        </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-emerald-900/10 p-4 shadow-lg border-emerald-500/20">
+                        <p className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-widest">Tổng hiệu suất (Hold+Sold)</p>
+                        <div className="mt-1 flex items-baseline gap-2">
+                            <p className={`text-2xl font-black ${overallTotalProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                {(overallTotalProfit > 0 ? "+" : "") + formatMoney(overallTotalProfit)}
+                            </p>
+                            <span className={`text-xs font-bold ${overallTotalProfit >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                                ({overallTotalInvestment > 0 ? ((overallTotalProfit / overallTotalInvestment) * 100).toFixed(2) : "0.00"}%)
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -794,21 +817,39 @@ export default function StockPage() {
                                             <span className="text-xs font-bold text-slate-400">{formatMoney(price?.opening || 0)} / {formatMoney(price?.reference || 0)}</span>
                                         </div>
                                         <div className="h-8 w-px bg-slate-800/50"></div>
-                                        <div className="flex flex-col items-end">
-                                            <span className="text-[10px] text-slate-500 uppercase font-black">Biến động (Phiên)</span>
-                                            {price && currentPriceValue > 0 ? (
-                                                <div className={`text-xs font-bold ${(currentPriceValue - (price.reference || price.opening || 0)) >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                                                    {currentPriceValue - (price.reference || price.opening || 0) > 0 ? "+" : ""}{formatMoney(currentPriceValue - (price.reference || price.opening || 0))}
-                                                    <span className="ml-1 opacity-60">
-                                                        ({(((currentPriceValue - (price.reference || price.opening || 0)) / (price.reference || price.opening || 1)) * 100).toFixed(1)}%)
-                                                    </span>
-                                                    <div className="text-[8px] font-bold text-slate-600 mt-0.5 uppercase">
-                                                        {price.timestamp ? `Lúc: ${new Date(price.timestamp).toLocaleTimeString("vi-VN")}` : ""}
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <span className="text-xs font-bold text-slate-600">--</span>
-                                            )}
+                                        <div className="flex flex-col items-end mr-2">
+                                            <span className="text-[10px] text-slate-500 uppercase font-black">Hiệu suất danh mục ({symbol})</span>
+                                            <div className="flex flex-col items-end">
+                                                {(() => {
+                                                    const symbolHoldTxs = txs.filter((t: Transaction) => t.status === "HOLD");
+                                                    const symbolSoldTxs = txs.filter((t: Transaction) => t.status === "SOLD");
+
+                                                    const groupInvestment = symbolHoldTxs.reduce((sum: number, t: Transaction) => sum + t.price * t.quantity, 0);
+                                                    const groupMarketValue = symbolHoldTxs.reduce((sum: number, t: Transaction) => {
+                                                        const current = currentPriceValue;
+                                                        return sum + (current > 0 ? current : t.price) * t.quantity;
+                                                    }, 0);
+                                                    const groupUnrealizedPL = groupMarketValue - groupInvestment;
+
+                                                    const groupSoldInvestment = symbolSoldTxs.reduce((sum: number, t: Transaction) => sum + t.price * t.quantity, 0);
+                                                    const groupRealizedPL = symbolSoldTxs.reduce((sum: number, t: Transaction) => sum + ((t.sellPrice || 0) - t.price) * t.quantity, 0);
+
+                                                    const groupTotalPL = groupUnrealizedPL + groupRealizedPL;
+                                                    const groupTotalInvestment = groupInvestment + groupSoldInvestment;
+                                                    const groupPLPerc = groupTotalInvestment > 0 ? (groupTotalPL / groupTotalInvestment) * 100 : 0;
+
+                                                    return (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-sm font-black ${groupTotalPL >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                                {(groupTotalPL >= 0 ? "+" : "") + formatMoney(groupTotalPL)}
+                                                            </span>
+                                                            <span className={`text-[10px] font-black ${groupTotalPL >= 0 ? "text-emerald-500/70" : "text-red-500/70"}`}>
+                                                                ({groupPLPerc.toFixed(1)}%)
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -946,34 +987,16 @@ export default function StockPage() {
                                                         <span className="text-[9px] font-bold text-slate-600 uppercase">Mua {tx.quantity.toLocaleString("vi-VN")}</span>
                                                         <span className="text-base font-black text-white">{formatMoney(tx.price)}</span>
                                                     </div>
-                                                    <div className="flex flex-col items-end">
-                                                        <span className="text-[9px] font-bold text-slate-600 uppercase">Lãi / Lỗ</span>
-                                                        <div className={`text-base font-black ${p >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                                            {p >= 0 ? "+" : ""}{formatMoney(p)}
-                                                            <span className="ml-1 text-xs opacity-60">({pPerc.toFixed(1)}%)</span>
+                                                    <div className="flex items-center justify-end">
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-[9px] font-bold text-slate-600 uppercase">Lãi / Lỗ</span>
+                                                            <div className={`text-base font-black ${p >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                                {p >= 0 ? "+" : ""}{formatMoney(p)}
+                                                                <span className="ml-1 text-xs opacity-60">({pPerc.toFixed(1)}%)</span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {/* {isSold ? (
-                                                    <div className="flex items-center gap-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-3 py-2">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[8px] font-black text-emerald-600 uppercase">Giá bán thực tế</span>
-                                                            <span className="text-sm font-black text-emerald-500">{formatMoney(tx.sellPrice!)}</span>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex items-center gap-4 bg-slate-950/30 rounded-xl px-3 py-2">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[8px] font-black text-emerald-600 uppercase">Mục tiêu</span>
-                                                            <span className="text-[10px] font-bold text-emerald-500">{formatMoney(tx.price * (1 + profitTarget / 100))}</span>
-                                                        </div>
-                                                        <div className="w-px h-4 bg-slate-800"></div>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[8px] font-black text-red-600 uppercase">Cắt lỗ</span>
-                                                            <span className="text-[10px] font-bold text-red-500">{formatMoney(tx.price * (1 - lossTarget / 100))}</span>
-                                                        </div>
-                                                    </div>
-                                                )} */}
                                                 <div className="flex items-center gap-4 bg-slate-950/30 rounded-xl px-3 py-2">
                                                     <div className="flex flex-col">
                                                         <span className="text-[8px] font-black text-emerald-600 uppercase">Mục tiêu</span>
@@ -1011,136 +1034,136 @@ export default function StockPage() {
                         );
                     })}
                 </div>
-            </div>
 
-            {/* Sell Dialog Modal */}
-            {sellTx && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => setSellTx(null)}></div>
-                    <div className="relative w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
-                        <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
-                            <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 11l3 3L22 4" />
-                            </svg>
+                {/* Sell Dialog Modal */}
+                {sellTx && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => setSellTx(null)}></div>
+                        <div className="relative w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
+                            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
+                                <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 11l3 3L22 4" />
+                                </svg>
+                            </div>
+                            <h3 className="mb-1 text-xl font-black text-white uppercase">Xác nhận bán</h3>
+                            <p className="mb-8 text-xs font-bold text-slate-500 uppercase leading-relaxed">
+                                Bán <span className="text-white">{sellTx.quantity}</span> cổ phiếu <span className="text-cyan-400">{sellTx.symbol}</span> mua ngày {new Date(sellTx.date).toLocaleDateString("vi-VN")}?
+                            </p>
+
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">Giá bán thực tế</label>
+                                    <input
+                                        autoFocus
+                                        value={sellPriceInput}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setSellPriceInput(formatInputNumber(e.target.value))}
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-5 py-4 text-2xl font-black text-white outline-none focus:border-emerald-500 transition-all text-right"
+                                        placeholder="0"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <button
+                                        onClick={() => setSellTx(null)}
+                                        className="rounded-2xl border border-slate-700 py-4 text-xs font-black text-slate-400 hover:bg-slate-800 transition-all uppercase"
+                                    >
+                                        Hủy bỏ
+                                    </button>
+                                    <button
+                                        onClick={handleConfirmSell}
+                                        disabled={isLoading}
+                                        className="rounded-2xl bg-emerald-600 py-4 text-xs font-black text-white hover:bg-emerald-500 active:scale-95 transition-all disabled:opacity-50 uppercase shadow-lg shadow-emerald-900/20"
+                                    >
+                                        {isLoading ? "Đang lưu..." : "Xác nhận bán"}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <h3 className="mb-1 text-xl font-black text-white uppercase">Xác nhận bán</h3>
-                        <p className="mb-8 text-xs font-bold text-slate-500 uppercase leading-relaxed">
-                            Bán <span className="text-white">{sellTx.quantity}</span> cổ phiếu <span className="text-cyan-400">{sellTx.symbol}</span> mua ngày {new Date(sellTx.date).toLocaleDateString("vi-VN")}?
-                        </p>
+                    </div>
+                )}
 
-                        <div className="space-y-6">
-                            <div>
-                                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">Giá bán thực tế</label>
-                                <input
-                                    autoFocus
-                                    value={sellPriceInput}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setSellPriceInput(formatInputNumber(e.target.value))}
-                                    className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-5 py-4 text-2xl font-black text-white outline-none focus:border-emerald-500 transition-all text-right"
-                                    placeholder="0"
+                {/* Symbol Analysis Popup */}
+                {analysisSymbol && (
+                    <div className="fixed inset-0 z-[105] flex items-center justify-center p-2 sm:p-4">
+                        <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm" onClick={() => setAnalysisSymbol(null)}></div>
+                        <div className="relative w-full max-w-6xl h-[90vh] rounded-3xl border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden flex flex-col">
+                            <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-6 py-4 bg-slate-900/50">
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Dữ liệu phân tích chứng khoán</p>
+                                    <h3 className="text-lg font-black text-white uppercase leading-none">Fireant Chart: <span className="text-cyan-400">{analysisSymbol}</span></h3>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <a
+                                        href={analysisUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-[10px] font-black text-cyan-400 hover:bg-cyan-500/20 transition-all uppercase"
+                                    >
+                                        Mở tab mới
+                                    </a>
+                                    <button
+                                        onClick={() => setAnalysisSymbol(null)}
+                                        className="rounded-xl bg-slate-800 px-4 py-2.5 text-[10px] font-black text-slate-300 hover:bg-slate-700 transition-all uppercase"
+                                    >
+                                        Đóng
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex-1 relative">
+                                <iframe
+                                    src={analysisUrl}
+                                    title={`Fireant ${analysisSymbol}`}
+                                    className="absolute inset-0 h-full w-full"
+                                    referrerPolicy="strict-origin-when-cross-origin"
                                 />
                             </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <button
-                                    onClick={() => setSellTx(null)}
-                                    className="rounded-2xl border border-slate-700 py-4 text-xs font-black text-slate-400 hover:bg-slate-800 transition-all uppercase"
-                                >
-                                    Hủy bỏ
-                                </button>
-                                <button
-                                    onClick={handleConfirmSell}
-                                    disabled={isLoading}
-                                    className="rounded-2xl bg-emerald-600 py-4 text-xs font-black text-white hover:bg-emerald-500 active:scale-95 transition-all disabled:opacity-50 uppercase shadow-lg shadow-emerald-900/20"
-                                >
-                                    {isLoading ? "Đang lưu..." : "Xác nhận bán"}
-                                </button>
-                            </div>
                         </div>
                     </div>
+                )}
+
+                {/* Bubble Buttons at Bottom */}
+                <div className="fixed bottom-8 right-8 z-[90] flex flex-col gap-4 items-end">
+                    <button
+                        onClick={() => loadTransactions(accessCode)}
+                        disabled={isRefreshingSheet}
+                        className="group flex h-14 w-14 md:h-16 md:w-auto md:px-6 items-center justify-center gap-3 rounded-2xl bg-slate-900 border border-slate-800 text-white shadow-2xl hover:scale-110 active:scale-95 transition-all disabled:opacity-50"
+                        title="Làm mới dữ liệu từ Sheets"
+                    >
+                        <div className={isRefreshingSheet ? "animate-spin" : ""}>
+                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </div>
+                        <span className="hidden md:block text-xs font-black uppercase tracking-widest">Làm mới Sheet</span>
+                    </button>
+                    <button
+                        onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
+                        disabled={isRefreshingPrices || transactions.filter((t: Transaction) => t.status === "HOLD").length === 0}
+                        className="group flex h-14 w-14 md:h-16 md:w-auto md:px-6 items-center justify-center gap-3 rounded-2xl bg-cyan-600 text-white shadow-2xl hover:scale-110 active:scale-95 transition-all disabled:opacity-50"
+                        title="Làm mới giá thị trường"
+                    >
+                        <div className={isRefreshingPrices ? "animate-spin" : ""}>
+                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                        </div>
+                        <span className="hidden md:block text-xs font-black uppercase tracking-widest">Làm mới giá</span>
+                    </button>
                 </div>
-            )}
 
-            {/* Symbol Analysis Popup */}
-            {analysisSymbol && (
-                <div className="fixed inset-0 z-[105] flex items-center justify-center p-2 sm:p-4">
-                    <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm" onClick={() => setAnalysisSymbol(null)}></div>
-                    <div className="relative w-full max-w-6xl h-[90vh] rounded-3xl border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden flex flex-col">
-                        <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-6 py-4 bg-slate-900/50">
-                            <div>
-                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Dữ liệu phân tích chứng khoán</p>
-                                <h3 className="text-lg font-black text-white uppercase leading-none">Fireant Chart: <span className="text-cyan-400">{analysisSymbol}</span></h3>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <a
-                                    href={analysisUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-[10px] font-black text-cyan-400 hover:bg-cyan-500/20 transition-all uppercase"
-                                >
-                                    Mở tab mới
-                                </a>
-                                <button
-                                    onClick={() => setAnalysisSymbol(null)}
-                                    className="rounded-xl bg-slate-800 px-4 py-2.5 text-[10px] font-black text-slate-300 hover:bg-slate-700 transition-all uppercase"
-                                >
-                                    Đóng
-                                </button>
-                            </div>
-                        </div>
-                        <div className="flex-1 relative">
-                            <iframe
-                                src={analysisUrl}
-                                title={`Fireant ${analysisSymbol}`}
-                                className="absolute inset-0 h-full w-full"
-                                referrerPolicy="strict-origin-when-cross-origin"
-                            />
+                {/* Toast Notification */}
+                {notification && (
+                    <div className="fixed bottom-12 left-1/2 z-[110] -translate-x-1/2 animate-bounce">
+                        <div className={`flex items-center gap-3 rounded-full border px-8 py-3.5 shadow-2xl backdrop-blur-xl ${notification.type === "success"
+                            ? "border-emerald-500/50 bg-emerald-950/80 text-emerald-300"
+                            : "border-cyan-500/50 bg-cyan-950/80 text-cyan-300"
+                            }`}>
+                            <div className={`h-2 w-2 rounded-full ${notification.type === "success" ? "bg-emerald-400" : "bg-cyan-400"}`}></div>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{notification.msg}</span>
                         </div>
                     </div>
-                </div>
-            )}
-
-            {/* Bubble Buttons at Bottom */}
-            <div className="fixed bottom-8 right-8 z-[90] flex flex-col gap-4 items-end">
-                <button
-                    onClick={() => loadTransactions(accessCode)}
-                    disabled={isRefreshingSheet}
-                    className="group flex h-14 w-14 md:h-16 md:w-auto md:px-6 items-center justify-center gap-3 rounded-2xl bg-slate-900 border border-slate-800 text-white shadow-2xl hover:scale-110 active:scale-95 transition-all disabled:opacity-50"
-                    title="Làm mới dữ liệu từ Sheets"
-                >
-                    <div className={isRefreshingSheet ? "animate-spin" : ""}>
-                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                    </div>
-                    <span className="hidden md:block text-xs font-black uppercase tracking-widest">Làm mới Sheet</span>
-                </button>
-                <button
-                    onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
-                    disabled={isRefreshingPrices || transactions.filter((t: Transaction) => t.status === "HOLD").length === 0}
-                    className="group flex h-14 w-14 md:h-16 md:w-auto md:px-6 items-center justify-center gap-3 rounded-2xl bg-cyan-600 text-white shadow-2xl hover:scale-110 active:scale-95 transition-all disabled:opacity-50"
-                    title="Làm mới giá thị trường"
-                >
-                    <div className={isRefreshingPrices ? "animate-spin" : ""}>
-                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        </svg>
-                    </div>
-                    <span className="hidden md:block text-xs font-black uppercase tracking-widest">Làm mới giá</span>
-                </button>
+                )}
             </div>
-
-            {/* Toast Notification */}
-            {notification && (
-                <div className="fixed bottom-12 left-1/2 z-[110] -translate-x-1/2 animate-bounce">
-                    <div className={`flex items-center gap-3 rounded-full border px-8 py-3.5 shadow-2xl backdrop-blur-xl ${notification.type === "success"
-                        ? "border-emerald-500/50 bg-emerald-950/80 text-emerald-300"
-                        : "border-cyan-500/50 bg-cyan-950/80 text-cyan-300"
-                        }`}>
-                        <div className={`h-2 w-2 rounded-full ${notification.type === "success" ? "bg-emerald-400" : "bg-cyan-400"}`}></div>
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">{notification.msg}</span>
-                    </div>
-                </div>
-            )}
         </main>
     );
 }
