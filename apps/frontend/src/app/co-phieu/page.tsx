@@ -907,7 +907,7 @@ export default function StockPage() {
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-[10px] font-black text-slate-500 uppercase">{new Date(tx.date).toLocaleDateString("vi-VN")}</span>
                                                     <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${isSold ? "bg-emerald-950 text-emerald-500" : "bg-cyan-950 text-cyan-500"}`}>
-                                                        {isSold ? `ĐÃ BÁN ${formatSellDate(tx.sellDate)}` : "ĐANG GIỮ"}
+                                                        {isSold ? `ĐÃ BÁN ${formatSellDate(tx.sellDate)} - {formatMoney(tx.sellPrice!)}` : "ĐANG GIỮ"}
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center justify-between">
@@ -923,7 +923,7 @@ export default function StockPage() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {isSold ? (
+                                                {/* {isSold ? (
                                                     <div className="flex items-center gap-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-3 py-2">
                                                         <div className="flex flex-col">
                                                             <span className="text-[8px] font-black text-emerald-600 uppercase">Giá bán thực tế</span>
@@ -942,7 +942,18 @@ export default function StockPage() {
                                                             <span className="text-[10px] font-bold text-red-500">{formatMoney(tx.price * (1 - lossTarget / 100))}</span>
                                                         </div>
                                                     </div>
-                                                )}
+                                                )} */}
+                                                <div className="flex items-center gap-4 bg-slate-950/30 rounded-xl px-3 py-2">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[8px] font-black text-emerald-600 uppercase">Mục tiêu</span>
+                                                        <span className="text-[10px] font-bold text-emerald-500">{formatMoney(tx.price * (1 + profitTarget / 100))}</span>
+                                                    </div>
+                                                    <div className="w-px h-4 bg-slate-800"></div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[8px] font-black text-red-600 uppercase">Cắt lỗ</span>
+                                                        <span className="text-[10px] font-bold text-red-500">{formatMoney(tx.price * (1 - lossTarget / 100))}</span>
+                                                    </div>
+                                                </div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     {!isSold && (
                                                         <button
