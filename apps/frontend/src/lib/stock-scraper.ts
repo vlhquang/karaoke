@@ -3,6 +3,7 @@ export interface ScrapedPrice {
     price: number;
     openingPrice: number | null;
     referencePrice: number;
+    color: string | null;
     timestamp: string;
 }
 
@@ -47,6 +48,7 @@ export async function scrapeStockPrice(symbol: string, isRefresh: boolean = fals
             let priceValue: string | null = null;
             let openValue: string | null = null;
             let changeValue: string | null = null;
+            let colorID: string | null = null;
 
             if (tradeMatch) {
                 const tradeJson = tradeMatch[1];
@@ -54,10 +56,12 @@ export async function scrapeStockPrice(symbol: string, isRefresh: boolean = fals
                 const p = tradeJson.match(/"LastPrice":"(?:\\"|[^"])*?([\d,.]+)\s*(?:\\u003c|<)/);
                 const o = tradeJson.match(/"OpenPrice":"([\d,.]+)"/);
                 const c = tradeJson.match(/"Change":"(?:\\"|[^"])*?([+-]?[\d,.]+)\s*(?:\\u003c|<)/);
+                const co = tradeJson.match(/"ColorID":"([^"]+)"/);
 
                 if (p) priceValue = p[1];
                 if (o) openValue = o[1];
                 if (c) changeValue = c[1];
+                if (co) colorID = co[1];
             }
 
             // Extraction strategy 2: ID-based patterns (Original Fallback)
@@ -97,6 +101,7 @@ export async function scrapeStockPrice(symbol: string, isRefresh: boolean = fals
                         price,
                         openingPrice,
                         referencePrice,
+                        color: colorID,
                         timestamp: formatDateTimeGmt7(new Date())
                     };
                 }

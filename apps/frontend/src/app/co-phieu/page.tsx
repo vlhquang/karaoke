@@ -18,6 +18,7 @@ interface PriceInfo {
     previous: number | null;
     opening: number | null;
     reference: number | null;
+    color: string | null;
     timestamp: string | null;
 }
 
@@ -135,6 +136,7 @@ export default function StockPage() {
                         opening: p.openingPrice,
                         reference: p.referencePrice,
                         previous: null,
+                        color: typeof p.color === "string" ? p.color : null,
                         timestamp: ts
                     };
                     const tsMs = parseTimestampToMs(ts);
@@ -244,6 +246,7 @@ export default function StockPage() {
                                 opening: data.openingPrice,
                                 reference: data.referencePrice,
                                 previous: prev[symbol]?.current || null,
+                                color: data.color || null,
                                 timestamp: data.timestamp
                             }
                         }));
@@ -497,6 +500,26 @@ export default function StockPage() {
     }, [transactions]);
 
     const analysisUrl = analysisSymbol ? `https://fireant.vn/ma-chung-khoan/${analysisSymbol}` : "";
+
+    const getStockPriceColorClass = (price: number, info: PriceInfo | null) => {
+        if (!info || price <= 0) return "text-slate-600";
+
+        // Tier 1: Direct color from Vietstock
+        if (info.color === "purple") return "text-stock-ceiling";
+        if (info.color === "blue") return "text-stock-floor";
+
+        // Tier 2: Calculation Fallback (7% margin for HOSE)
+        const ref = info.reference || info.opening || 0;
+        if (ref > 0) {
+            if (price >= ref * 1.069) return "text-stock-ceiling";
+            if (price <= ref * 0.931) return "text-stock-floor";
+        }
+
+        // Standard colors
+        if (price > ref) return "text-emerald-400";
+        if (price < ref) return "text-red-400";
+        return "text-slate-400"; // Reference price
+    };
 
     if (!isInitialized) return null;
 
@@ -758,7 +781,7 @@ export default function StockPage() {
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-1.5">
-                                                <span className={`text-xl font-black ${!price ? 'text-slate-600' : (price.current >= (price.reference || price.opening || 0) ? "text-emerald-400" : "text-red-400")}`}>
+                                                <span className={`text-xl font-black ${getStockPriceColorClass(currentPriceValue, price || null)}`}>
                                                     {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "Đang chờ..."}
                                                 </span>
                                             </div>
