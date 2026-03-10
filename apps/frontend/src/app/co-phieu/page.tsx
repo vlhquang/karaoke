@@ -846,7 +846,7 @@ export default function StockPage() {
                                                             )}
                                                             {isSold && (
                                                                 <div className="flex flex-col items-end">
-                                                                    <span className="text-[9px] font-bold text-emerald-600 uppercase">Giá bán</span>
+                                                                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-tighter">Giá bán thực tế</span>
                                                                     <span className="text-sm font-black text-emerald-500">{formatMoney(tx.sellPrice!)}</span>
                                                                 </div>
                                                             )}
@@ -923,7 +923,14 @@ export default function StockPage() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {!isSold && (
+                                                {isSold ? (
+                                                    <div className="flex items-center gap-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-3 py-2">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[8px] font-black text-emerald-600 uppercase">Giá bán thực tế</span>
+                                                            <span className="text-sm font-black text-emerald-500">{formatMoney(tx.sellPrice!)}</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
                                                     <div className="flex items-center gap-4 bg-slate-950/30 rounded-xl px-3 py-2">
                                                         <div className="flex flex-col">
                                                             <span className="text-[8px] font-black text-emerald-600 uppercase">Mục tiêu</span>
