@@ -99,10 +99,10 @@ export default function StockPage() {
             clearTimeout(highlightTimersRef.current[normalizedSymbol]);
         }
 
-        setRecentlyUpdatedSymbols((prev) => ({ ...prev, [normalizedSymbol]: true }));
+        setRecentlyUpdatedSymbols((prev: Record<string, boolean>) => ({ ...prev, [normalizedSymbol]: true }));
 
         highlightTimersRef.current[normalizedSymbol] = setTimeout(() => {
-            setRecentlyUpdatedSymbols((prev) => {
+            setRecentlyUpdatedSymbols((prev: Record<string, boolean>) => {
                 const next = { ...prev };
                 delete next[normalizedSymbol];
                 return next;
@@ -248,6 +248,19 @@ export default function StockPage() {
                             }
                         }));
                         markSymbolRecentlyUpdated(symbol);
+
+                        // Update global lastUpdated if this fetch is newer
+                        if (data.timestamp) {
+                            setLastUpdated(prev => {
+                                if (!prev) return data.timestamp;
+                                const currentT = parseTimestampToMs(prev);
+                                const newT = parseTimestampToMs(data.timestamp);
+                                if (currentT !== null && newT !== null && newT > currentT) {
+                                    return data.timestamp;
+                                }
+                                return prev;
+                            });
+                        }
                     }
                 } catch (err) {
                     console.error(`Failed to fetch price for ${symbol}`, err);
@@ -538,9 +551,9 @@ export default function StockPage() {
     return (
         <main className="min-h-screen bg-slate-950 font-sans text-slate-200">
             {/* Header section with worker status */}
-            <header className="border-b border-slate-800 bg-slate-900/50 pt-8 pb-10 sticky top-0 z-40 backdrop-blur-md">
+            <header className="border-b border-slate-800 bg-slate-900/50 pt-8 pb-6 bg-transparent">
                 <div className="mx-auto max-w-6xl px-4 flex flex-col items-center">
-                    <div className="flex items-center justify-between w-full mb-6">
+                    <div className="flex items-center justify-between w-full">
                         <div className="flex items-center gap-3">
                             <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-cyan-500 text-slate-950">
                                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -555,7 +568,7 @@ export default function StockPage() {
                         <div className="flex flex-col items-end gap-1">
                             {lastUpdated && (
                                 <div className="text-[10px] font-bold text-slate-500 uppercase">
-                                    Giá: {formatDateTime(lastUpdated)}
+                                    Cập nhật: {formatDateTime(lastUpdated)}
                                 </div>
                             )}
                             {workerStatus && (
@@ -566,39 +579,39 @@ export default function StockPage() {
                             )}
                         </div>
                     </div>
-
-                    <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
-                        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tổng đầu tư</p>
-                            <p className="mt-1 text-2xl font-black text-white">{formatMoney(totalInvestment)}</p>
-                        </div>
-                        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Giá trị hiện tại</p>
-                            <p className={`mt-1 text-2xl font-black ${totalMarketValue >= totalInvestment ? "text-emerald-400" : "text-red-400 text-opacity-80"}`}>
-                                {formatMoney(totalMarketValue)}
-                            </p>
-                        </div>
-                        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                            <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Lãi / Lỗ tạm tính</p>
-                            </div>
-                            <div className="mt-1 flex items-baseline gap-2">
-                                <p className={`text-2xl font-black ${totalProfitLossManual >= 0 ? "text-emerald-400" : "text-red-400 text-opacity-80"}`}>
-                                    {(totalProfitLossManual > 0 ? "+" : "") + formatMoney(totalProfitLossManual)}
-                                </p>
-                                <span className={`text-xs font-bold ${totalProfitLossManual >= 0 ? "text-emerald-500/60" : "text-red-500/60"}`}>
-                                    ({totalInvestment > 0 ? ((totalProfitLossManual / totalInvestment) * 100).toFixed(2) : "0.00"}%)
-                                </span>
-                            </div>
-                            <div className="mt-1 text-[10px] font-bold text-slate-600 uppercase border-t border-slate-800/50 pt-1">
-                                Chốt lời (Sold): <span className={totalProfitValueSold >= 0 ? "text-emerald-500" : "text-red-500"}>{formatMoney(totalProfitValueSold)}</span>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </header>
 
             <div className="mx-auto max-w-6xl px-4 py-8 space-y-8">
+                {/* Summary Section moved here */}
+                <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg shadow-cyan-950/10">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tổng đầu tư</p>
+                        <p className="mt-1 text-2xl font-black text-white">{formatMoney(totalInvestment)}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg shadow-emerald-950/10">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Giá trị hiện tại</p>
+                        <p className={`mt-1 text-2xl font-black ${totalMarketValue >= totalInvestment ? "text-emerald-400" : "text-red-400 text-opacity-80"}`}>
+                            {formatMoney(totalMarketValue)}
+                        </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg shadow-slate-950/10">
+                        <div className="flex items-center justify-between">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Lãi / Lỗ tạm tính</p>
+                        </div>
+                        <div className="mt-1 flex items-baseline gap-2">
+                            <p className={`text-2xl font-black ${totalProfitLossManual >= 0 ? "text-emerald-400" : "text-red-400 text-opacity-80"}`}>
+                                {(totalProfitLossManual > 0 ? "+" : "") + formatMoney(totalProfitLossManual)}
+                            </p>
+                            <span className={`text-xs font-bold ${totalProfitLossManual >= 0 ? "text-emerald-500/60" : "text-red-500/60"}`}>
+                                ({totalInvestment > 0 ? ((totalProfitLossManual / totalInvestment) * 100).toFixed(2) : "0.00"}%)
+                            </span>
+                        </div>
+                        <div className="mt-1 text-[10px] font-bold text-slate-600 uppercase border-t border-slate-800/50 pt-1">
+                            Chốt lời (Sold): <span className={totalProfitValueSold >= 0 ? "text-emerald-500" : "text-red-500"}>{formatMoney(totalProfitValueSold)}</span>
+                        </div>
+                    </div>
+                </div>
                 {/* Form and Settings Grid */}
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
                     {/* Add Transaction Form */}
@@ -746,8 +759,8 @@ export default function StockPage() {
 
                                     <div className="mt-3 flex items-center gap-6 sm:mt-0">
                                         <div className="flex flex-col items-end">
-                                            <span className="text-[10px] text-slate-500 uppercase font-black">Giá quy chiếu / Mở cửa</span>
-                                            <span className="text-xs font-bold text-slate-400">{formatMoney(price?.reference || price?.opening || 0)}</span>
+                                            <span className="text-[10px] text-slate-500 uppercase font-black">Mở cửa / Tham chiếu</span>
+                                            <span className="text-xs font-bold text-slate-400">{formatMoney(price?.opening || 0)} / {formatMoney(price?.reference || 0)}</span>
                                         </div>
                                         <div className="h-8 w-px bg-slate-800/50"></div>
                                         <div className="flex flex-col items-end">
@@ -758,6 +771,9 @@ export default function StockPage() {
                                                     <span className="ml-1 opacity-60">
                                                         ({(((currentPriceValue - (price.reference || price.opening || 0)) / (price.reference || price.opening || 1)) * 100).toFixed(1)}%)
                                                     </span>
+                                                    <div className="text-[8px] font-bold text-slate-600 mt-0.5 uppercase">
+                                                        {price.timestamp ? `Lúc: ${new Date(price.timestamp).toLocaleTimeString("vi-VN")}` : ""}
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <span className="text-xs font-bold text-slate-600">--</span>
