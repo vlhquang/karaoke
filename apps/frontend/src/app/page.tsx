@@ -43,6 +43,12 @@ export default function HomePage() {
       title: "Tạo video",
       description: "AI tạo nội dung Shorts: kịch bản, prompt video, tiêu đề, mô tả, caption, hashtag.",
       badge: "New"
+    },
+    {
+      href: "/gps-tracker/sender.html",
+      title: "Chia sẻ hành trình",
+      description: "Trình theo dõi GPS realtime, ứng dụng web chuyên dụng chia sẻ vị trí xe.",
+      badge: "New"
     }
   ];
 

@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GPS Sender - Chia Sẻ Hành Trình</title>
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --primary: #0ea5e9;
+            --primary-hover: #38bdf8;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #22d3ee;
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            background-image:
+                radial-gradient(circle at 15% 50%, rgba(14, 165, 233, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(34, 211, 238, 0.15) 0%, transparent 50%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px 30px;
+            width: 100%;
+            max-width: 480px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: fadeUp 0.6s ease-out;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #38bdf8, #22d3ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 15px;
+            margin-bottom: 40px;
+            line-height: 1.5;
+        }
+
+        .status-ring {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: rgba(14, 165, 233, 0.1);
+            box-shadow: inset 0 0 20px rgba(14, 165, 233, 0.2);
+            transition: all 0.5s ease;
+        }
+
+        .status-ring::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px dashed rgba(14, 165, 233, 0.3);
+            animation: spin 15s linear infinite;
+        }
+
+        .status-ring.active {
+            background: rgba(16, 185, 129, 0.1);
+            box-shadow: inset 0 0 30px rgba(16, 185, 129, 0.3);
+        }
+
+        .status-ring.active::before {
+            border-color: rgba(16, 185, 129, 0.8);
+            animation: spin 5s linear infinite;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .icon {
+            font-size: 48px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+            opacity: 0.5;
+            transition: opacity 0.3s;
+        }
+
+        .info-grid.active {
+            opacity: 1;
+        }
+
+        .info-card {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        button {
+            outline: none;
+            border: none;
+            border-radius: 100px;
+            font-size: 16px;
+            font-weight: 600;
+            padding: 18px 32px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, var(--primary), #0284c7);
+            color: white;
+            box-shadow: 0 10px 20px -10px var(--primary);
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px -10px var(--primary);
+            background: linear-gradient(135deg, var(--primary-hover), var(--primary));
+        }
+
+        .btn-start:active {
+            transform: translateY(1px);
+        }
+
+        .btn-share {
+            background: #0068FF;
+            /* Zalo Color */
+            color: white;
+            margin-top: 15px;
+            display: none;
+            box-shadow: 0 10px 20px -10px #0068FF;
+        }
+
+        .btn-share:hover {
+            background: #0056d6;
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px -10px #0068FF;
+        }
+
+        .pulse {
+            display: none;
+            width: 10px;
+            height: 10px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: pulsing 2s infinite;
+        }
+
+        .active .pulse {
+            display: inline-block;
+        }
+
+        @keyframes pulsing {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+
+        #trackIdDisplay {
+            margin-top: 25px;
+            font-size: 13px;
+            color: var(--text-muted);
+            font-family: monospace;
+            opacity: 0.7;
+        }
+
+        /* Minimap styles */
+        #minimap-container {
+            width: 100%;
+            height: 180px;
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: none;
+        }
+
+        #minimap {
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .my-marker {
+            background: var(--primary);
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--primary);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Cảm biến GPS</h1>
+        <p class="subtitle">Liên tục phát trực tiếp vị trí của bạn với một đường link duy nhất</p>
+
+        <div class="status-ring" id="statusRing">
+            <div class="icon" id="carIcon">🚙</div>
+        </div>
+
+        <div class="info-grid" id="infoGrid">
+            <div class="info-card">
+                <div class="info-label">Tốc độ</div>
+                <div class="info-value"><span id="speedVal">0.0</span> km/h</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">Trạng thái</div>
+                <div class="info-value" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <span class="pulse"></span>
+                    <span id="statusTxt">Đang chờ</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="minimap-container">
+            <div id="minimap"></div>
+        </div>
+
+        <button class="btn-start" id="startBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+            Bắt đầu chia sẻ hành trình
+        </button>
+
+        <button class="btn-share" id="shareBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+            Chia sẻ qua Zalo
+        </button>
+
+        <div id="trackIdDisplay"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // PWA Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW setup failed: ', err));
+            });
+        }
+
+        const startBtn = document.getElementById('startBtn');
+        const shareBtn = document.getElementById('shareBtn');
+        const statusRing = document.getElementById('statusRing');
+        const infoGrid = document.getElementById('infoGrid');
+        const speedVal = document.getElementById('speedVal');
+        const statusTxt = document.getElementById('statusTxt');
+        const trackIdDisplay = document.getElementById('trackIdDisplay');
+
+        let watchId = null;
+        let socket = null;
+        let isTracking = false;
+        let trackingId = localStorage.getItem('trackingId');
+
+        if (!trackingId) {
+            trackingId = crypto.randomUUID();
+            localStorage.setItem('trackingId', trackingId);
+        }
+        trackIdDisplay.textContent = `ID: ${trackingId.split('-')[0]}`;
+
+        function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                navigator.wakeLock.request('screen').catch(() => { });
+            }
+        }
+
+        startBtn.addEventListener('click', () => {
+            if (!isTracking) {
+                startTracking();
+            } else {
+                stopTracking();
+            }
+        });
+
+        shareBtn.addEventListener('click', () => {
+            const viewerUrl = `${window.location.origin}/gps-tracker/viewer.html?id=${trackingId}`;
+
+            if (navigator.share) {
+                // Native Mobile Share (Zalo, Messenger, SMS...)
+                navigator.share({
+                    title: 'Theo dõi hành trình của tôi',
+                    url: viewerUrl
+                }).catch(err => console.log('Lỗi Share: ', err));
+            } else {
+                // Fallback Desktop: Copy Link
+                navigator.clipboard.writeText(viewerUrl).then(() => {
+                    alert("Đã copy link theo dõi vào bộ nhớ tạm:\n\n" + viewerUrl);
+                }).catch(() => {
+                    alert("Link theo dõi hành trình của bạn:\n\n" + viewerUrl);
+                });
+            }
+        });
+
+        function initSocket() {
+            if (!socket) {
+                // Connect to Socket.IO namespace defined in server
+                socket = io('/gps', { transports: ['websocket', 'polling'] });
+                socket.on('connect', () => console.log("Socket connected"));
+            }
+        }
+
+        function startTracking() {
+            if (!navigator.geolocation) {
+                alert("Trình duyệt không hỗ trợ GPS");
+                return;
+            }
+
+            requestWakeLock();
+            initSocket();
+            isTracking = true;
+
+            startBtn.innerHTML = `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+        Dừng chia sẻ
+      `;
+            startBtn.style.background = 'linear-gradient(135deg, #ef4444, #b91c1c)';
+            shareBtn.style.display = 'flex';
+
+            statusRing.classList.add('active');
+            infoGrid.classList.add('active');
+            statusTxt.textContent = "Đang phát";
+
+            watchId = navigator.geolocation.watchPosition(
+                position => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const speed = position.coords.speed; // meters/sec
+                    const heading = position.coords.heading;
+                    const accuracy = position.coords.accuracy;
+
+                    let speedKmH = 0;
+                    if (speed !== null && speed > 0) {
+                        speedKmH = speed * 3.6;
+                    }
+                    speedVal.textContent = speedKmH.toFixed(1);
+
+                    const payload = {
+                        trackingId,
+                        latitude: lat,
+                        longitude: lng,
+                        speed: speedKmH,
+                        heading: heading || 0,
+                        accuracy: accuracy || 0,
+                        timestamp: new Date().toISOString()
+                    };
+
+                    updateMinimap(lat, lng, accuracy);
+
+                    if (socket && socket.connected) {
+                        socket.emit("send_location", payload);
+                    } else {
+                        // Fallback REST API
+                        fetch('/api/gps/location', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        }).catch(e => console.log('REST fallback failed', e));
+                    }
+                },
+                error => {
+                    console.warn('GPS Error', error);
+                    if (error.code === 1) alert('Vui lòng cấp quyền vị trí cho trang web để chia sẻ hành trình');
+                },
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+            );
+        }
+
+        function stopTracking() {
+            if (watchId) navigator.geolocation.clearWatch(watchId);
+            isTracking = false;
+
+            startBtn.innerHTML = `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Bắt đầu chia sẻ hành trình
+      `;
+            startBtn.style.background = '';
+            shareBtn.style.display = 'none';
+            document.getElementById('minimap-container').style.display = 'none';
+
+            statusRing.classList.remove('active');
+            infoGrid.classList.remove('active');
+            statusTxt.textContent = "Đã dừng";
+            speedVal.textContent = "0.0";
+        }
+
+        // Minimap logic
+        let map = null;
+        let minimapMarker = null;
+        let minimapAccuracyCircle = null;
+
+        // Auto detect and show map immediately on load
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(pos => {
+                if (!isTracking) {
+                    updateMinimap(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+                }
+            }, () => { }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+        }
+
+        function updateMinimap(lat, lng, accuracy) {
+            document.getElementById('minimap-container').style.display = 'block';
+            if (!map) {
+                // Leaflet map initialization
+                map = L.map('minimap', { zoomControl: false, attributionControl: false }).setView([lat, lng], 16);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+            } else {
+                map.setView([lat, lng], map.getZoom());
+                map.invalidateSize(); // In case container size changed
+            }
+
+            if (!minimapMarker) {
+                const icon = L.divIcon({ className: 'my-marker', iconSize: [16, 16] });
+                minimapMarker = L.marker([lat, lng], { icon }).addTo(map);
+                minimapAccuracyCircle = L.circle([lat, lng], { radius: accuracy || 10, color: 'var(--primary)', fillOpacity: 0.15 }).addTo(map);
+            } else {
+                minimapMarker.setLatLng([lat, lng]);
+                minimapAccuracyCircle.setLatLng([lat, lng]).setRadius(accuracy || 10);
+            }
+        }
+    </script>
+</body>
+
+</html>

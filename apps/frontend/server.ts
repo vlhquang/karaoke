@@ -14,6 +14,7 @@ import { RoomService as LiXiRoomService } from "./src/li-xi-nang-cao/services/ro
 import { registerLiXiNamespace } from "./src/li-xi-nang-cao/socket";
 import { startKeepAlive } from "./src/lib/keep-alive";
 import { getStockAutoRefreshStatus, startStockAutoRefreshWorker } from "./src/lib/stock-auto-refresh";
+import { registerGpsTracker } from "./src/gps-tracker";
 import type {
   AddSongPayload,
   ClientToServerEvents,
@@ -358,6 +359,9 @@ app.prepare().then(() => {
       data: getStockAutoRefreshStatus()
     });
   });
+
+  registerGpsTracker(null as any, expressApp);
+
   expressApp.all("*", (req, res) => handle(req, res));
   const httpServer = createServer(expressApp);
 
@@ -371,6 +375,7 @@ app.prepare().then(() => {
     maxHttpBufferSize: Number(process.env.SOCKET_MAX_HTTP_BUFFER_SIZE ?? 20 * 1024 * 1024)
   });
   registerLiXiNamespace(io.of("/lixi"), liXiRoomService);
+  registerGpsTracker(io as any, null as any); // Bind socket ONLY after HTTP server starts
   setInterval(() => liXiRoomService.cleanupExpiredRooms(Date.now()), 5 * 60 * 1000);
 
   const emitRoomState = (roomCode: string): void => {
