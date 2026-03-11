@@ -269,10 +269,19 @@
         }
 
         .my-marker {
-            background: var(--primary);
-            border: 3px solid white;
-            border-radius: 50%;
-            box-shadow: 0 0 10px var(--primary);
+            background: transparent;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .car-marker-icon {
+            filter: drop-shadow(0 0 5px var(--primary));
+            transition: transform 0.3s ease-out;
+            width: 24px;
+            height: 24px;
         }
 
         /* Custom Toggle Switch */
@@ -620,7 +629,7 @@
                     timestamp: new Date().toISOString()
                 };
 
-                updateMinimap(lat, lng, accuracy);
+                updateMinimap(lat, lng, accuracy, pos.coords.heading);
 
                 try {
                     let result;
@@ -712,11 +721,12 @@
             statusTxt.textContent = "Đã dừng";
             speedVal.textContent = "0.0";
             nextUpdateTxt.textContent = "";
+            updateMinimap(16.4637, 107.5909, 0, 0, true);
         }
 
         let map = null, mMarker = null, mAcc = null;
 
-        function updateMinimap(lat, lng, acc, isDefault = false) {
+        function updateMinimap(lat, lng, acc, heading, isDefault = false) {
             const container = document.getElementById('minimap-container');
             const loadingText = container.querySelector('span');
             if (loadingText) loadingText.style.display = 'none';
@@ -731,18 +741,37 @@
             }
 
             if (!isDefault) {
+                const rotation = heading || 0;
+                const carHtml = `
+                    <svg class="car-marker-icon" style="transform: rotate(${rotation}deg)" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5H6.5C5.84 5 5.28 5.42 5.08 6.01L3 12V20C3 20.55 3.45 21 4 21H5C5.55 21 6 20.55 6 20V19H18V20C18 20.55 18.45 21 19 21H20C20.55 21 21 20.55 21 20V12L18.92 6.01ZM6.5 16C5.67 16 5 15.33 5 14.5C5 13.67 5.67 13 6.5 13C7.33 13 8 13.67 8 14.5C8 15.33 7.33 16 6.5 16ZM17.5 16C16.67 16 16 15.33 16 14.5C16 13.67 16.67 13 17.5 13C18.33 13 19 13.67 19 14.5C19 15.33 18.33 16 17.5 16ZM5 11L6.5 6.5H17.5L19 11H5Z" fill="#0ea5e9"/>
+                    </svg>
+                `;
+
                 if (!mMarker) {
-                    mMarker = L.marker([lat, lng], { icon: L.divIcon({ className: 'my-marker', iconSize: [16, 16] }) }).addTo(map);
+                    const carIcon = L.divIcon({
+                        className: 'my-marker',
+                        html: carHtml,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    });
+                    mMarker = L.marker([lat, lng], { icon: carIcon }).addTo(map);
                     mAcc = L.circle([lat, lng], { radius: acc || 10, color: 'var(--primary)', fillOpacity: 0.1 }).addTo(map);
                 } else {
                     mMarker.setLatLng([lat, lng]);
+                    mMarker.setIcon(L.divIcon({
+                        className: 'my-marker',
+                        html: carHtml,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    }));
                     mAcc.setLatLng([lat, lng]).setRadius(acc || 10);
                 }
             }
         }
 
         // Initialize Map with a default Vietnam center immediately
-        updateMinimap(16.4637, 107.5909, 0, true);
+        updateMinimap(16.4637, 107.5909, 0, 0, true);
 
         let lastSnapTime = 0;
         async function processPosition(pos, isRealtime = false) {
@@ -761,7 +790,7 @@
                 }
             }
 
-            updateMinimap(lat, lng, accuracy);
+            updateMinimap(lat, lng, accuracy, pos.coords.heading);
             return { lat, lng };
         }
 
