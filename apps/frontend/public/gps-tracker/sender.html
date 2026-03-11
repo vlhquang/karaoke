@@ -716,33 +716,44 @@
             nextUpdateTxt.textContent = "";
         }
 
-        // Initial Location Check for Minimap
+        let map = null, mMarker = null, mAcc = null;
+
+        function updateMinimap(lat, lng, acc, isDefault = false) {
+            const container = document.getElementById('minimap-container');
+            const loadingText = container.querySelector('span');
+            if (loadingText) loadingText.style.display = 'none';
+
+            if (!map) {
+                map = L.map('minimap', { zoomControl: false, attributionControl: false }).setView([lat, lng], isDefault ? 5 : 16);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
+                setTimeout(() => map.invalidateSize(), 300);
+            } else if (!isDefault) {
+                map.setView([lat, lng], map.getZoom() < 10 ? 16 : map.getZoom());
+                map.invalidateSize();
+            }
+
+            if (!isDefault) {
+                if (!mMarker) {
+                    mMarker = L.marker([lat, lng], { icon: L.divIcon({ className: 'my-marker', iconSize: [16, 16] }) }).addTo(map);
+                    mAcc = L.circle([lat, lng], { radius: acc || 10, color: 'var(--primary)', fillOpacity: 0.1 }).addTo(map);
+                } else {
+                    mMarker.setLatLng([lat, lng]);
+                    mAcc.setLatLng([lat, lng]).setRadius(acc || 10);
+                }
+            }
+        }
+
+        // Initialize Map with a default Vietnam center immediately
+        updateMinimap(16.4637, 107.5909, 0, true);
+
+        // Try to get precise location
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
                 updateMinimap(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
             }, (err) => {
                 console.log("Initial GPS failed:", err);
                 addLog("Không lấy được GPS khởi tạo", "info");
-            }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
-        }
-
-        let map = null, mMarker = null, mAcc = null;
-        function updateMinimap(lat, lng, acc) {
-            if (!map) {
-                map = L.map('minimap', { zoomControl: false, attributionControl: false }).setView([lat, lng], 16);
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
-                setTimeout(() => map.invalidateSize(), 500);
-            } else {
-                map.setView([lat, lng], map.getZoom());
-                map.invalidateSize();
-            }
-            if (!mMarker) {
-                mMarker = L.marker([lat, lng], { icon: L.divIcon({ className: 'my-marker', iconSize: [16, 16] }) }).addTo(map);
-                mAcc = L.circle([lat, lng], { radius: acc || 10, color: 'var(--primary)', fillOpacity: 0.1 }).addTo(map);
-            } else {
-                mMarker.setLatLng([lat, lng]);
-                mAcc.setLatLng([lat, lng]).setRadius(acc || 10);
-            }
+            }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
         }
     </script>
 </body>
