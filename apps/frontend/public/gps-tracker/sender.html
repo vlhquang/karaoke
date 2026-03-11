@@ -324,6 +324,63 @@
 
         <div id="trackIdDisplay"></div>
 
+        <!-- Configuration Settings -->
+        <div id="settingsArea"
+            style="margin-top: 25px; text-align: left; background: rgba(0,0,0,0.2); border-radius: 20px; padding: 20px; border: 1px solid rgba(255,255,255,0.05);">
+            <div class="info-label" style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z">
+                    </path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                Cài đặt cập nhật
+            </div>
+
+            <div
+                style="display: flex; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 4px; margin-bottom: 15px;">
+                <button id="modeTimeBtn"
+                    style="padding: 8px; font-size: 13px; border-radius: 10px; background: var(--primary); color: white; flex: 1;">Theo
+                    thời gian</button>
+                <button id="modeDistBtn"
+                    style="padding: 8px; font-size: 13px; border-radius: 10px; background: transparent; color: var(--text-muted); flex: 1;">Theo
+                    khoảng cách</button>
+            </div>
+
+            <!-- Time Options -->
+            <div id="timeOptions">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="font-size: 13px; color: var(--text-muted);">Chu kỳ cập nhật</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="number" id="timePeriod" value="30" min="5"
+                            style="width: 60px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white; padding: 4px 8px; font-size: 13px; outline: none;">
+                        <span style="font-size: 13px; color: var(--text-muted);">giây</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Distance Options -->
+            <div id="distOptions" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <span style="font-size: 13px; color: var(--text-muted);">Khoảng cách tối thiểu</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="number" id="distThreshold" value="50" min="5"
+                            style="width: 60px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white; padding: 4px 8px; font-size: 13px; outline: none;">
+                        <span style="font-size: 13px; color: var(--text-muted);">mét</span>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 13px; color: var(--text-muted);">Tần suất kiểm tra</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="number" id="distCheckInterval" value="10" min="2"
+                            style="width: 60px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white; padding: 4px 8px; font-size: 13px; outline: none;">
+                        <span style="font-size: 13px; color: var(--text-muted);">giây</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="logArea" style="margin-top: 30px; text-align: left; display: none;">
             <div class="info-label" style="display: flex; justify-content: space-between; align-items: center;">
                 Nhật ký hoạt động
@@ -355,20 +412,69 @@
         const logContainer = document.getElementById('logContainer');
         const nextUpdateTxt = document.getElementById('nextUpdateTxt');
 
+        // Settings Elements
+        const modeTimeBtn = document.getElementById('modeTimeBtn');
+        const modeDistBtn = document.getElementById('modeDistBtn');
+        const timeOptions = document.getElementById('timeOptions');
+        const distOptions = document.getElementById('distOptions');
+        const timePeriodInput = document.getElementById('timePeriod');
+        const distThresholdInput = document.getElementById('distThreshold');
+        const distCheckInput = document.getElementById('distCheckInterval');
+        const settingsArea = document.getElementById('settingsArea');
+
         let watchId = null;
         let socket = null;
         let isTracking = false;
         let trackingId = localStorage.getItem('trackingId');
-        let updateInterval = null;
         let countdownInterval = null;
         let nextUpdateTime = 0;
-        const UPDATE_PERIOD_MS = 30000; // 30 seconds
+
+        let activeMode = 'time'; // 'time' or 'distance'
+        let lastSentLocation = null;
 
         if (!trackingId) {
             trackingId = crypto.randomUUID();
             localStorage.setItem('trackingId', trackingId);
         }
         trackIdDisplay.textContent = `ID: ${trackingId.split('-')[0]}`;
+
+        // Settings Logic
+        modeTimeBtn.addEventListener('click', () => {
+            if (isTracking) return;
+            activeMode = 'time';
+            modeTimeBtn.style.background = 'var(--primary)';
+            modeTimeBtn.style.color = 'white';
+            modeDistBtn.style.background = 'transparent';
+            modeDistBtn.style.color = 'var(--text-muted)';
+            timeOptions.style.display = 'block';
+            distOptions.style.display = 'none';
+        });
+
+        modeDistBtn.addEventListener('click', () => {
+            if (isTracking) return;
+            activeMode = 'distance';
+            modeDistBtn.style.background = 'var(--primary)';
+            modeDistBtn.style.color = 'white';
+            modeTimeBtn.style.background = 'transparent';
+            modeTimeBtn.style.color = 'var(--text-muted)';
+            timeOptions.style.display = 'none';
+            distOptions.style.display = 'block';
+        });
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // metres
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c; // in metres
+        }
 
         function addLog(msg, type = 'info') {
             const time = new Date().toLocaleTimeString('vi-VN', { hour12: false });
@@ -432,16 +538,31 @@
         async function sendLocationUpdate() {
             if (!isTracking) return;
 
-            addLog("Bắt đầu lấy vị trí GPS...", "process");
+            addLog(activeMode === 'time' ? "Cập nhật định kỳ..." : "Kiểm tra độ lệch vị trí...", "process");
 
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
-                    addLog("Lấy vị trí GPS thành công", "success");
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
                     const speed = position.coords.speed;
                     const heading = position.coords.heading;
                     const accuracy = position.coords.accuracy;
+
+                    // Mode Distance Check
+                    if (activeMode === 'distance' && lastSentLocation) {
+                        const dist = calculateDistance(lat, lng, lastSentLocation.lat, lastSentLocation.lng);
+                        const threshold = parseInt(distThresholdInput.value) || 50;
+
+                        if (dist < threshold) {
+                            addLog(`Độ lệch ${dist.toFixed(1)}m < ${threshold}m. Bỏ qua cập nhật.`, "info");
+                            resetTimer();
+                            return;
+                        } else {
+                            addLog(`Độ lệch ${dist.toFixed(1)}m >= ${threshold}m. Bắt đầu gửi...`, "success");
+                        }
+                    }
+
+                    addLog("Lấy vị trí GPS thành công", "success");
 
                     let speedKmH = 0;
                     if (speed !== null && speed > 0) {
@@ -459,14 +580,13 @@
                         timestamp: new Date().toISOString()
                     };
 
-                    addLog("Đang gửi vị trí lên server...", "process");
+                    addLog("Đang gửi lên server...", "process");
 
                     try {
                         let result;
                         if (socket && socket.connected) {
                             result = await new Promise((resolve) => {
                                 socket.emit("send_location", payload, (res) => resolve(res));
-                                // Timeout after 10s
                                 setTimeout(() => resolve({ ok: false, error: 'timeout' }), 10000);
                             });
                         } else {
@@ -480,17 +600,16 @@
                         }
 
                         if (result.ok) {
-                            addLog("Cập nhật vị trí thành công (Server OK)", "success");
+                            addLog("Server xác nhận thành công", "success");
+                            lastSentLocation = { lat, lng };
                             if (result.status === 'synced') {
-                                addLog("Đã lưu vào Google Sheet thành công!", "success");
-                                resetTimer();
+                                addLog("Đã đồng bộ Google Sheets!", "success");
                             } else {
-                                addLog("Vị trí đã lưu (Memory Only - GS Offline)", "info");
-                                resetTimer();
+                                addLog("Đã lưu memory (GS Offline)", "info");
                             }
+                            resetTimer();
                         } else {
                             addLog(`Gửi thất bại: ${result.error || 'Lỗi không xác định'}`, "error");
-                            // Retry soon
                             setTimeout(sendLocationUpdate, 5000);
                         }
                     } catch (e) {
@@ -507,12 +626,16 @@
         }
 
         function resetTimer() {
-            nextUpdateTime = Date.now() + UPDATE_PERIOD_MS;
+            const period = activeMode === 'time'
+                ? (parseInt(timePeriodInput.value) || 30)
+                : (parseInt(distCheckInput.value) || 10);
+
+            nextUpdateTime = Date.now() + (period * 1000);
             if (countdownInterval) clearInterval(countdownInterval);
 
             countdownInterval = setInterval(() => {
                 const remaining = Math.max(0, Math.round((nextUpdateTime - Date.now()) / 1000));
-                nextUpdateTxt.textContent = `Tiếp theo: ${remaining}s`;
+                nextUpdateTxt.textContent = `${activeMode === 'time' ? 'Cập nhật' : 'Kiểm tra'}: ${remaining}s`;
 
                 if (remaining <= 0) {
                     clearInterval(countdownInterval);
@@ -530,6 +653,7 @@
             requestWakeLock();
             initSocket();
             isTracking = true;
+            lastSentLocation = null; // Reset for new session
 
             startBtn.innerHTML = `
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
@@ -538,17 +662,18 @@
             startBtn.style.background = 'linear-gradient(135deg, #ef4444, #b91c1c)';
             shareBtn.style.display = 'flex';
             logArea.style.display = 'block';
+            settingsArea.style.opacity = '0.5';
+            settingsArea.style.pointerEvents = 'none';
 
             statusRing.classList.add('active');
             infoGrid.classList.add('active');
             statusTxt.textContent = "Đang phát";
 
-            addLog("Bắt đầu phiên chia sẻ hành trình", "info");
+            addLog(`Khởi chạy: Chế độ ${activeMode === 'time' ? 'Thời gian' : 'Khoảng cách'}`, "info");
 
             // First update immediate
             sendLocationUpdate();
 
-            // Realtime map/speed display (not for saving)
             watchId = navigator.geolocation.watchPosition(
                 position => {
                     updateMinimap(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
@@ -566,6 +691,7 @@
             if (watchId) navigator.geolocation.clearWatch(watchId);
             if (countdownInterval) clearInterval(countdownInterval);
             isTracking = false;
+            lastSentLocation = null;
 
             startBtn.innerHTML = `
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -574,12 +700,15 @@
             startBtn.style.background = '';
             shareBtn.style.display = 'none';
             logArea.style.display = 'none';
+            settingsArea.style.opacity = '1';
+            settingsArea.style.pointerEvents = 'auto';
             document.getElementById('minimap-container').style.display = 'none';
 
             statusRing.classList.remove('active');
             infoGrid.classList.remove('active');
             statusTxt.textContent = "Đã dừng";
             speedVal.textContent = "0.0";
+            nextUpdateTxt.textContent = "";
 
             addLog("Đã kết thúc phiên chia sẻ", "info");
         }
