@@ -19,15 +19,23 @@ const latestLocations = new Map<string, GPSLocation>();
 // Google Sheets setup
 let doc: GoogleSpreadsheet | null = null;
 let sheet: any = null;
+let sheetInitError: string | null = null;
 
 export const initGoogleSheets = async () => {
+    sheetInitError = null;
     try {
         const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
         const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
         const sheetId = process.env.GPS_SPREADSHEET_ID;
 
         if (!email || !privateKey || !sheetId) {
-            console.warn("GPS Tracker: Google Sheets credentials missing. History saving disabled.");
+            const missing = [];
+            if (!email) missing.push("GOOGLE_SERVICE_ACCOUNT_EMAIL");
+            if (!privateKey) missing.push("GOOGLE_PRIVATE_KEY");
+            if (!sheetId) missing.push("GPS_SPREADSHEET_ID");
+
+            sheetInitError = `Missing configuration: ${missing.join(", ")}`;
+            console.warn(`GPS Tracker: ${sheetInitError}. History saving disabled.`);
             return;
         }
 
@@ -49,6 +57,7 @@ export const initGoogleSheets = async () => {
         }
         console.log("GPS Tracker: Google Sheets connected successfully.");
     } catch (err) {
+        sheetInitError = `Connection failed: ${err instanceof Error ? err.message : String(err)}`;
         console.error("GPS Tracker: Google Sheets init failed:", err);
     }
 };
@@ -162,7 +171,10 @@ export const registerGpsTracker = (io: Server | null, app: express.Express | nul
                 return;
             }
             if (!sheet) {
-                res.status(503).json({ error: "History storage currently unavailable" });
+                res.status(503).json({
+                    error: "History storage currently unavailable",
+                    details: sheetInitError || "Initialization in progress or unknown error"
+                });
                 return;
             }
 

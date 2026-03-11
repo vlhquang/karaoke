@@ -578,9 +578,51 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
-        function requestWakeLock() {
-            if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => { });
+        let wakeLock = null;
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    addLog("Screen Wake Lock: Active", "success");
+                    wakeLock.addEventListener('release', () => {
+                        addLog("Wake Lock released", "info");
+                    });
+                } catch (err) {
+                    addLog("Wake Lock failed", "error");
+                }
+            }
         }
+
+        // --- Keep-Alive / Background logic ---
+        let silentAudio = null;
+        function startSilentAudio() {
+            if (silentAudio) return;
+            // Create a 1-second silent MP3 base64
+            const silentMp3 = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA== ";
+            silentAudio = new Audio(silentMp3);
+            silentAudio.loop = true;
+            silentAudio.play().then(() => {
+                addLog("Keep-alive audio: ON", "success");
+            }).catch(e => {
+                console.log("Audio play failed:", e);
+                addLog("Cần chạm để bật audio", "info");
+            });
+        }
+
+        function stopSilentAudio() {
+            if (silentAudio) {
+                silentAudio.pause();
+                silentAudio = null;
+                addLog("Keep-alive audio: OFF", "info");
+            }
+        }
+
+        // Re-request wake lock when page becomes visible again
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
 
         startBtn.addEventListener('click', () => {
             if (!isTracking) startTracking();
@@ -727,6 +769,7 @@
             statusTxt.textContent = "Đang phát";
             addLog(`Khởi chạy: ${activeMode === 'time' ? 'Thời gian' : 'Khoảng cách'}`, "info");
 
+            startSilentAudio();
             sendLocationUpdate();
             watchId = navigator.geolocation.watchPosition(pos => {
                 processPosition(pos, true); // Real-time update
@@ -749,6 +792,11 @@
             statusTxt.textContent = "Đã dừng";
             speedVal.textContent = "0.0";
             nextUpdateTxt.textContent = "";
+            stopSilentAudio();
+            if (wakeLock) {
+                wakeLock.release();
+                wakeLock = null;
+            }
             updateMinimap(16.4637, 107.5909, 0, 0, true);
         }
 
