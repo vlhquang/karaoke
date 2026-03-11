@@ -115,6 +115,11 @@ export const registerGpsTracker = (io: Server | null, app: express.Express | nul
                     ack({ ok: true, status: synced ? "synced" : "memory_only" });
                 }
             });
+
+            socket.on("viewer_location", (data: { trackingId: string; viewerId: string; latitude: number; longitude: number }) => {
+                // Broadcast viewer location to all clients in the tracking room (including the sender)
+                gpsIo.to(data.trackingId).emit("viewer_location_update", data);
+            });
         });
     }
 

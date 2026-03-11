@@ -283,6 +283,55 @@
             width: 24px;
             height: 24px;
         }
+        
+        .viewer-marker {
+            background: var(--success);
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--success);
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .fullscreen-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: white;
+            padding: 0;
+        }
+        
+        .fullscreen-btn:hover {
+            background: rgba(0,0,0,0.8);
+            transform: none;
+        }
+
+        #minimap-container.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            margin: 0;
+            border-radius: 0;
+        }
 
         /* Custom Toggle Switch */
         .switch {
@@ -357,6 +406,11 @@
         </div>
 
         <div id="minimap-container">
+            <button class="fullscreen-btn" id="fsBtn" title="Phóng to bản đồ">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                </svg>
+            </button>
             <div id="minimap" style="width: 100%; height: 100%; position: absolute; z-index: 1;"></div>
             <span style="font-size: 13px; color: var(--text-muted); z-index: 0;">Đang tải bản đồ...</span>
         </div>
@@ -521,6 +575,26 @@
         let nextUpdateTime = 0;
         let activeMode = 'time';
         let lastSentLocation = null;
+        
+        // Viewers Tracking
+        const viewersMap = new Map(); // id -> marker
+
+        // Fullscreen map logic
+        const fsBtn = document.getElementById('fsBtn');
+        const minimapContainer = document.getElementById('minimap-container');
+        let isMapFullscreen = false;
+        
+        fsBtn.addEventListener('click', () => {
+            isMapFullscreen = !isMapFullscreen;
+            if (isMapFullscreen) {
+                minimapContainer.classList.add('fullscreen');
+                fsBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>`;
+            } else {
+                minimapContainer.classList.remove('fullscreen');
+                fsBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>`;
+            }
+            if (map) setTimeout(() => map.invalidateSize(), 300);
+        });
 
         if (!trackingId) {
             trackingId = crypto.randomUUID();
@@ -611,33 +685,68 @@
         }
 
         // --- Keep-Alive / Background logic ---
-        let silentAudio = null;
-        function startSilentAudio() {
-            if (silentAudio) return;
-            // Create a 1-second silent MP3 base64
-            const silentMp3 = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA== ";
-            silentAudio = new Audio(silentMp3);
-            silentAudio.loop = true;
-            silentAudio.play().then(() => {
-                addLog("Keep-alive audio: ON", "success");
-            }).catch(e => {
-                console.log("Audio play failed:", e);
-                addLog("Cần chạm để bật audio", "info");
-            });
-        }
+        let audioCtx = null;
+        let oscillator = null;
+        let gainNode = null;
 
-        function stopSilentAudio() {
-            if (silentAudio) {
-                silentAudio.pause();
-                silentAudio = null;
-                addLog("Keep-alive audio: OFF", "info");
+        function startSilentAudio() {
+            if (audioCtx) return;
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Cần tạo oscillator tạo âm thanh siêu việt/vô hình dải tần thấp để browser giữ process
+                oscillator = audioCtx.createOscillator();
+                gainNode = audioCtx.createGain();
+                
+                // Mute hoàn toàn âm thanh
+                gainNode.gain.value = 0; 
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.start();
+                
+                // Resume audio context which might be suspended by default
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                
+                addLog("Web Audio Keep-Alive: ON", "success");
+            } catch(e) {
+                console.log("Audio Context failed:", e);
+                addLog("Lỗi kích hoạt chạy ngầm", "error");
             }
         }
 
-        // Re-request wake lock when page becomes visible again
+        function stopSilentAudio() {
+            if (oscillator) {
+                try {
+                    oscillator.stop();
+                    oscillator.disconnect();
+                } catch(e) {}
+            }
+            if (audioCtx) {
+                try {
+                    audioCtx.close();
+                } catch(e) {}
+            }
+            oscillator = null;
+            audioCtx = null;
+            addLog("Web Audio Keep-Alive: OFF", "info");
+        }
+
+        // Re-request wake lock and resume audio when page becomes visible again
         document.addEventListener('visibilitychange', async () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') {
-                await requestWakeLock();
+            if (document.visibilityState === 'visible') {
+                if (isTracking) {
+                    if (wakeLock === null) await requestWakeLock();
+                    if (audioCtx && audioCtx.state === 'suspended') {
+                        audioCtx.resume();
+                    }
+                    // Bắn ngay 1 location update khi user vừa mở lại app
+                    addLog("Ứng dụng hoạt động lại -> Ép cập nhật", "process");
+                    executeLocationUpdate();
+                }
             }
         });
 
@@ -660,8 +769,25 @@
         function initSocket() {
             if (!socket) {
                 socket = io('/gps', { transports: ['polling', 'websocket'] });
-                socket.on('connect', () => addLog("Realtime OK", "success"));
+                socket.on('connect', () => {
+                    addLog("Realtime OK", "success");
+                    if (isTracking) socket.emit('join_tracking', trackingId);
+                });
                 socket.on('disconnect', () => addLog("Mất kết nối", "error"));
+                
+                socket.on('viewer_location_update', (data) => {
+                    if (data.trackingId === trackingId && map) {
+                        const { viewerId, latitude, longitude } = data;
+                        if (!viewersMap.has(viewerId)) {
+                            const icon = L.divIcon({ className: 'viewer-marker', html: 'V', iconSize: [16,16] });
+                            const m = L.marker([latitude, longitude], { icon }).addTo(map);
+                            viewersMap.set(viewerId, m);
+                            addLog("Có người theo dõi mới", "info");
+                        } else {
+                            viewersMap.get(viewerId).setLatLng([latitude, longitude]);
+                        }
+                    }
+                });
             }
         }
 
@@ -764,18 +890,32 @@
             }
         });
 
+        let trackingTimeout = null;
+
         function resetTimer() {
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (trackingTimeout) clearTimeout(trackingTimeout);
+            
             const period = activeMode === 'time' ? (parseInt(timePeriodInput.value) || 30) : (parseInt(distCheckInput.value) || 10);
             nextUpdateTime = Date.now() + (period * 1000);
-            if (countdownInterval) clearInterval(countdownInterval);
+            
+            // UI Countdown Update
             countdownInterval = setInterval(() => {
+                if (!isTracking) return clearInterval(countdownInterval);
                 const rem = Math.max(0, Math.round((nextUpdateTime - Date.now()) / 1000));
                 nextUpdateTxt.textContent = `${activeMode === 'time' ? 'Cập nhật' : 'Kiểm tra'}: ${rem}s`;
-                if (rem <= 0) {
-                    clearInterval(countdownInterval);
-                    sendLocationUpdate();
-                }
             }, 1000);
+            
+            // Recursive Background-safe Execute
+            trackingTimeout = setTimeout(() => {
+                if (isTracking) executeLocationUpdate();
+            }, period * 1000);
+        }
+        
+        // This is a wrapper to call sendLocationUpdate properly from setTimeout
+        function executeLocationUpdate() {
+            if (trackingTimeout) clearTimeout(trackingTimeout);
+            sendLocationUpdate();
         }
 
         function startTracking() {
@@ -784,6 +924,9 @@
             initSocket();
             isTracking = true;
             lastSentLocation = null;
+            if (socket && socket.connected) {
+                socket.emit('join_tracking', trackingId); // Join room so sender can receive viewer_location
+            }
 
             startBtn.innerHTML = `Dừng chia sẻ`;
             startBtn.style.background = 'linear-gradient(135deg, #ef4444, #b91c1c)';
@@ -799,9 +942,11 @@
 
             if (keepScreenOnToggle.checked) requestWakeLock();
             startSilentAudio();
-            sendLocationUpdate();
+            executeLocationUpdate();
+            
+            // Vẫn giữ watchPosition để OS push liên tục lên, nhưng processPosition ko tự gửi API mà chỉ hiển thị minimap
             watchId = navigator.geolocation.watchPosition(pos => {
-                processPosition(pos, true); // Real-time update
+                processPosition(pos, true); // Real-time update map
                 if (pos.coords.speed !== null) speedVal.textContent = (pos.coords.speed * 3.6).toFixed(1);
             }, null, { enableHighAccuracy: true });
         }
@@ -809,6 +954,7 @@
         function stopTracking() {
             if (watchId) navigator.geolocation.clearWatch(watchId);
             if (countdownInterval) clearInterval(countdownInterval);
+            if (trackingTimeout) clearTimeout(trackingTimeout);
             isTracking = false;
             startBtn.innerHTML = `Bắt đầu chia sẻ hành trình`;
             startBtn.style.background = '';
@@ -840,16 +986,17 @@
                 map = L.map('minimap', {
                     zoomControl: false,
                     attributionControl: false,
-                    dragging: false,
-                    touchZoom: false,
-                    doubleClickZoom: false,
-                    scrollWheelZoom: false,
+                    dragging: true,
+                    touchZoom: true,
+                    doubleClickZoom: true,
+                    scrollWheelZoom: true,
                     boxZoom: false,
                     keyboard: false
                 }).setView([lat, lng], isDefault ? 5 : 16);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
                 setTimeout(() => map.invalidateSize(), 300);
-            } else if (!isDefault) {
+            } else if (!isDefault && !isMapFullscreen) {
+                // Chỉ auto center nếu không ở chế độ fullscreen (vì fullscreen người ta có thể đang pan map)
                 map.setView([lat, lng], map.getZoom() < 10 ? 16 : map.getZoom());
                 map.invalidateSize();
             }
@@ -893,22 +1040,19 @@
             let lng = pos.coords.longitude;
             const accuracy = pos.coords.accuracy;
 
-            // Update map immediately with raw data for responsiveness
-            updateMinimap(lat, lng, accuracy, pos.coords.heading);
-
             if (snapToRoadToggle.checked) {
-                // Throttle snapping for realtime updates (max 1 per 3 seconds)
                 const now = Date.now();
                 if (!isRealtime || (now - lastSnapTime > 3000)) {
                     if (isRealtime) lastSnapTime = now;
                     const snapped = await snapToRoad(lat, lng);
                     lat = snapped.lat;
                     lng = snapped.lng;
-                    // Update again with snapped data
                     updateMinimap(lat, lng, accuracy, pos.coords.heading);
+                    return { lat, lng };
                 }
             }
-
+            
+            updateMinimap(lat, lng, accuracy, pos.coords.heading);
             return { lat, lng };
         }
 

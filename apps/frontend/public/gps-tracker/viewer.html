@@ -217,6 +217,12 @@
             color: var(--primary);
             font-weight: bold;
         }
+
+        .direction-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 </head>
 
@@ -453,6 +459,17 @@
                     accuracyCircle.setLatLng([myPos.lat, myPos.lng]).setRadius(pos.coords.accuracy);
                 }
                 updateConnection();
+                
+                // Emit viewer location if watching a specific track
+                if (targetIds.length > 0 && selectedVehicleId && socket.connected) {
+                    if (!window.viewerId) window.viewerId = crypto.randomUUID();
+                    socket.emit('viewer_location', {
+                        trackingId: selectedVehicleId,
+                        viewerId: window.viewerId,
+                        latitude: myPos.lat,
+                        longitude: myPos.lng
+                    });
+                }
             },
             err => console.log('Viewer GPS error', err),
             { enableHighAccuracy: true }
@@ -505,8 +522,12 @@
             fetchPoints(`/api/gps/historyByDate?id=${selectedVehicleId}&date=${date}`);
         }
 
+        let directionMarkers = [];
+
         function drawRoute(points) {
             if (currentHistoryLine) map.removeLayer(currentHistoryLine);
+            directionMarkers.forEach(m => map.removeLayer(m));
+            directionMarkers = [];
 
             // Clean/parse data from sheets 
             const latlngs = [];
@@ -525,6 +546,28 @@
             if (latlngs.length === 0) return alert('Không thể trích xuất toạ độ hợp lệ từ lịch sử.');
 
             currentHistoryLine = L.polyline(latlngs, { color: '#8b5cf6', weight: 4, opacity: 0.7 }).addTo(map);
+            
+            // Draw direction arrows on the path
+            for (let i = 0; i < latlngs.length - 1; i++) {
+                const p1 = latlngs[i];
+                const p2 = latlngs[i+1];
+                // Calculate bearing/heading
+                const y = Math.sin((p2[1] - p1[1]) * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180);
+                const x = Math.cos(p1[0] * Math.PI / 180) * Math.sin(p2[0] * Math.PI / 180) -
+                          Math.sin(p1[0] * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180) * Math.cos((p2[1] - p1[1]) * Math.PI / 180);
+                let bearing = Math.atan2(y, x) * 180 / Math.PI;
+                if (bearing < 0) bearing += 360;
+                
+                // Only place arrow if distance is large enough
+                const dist = getDistance(p1[0], p1[1], p2[0], p2[1]) * 1000; // in meters
+                if (dist > 10) { // minimum 10 meters spacing between arrows
+                    const arrowHtml = `<div class="direction-arrow" style="transform: rotate(${bearing}deg);"><svg width="12" height="12" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L22 20L12 17L2 20L12 2Z"/></svg></div>`;
+                    const arrowIcon = L.divIcon({ html: arrowHtml, className: '', iconSize: [12, 12], iconAnchor: [6, 6] });
+                    const marker = L.marker(p2, { icon: arrowIcon, interactive: false }).addTo(map);
+                    directionMarkers.push(marker);
+                }
+            }
+
             map.fitBounds(currentHistoryLine.getBounds());
 
             btnReplay.style.display = 'inline-block';
@@ -550,29 +593,6 @@
                 const p = latlngs[idx];
                 v.marker.setLatLng([p[0], p[1]]);
                 map.setView([p[0], p[1]], map.getZoom(), { animate: false });
-                idx++;
-            }, 500); // 0.5s per point
-        }
-
-        function doReplay(points) {
-            if (replayInterval) clearInterval(replayInterval);
-            let idx = 0;
-            const v = vehiclesInfo.get(selectedVehicleId);
-            if (!v || !v.marker) return;
-
-            btnReplay.textContent = "Đang Replay...";
-            btnReplay.style.background = '#0ea5e9';
-
-            replayInterval = setInterval(() => {
-                if (idx >= points.length) {
-                    clearInterval(replayInterval);
-                    btnReplay.textContent = "Replay";
-                    btnReplay.style.background = '#8b5cf6';
-                    return;
-                }
-                const p = points[idx];
-                v.marker.setLatLng([parseFloat(p.latitude), parseFloat(p.longitude)]);
-                map.setView([parseFloat(p.latitude), parseFloat(p.longitude)], map.getZoom(), { animate: false });
                 idx++;
             }, 500); // 0.5s per point
         }
