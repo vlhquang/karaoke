@@ -368,384 +368,202 @@
                         <input type="number" id="distThreshold" value="50" min="5"
                             style="width: 60px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white; padding: 4px 8px; font-size: 13px; outline: none;">
                         <span style="font-size: 13px; color: var(--text-muted);">mét</span>
+                        <div class="info-label"
+                            style="display: flex; justify-content: space-between; align-items: center;">
+                            Nhật ký hoạt động
+                            <span id="nextUpdateTxt"
+                                style="text-transform: none; color: var(--accent); font-weight: 800;"></span>
+                        </div>
+                        <div id="logContainer"
+                            style="background: rgba(0,0,0,0.3); border-radius: 12px; height: 120px; overflow-y: auto; padding: 10px; font-size: 11px; font-family: monospace; border: 1px solid rgba(255,255,255,0.05); margin-top: 5px;">
+                        </div>
                     </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 13px; color: var(--text-muted);">Tần suất kiểm tra</span>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <input type="number" id="distCheckInterval" value="10" min="2"
-                            style="width: 60px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white; padding: 4px 8px; font-size: 13px; outline: none;">
-                        <span style="font-size: 13px; color: var(--text-muted);">giây</span>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <div id="logArea" style="margin-top: 30px; text-align: left; display: none;">
-            <div class="info-label" style="display: flex; justify-content: space-between; align-items: center;">
-                Nhật ký hoạt động
-                <span id="nextUpdateTxt" style="text-transform: none; color: var(--accent); font-weight: 800;"></span>
-            </div>
-            <div id="logContainer"
-                style="background: rgba(0,0,0,0.3); border-radius: 12px; height: 120px; overflow-y: auto; padding: 10px; font-size: 11px; font-family: monospace; border: 1px solid rgba(255,255,255,0.05); margin-top: 5px;">
-            </div>
-        </div>
-    </div>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        // PWA Registration
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW setup failed: ', err));
-            });
-        }
-
-        const startBtn = document.getElementById('startBtn');
-        const shareBtn = document.getElementById('shareBtn');
-        const statusRing = document.getElementById('statusRing');
-        const infoGrid = document.getElementById('infoGrid');
-        const speedVal = document.getElementById('speedVal');
-        const statusTxt = document.getElementById('statusTxt');
-        const trackIdDisplay = document.getElementById('trackIdDisplay');
-        const logArea = document.getElementById('logArea');
-        const logContainer = document.getElementById('logContainer');
-        const nextUpdateTxt = document.getElementById('nextUpdateTxt');
-
-        // Settings Elements
-        const modeTimeBtn = document.getElementById('modeTimeBtn');
-        const modeDistBtn = document.getElementById('modeDistBtn');
-        const timeOptions = document.getElementById('timeOptions');
-        const distOptions = document.getElementById('distOptions');
-        const timePeriodInput = document.getElementById('timePeriod');
-        const distThresholdInput = document.getElementById('distThreshold');
-        const distCheckInput = document.getElementById('distCheckInterval');
-        const settingsArea = document.getElementById('settingsArea');
-
-        let watchId = null;
-        let socket = null;
-        let isTracking = false;
-        let trackingId = localStorage.getItem('trackingId');
-        let countdownInterval = null;
-        let nextUpdateTime = 0;
-
-        let activeMode = 'time'; // 'time' or 'distance'
-        let lastSentLocation = null;
-
-        if (!trackingId) {
-            trackingId = crypto.randomUUID();
-            localStorage.setItem('trackingId', trackingId);
-        }
-        trackIdDisplay.textContent = `ID: ${trackingId.split('-')[0]}`;
-
-        // Settings Logic
-        modeTimeBtn.addEventListener('click', () => {
-            if (isTracking) return;
-            activeMode = 'time';
-            modeTimeBtn.style.background = 'var(--primary)';
-            modeTimeBtn.style.color = 'white';
-            modeDistBtn.style.background = 'transparent';
-            modeDistBtn.style.color = 'var(--text-muted)';
-            timeOptions.style.display = 'block';
-            distOptions.style.display = 'none';
-        });
-
-        modeDistBtn.addEventListener('click', () => {
-            if (isTracking) return;
-            activeMode = 'distance';
-            modeDistBtn.style.background = 'var(--primary)';
-            modeDistBtn.style.color = 'white';
-            modeTimeBtn.style.background = 'transparent';
-            modeTimeBtn.style.color = 'var(--text-muted)';
-            timeOptions.style.display = 'none';
-            distOptions.style.display = 'block';
-        });
-
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; // metres
-            const φ1 = lat1 * Math.PI / 180;
-            const φ2 = lat2 * Math.PI / 180;
-            const Δφ = (lat2 - lat1) * Math.PI / 180;
-            const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                Math.cos(φ1) * Math.cos(φ2) *
-                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-            return R * c; // in metres
-        }
-
-        function addLog(msg, type = 'info') {
-            const time = new Date().toLocaleTimeString('vi-VN', { hour12: false });
-            const logEntry = document.createElement('div');
-            logEntry.style.marginBottom = '4px';
-            logEntry.style.borderLeft = `2px solid ${type === 'success' ? '#10b981' : (type === 'error' ? '#ef4444' : '#0ea5e9')}`;
-            logEntry.style.paddingLeft = '8px';
-
-            let color = 'var(--text-muted)';
-            if (type === 'success') color = '#10b981';
-            if (type === 'error') color = '#ef4444';
-            if (type === 'process') color = '#38bdf8';
-
-            logEntry.innerHTML = `<span style="color: #64748b;">[${time}]</span> <span style="color: ${color}">${msg}</span>`;
-            logContainer.prepend(logEntry);
-        }
-
-        function requestWakeLock() {
-            if ('wakeLock' in navigator) {
-                navigator.wakeLock.request('screen').catch(() => { });
-            }
-        }
-
-        startBtn.addEventListener('click', () => {
-            if (!isTracking) {
-                startTracking();
-            } else {
-                stopTracking();
-            }
-        });
-
-        shareBtn.addEventListener('click', () => {
-            const viewerUrl = `${window.location.origin}/gps-tracker/viewer.html?id=${trackingId}`;
-
-            if (navigator.share) {
-                navigator.share({
-                    title: 'Theo dõi hành trình của tôi',
-                    url: viewerUrl
-                }).catch(err => console.log('Lỗi Share: ', err));
-            } else {
-                navigator.clipboard.writeText(viewerUrl).then(() => {
-                    alert("Đã copy link theo dõi vào bộ nhớ tạm:\n\n" + viewerUrl);
-                }).catch(() => {
-                    alert("Link theo dõi hành trình của bạn:\n\n" + viewerUrl);
-                });
-            }
-        });
-
-        function initSocket() {
-            if (!socket) {
-                socket = io('/gps', { transports: ['websocket', 'polling'] });
-                socket.on('connect', () => {
-                    addLog("Kết nối server realtime thành công", "success");
-                });
-                socket.on('disconnect', () => {
-                    addLog("Mất kết nối server", "error");
-                });
-            }
-        }
-
-        async function sendLocationUpdate() {
-            if (!isTracking) return;
-
-            addLog(activeMode === 'time' ? "Cập nhật định kỳ..." : "Kiểm tra độ lệch vị trí...", "process");
-
-            navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    const speed = position.coords.speed;
-                    const heading = position.coords.heading;
-                    const accuracy = position.coords.accuracy;
-
-                    // Mode Distance Check
-                    if (activeMode === 'distance' && lastSentLocation) {
-                        const dist = calculateDistance(lat, lng, lastSentLocation.lat, lastSentLocation.lng);
-                        const threshold = parseInt(distThresholdInput.value) || 50;
-
-                        if (dist < threshold) {
-                            addLog(`Độ lệch ${dist.toFixed(1)}m < ${threshold}m. Bỏ qua cập nhật.`, "info");
-                            resetTimer();
-                            return;
-                        } else {
-                            addLog(`Độ lệch ${dist.toFixed(1)}m >= ${threshold}m. Bắt đầu gửi...`, "success");
-                        }
+                <script src="/socket.io/socket.io.js"></script>
+                <script>
+                    // PWA Registration
+                    if ('serviceWorker' in navigator) {
+                        window.addEventListener('load', () => {
+                            navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW setup failed: ', err));
+                        });
                     }
 
-                    addLog("Lấy vị trí GPS thành công", "success");
+                    const startBtn = document.getElementById('startBtn');
+                    const shareBtn = document.getElementById('shareBtn');
+                    const statusRing = document.getElementById('statusRing');
+                    const infoGrid = document.getElementById('infoGrid');
+                    const speedVal = document.getElementById('speedVal');
+                    const statusTxt = document.getElementById('statusTxt');
+                    const trackIdDisplay = document.getElementById('trackIdDisplay');
+                    const logArea = document.getElementById('logArea');
+                    const logContainer = document.getElementById('logContainer');
+                    const nextUpdateTxt = document.getElementById('nextUpdateTxt');
 
-                    let speedKmH = 0;
-                    if (speed !== null && speed > 0) {
-                        speedKmH = speed * 3.6;
+                    // Settings Elements
+                    const modeTimeBtn = document.getElementById('modeTimeBtn');
+                    const modeDistBtn = document.getElementById('modeDistBtn');
+                    result = await new Promise((resolve) => {
+                        socket.emit("send_location", payload, (res) => resolve(res));
+                        setTimeout(() => resolve({ ok: false, error: 'timeout' }), 10000);
+                    });
+                                    } else {
+                        const res = await fetch('/api/gps/location', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        result = await res.json();
+                        result.ok = result.success;
                     }
-                    speedVal.textContent = speedKmH.toFixed(1);
 
-                    const payload = {
-                        trackingId,
-                        latitude: lat,
-                        longitude: lng,
-                        speed: speedKmH,
-                        heading: heading || 0,
-                        accuracy: accuracy || 0,
-                        timestamp: new Date().toISOString()
-                    };
-
-                    addLog("Đang gửi lên server...", "process");
-
-                    try {
-                        let result;
-                        if (socket && socket.connected) {
-                            result = await new Promise((resolve) => {
-                                socket.emit("send_location", payload, (res) => resolve(res));
-                                setTimeout(() => resolve({ ok: false, error: 'timeout' }), 10000);
-                            });
+                    if (result.ok) {
+                        addLog("Server xác nhận thành công", "success");
+                        lastSentLocation = { lat, lng };
+                        if (result.status === 'synced') {
+                            addLog("Đã đồng bộ Google Sheets!", "success");
                         } else {
-                            const res = await fetch('/api/gps/location', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(payload)
-                            });
-                            result = await res.json();
-                            result.ok = result.success;
+                            addLog("Đã lưu memory (GS Offline)", "info");
                         }
-
-                        if (result.ok) {
-                            addLog("Server xác nhận thành công", "success");
-                            lastSentLocation = { lat, lng };
-                            if (result.status === 'synced') {
-                                addLog("Đã đồng bộ Google Sheets!", "success");
-                            } else {
-                                addLog("Đã lưu memory (GS Offline)", "info");
-                            }
-                            resetTimer();
-                        } else {
-                            addLog(`Gửi thất bại: ${result.error || 'Lỗi không xác định'}`, "error");
-                            setTimeout(sendLocationUpdate, 5000);
-                        }
-                    } catch (e) {
+                        resetTimer();
+                    } else {
+                        addLog(`Gửi thất bại: ${result.error || 'Lỗi không xác định'}`, "error");
+                        setTimeout(sendLocationUpdate, 5000);
+                    }
+                                } catch (e) {
                         addLog(`Lỗi mạng: ${e.message}`, "error");
                         setTimeout(sendLocationUpdate, 5000);
                     }
-                },
-                (error) => {
-                    addLog(`GPS Lỗi: ${error.message}`, "error");
-                    setTimeout(sendLocationUpdate, 10000);
-                },
-                { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
-            );
-        }
+                            },
+                    (error) => {
+                        addLog(`GPS Lỗi: ${error.message}`, "error");
+                        setTimeout(sendLocationUpdate, 10000);
+                    },
+                        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+                        );
+                    }
 
-        function resetTimer() {
-            const period = activeMode === 'time'
-                ? (parseInt(timePeriodInput.value) || 30)
-                : (parseInt(distCheckInput.value) || 10);
+                    function resetTimer() {
+                        const period = activeMode === 'time'
+                            ? (parseInt(timePeriodInput.value) || 30)
+                            : (parseInt(distCheckInput.value) || 10);
 
-            nextUpdateTime = Date.now() + (period * 1000);
-            if (countdownInterval) clearInterval(countdownInterval);
+                        nextUpdateTime = Date.now() + (period * 1000);
+                        if (countdownInterval) clearInterval(countdownInterval);
 
-            countdownInterval = setInterval(() => {
-                const remaining = Math.max(0, Math.round((nextUpdateTime - Date.now()) / 1000));
-                nextUpdateTxt.textContent = `${activeMode === 'time' ? 'Cập nhật' : 'Kiểm tra'}: ${remaining}s`;
+                        countdownInterval = setInterval(() => {
+                            const remaining = Math.max(0, Math.round((nextUpdateTime - Date.now()) / 1000));
+                            nextUpdateTxt.textContent = `${activeMode === 'time' ? 'Cập nhật' : 'Kiểm tra'}: ${remaining}s`;
 
-                if (remaining <= 0) {
-                    clearInterval(countdownInterval);
-                    sendLocationUpdate();
-                }
-            }, 1000);
-        }
+                            if (remaining <= 0) {
+                                clearInterval(countdownInterval);
+                                sendLocationUpdate();
+                            }
+                        }, 1000);
+                    }
 
-        function startTracking() {
-            if (!navigator.geolocation) {
-                alert("Trình duyệt không hỗ trợ GPS");
-                return;
-            }
+                    function startTracking() {
+                        if (!navigator.geolocation) {
+                            alert("Trình duyệt không hỗ trợ GPS");
+                            return;
+                        }
 
-            requestWakeLock();
-            initSocket();
-            isTracking = true;
-            lastSentLocation = null; // Reset for new session
+                        requestWakeLock();
+                        initSocket();
+                        isTracking = true;
+                        lastSentLocation = null; // Reset for new session
 
-            startBtn.innerHTML = `
+                        startBtn.innerHTML = `
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
                 Dừng chia sẻ
             `;
-            startBtn.style.background = 'linear-gradient(135deg, #ef4444, #b91c1c)';
-            shareBtn.style.display = 'flex';
-            logArea.style.display = 'block';
-            settingsArea.style.opacity = '0.5';
-            settingsArea.style.pointerEvents = 'none';
+                        startBtn.style.background = 'linear-gradient(135deg, #ef4444, #b91c1c)';
+                        shareBtn.style.display = 'flex';
+                        logArea.style.display = 'block';
+                        settingsArea.style.opacity = '0.5';
+                        settingsArea.style.pointerEvents = 'none';
 
-            statusRing.classList.add('active');
-            infoGrid.classList.add('active');
-            statusTxt.textContent = "Đang phát";
+                        statusRing.classList.add('active');
+                        infoGrid.classList.add('active');
+                        statusTxt.textContent = "Đang phát";
 
-            addLog(`Khởi chạy: Chế độ ${activeMode === 'time' ? 'Thời gian' : 'Khoảng cách'}`, "info");
+                        addLog(`Khởi chạy: Chế độ ${activeMode === 'time' ? 'Thời gian' : 'Khoảng cách'}`, "info");
 
-            // First update immediate
-            sendLocationUpdate();
+                        // First update immediate
+                        sendLocationUpdate();
 
-            watchId = navigator.geolocation.watchPosition(
-                position => {
-                    updateMinimap(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
-                    const speed = position.coords.speed;
-                    if (speed !== null && speed > 0) {
-                        speedVal.textContent = (speed * 3.6).toFixed(1);
+                        watchId = navigator.geolocation.watchPosition(
+                            position => {
+                                updateMinimap(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
+                                const speed = position.coords.speed;
+                                if (speed !== null && speed > 0) {
+                                    speedVal.textContent = (speed * 3.6).toFixed(1);
+                                }
+                            },
+                            null,
+                            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+                        );
                     }
-                },
-                null,
-                { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-            );
-        }
 
-        function stopTracking() {
-            if (watchId) navigator.geolocation.clearWatch(watchId);
-            if (countdownInterval) clearInterval(countdownInterval);
-            isTracking = false;
-            lastSentLocation = null;
+                    function stopTracking() {
+                        if (watchId) navigator.geolocation.clearWatch(watchId);
+                        if (countdownInterval) clearInterval(countdownInterval);
+                        isTracking = false;
+                        lastSentLocation = null;
 
-            startBtn.innerHTML = `
+                        startBtn.innerHTML = `
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                 Bắt đầu chia sẻ hành trình
             `;
-            startBtn.style.background = '';
-            shareBtn.style.display = 'none';
-            logArea.style.display = 'none';
-            settingsArea.style.opacity = '1';
-            settingsArea.style.pointerEvents = 'auto';
-            document.getElementById('minimap-container').style.display = 'none';
+                        startBtn.style.background = '';
+                        shareBtn.style.display = 'none';
+                        logArea.style.display = 'none';
+                        settingsArea.style.opacity = '1';
+                        settingsArea.style.pointerEvents = 'auto';
+                        document.getElementById('minimap-container').style.display = 'none';
 
-            statusRing.classList.remove('active');
-            infoGrid.classList.remove('active');
-            statusTxt.textContent = "Đã dừng";
-            speedVal.textContent = "0.0";
-            nextUpdateTxt.textContent = "";
+                        statusRing.classList.remove('active');
+                        infoGrid.classList.remove('active');
+                        statusTxt.textContent = "Đã dừng";
+                        speedVal.textContent = "0.0";
+                        nextUpdateTxt.textContent = "";
 
-            addLog("Đã kết thúc phiên chia sẻ", "info");
-        }
+                        addLog("Đã kết thúc phiên chia sẻ", "info");
+                    }
 
-        // Minimap logic
-        let map = null;
-        let minimapMarker = null;
-        let minimapAccuracyCircle = null;
+                    // Minimap logic
+                    let map = null;
+                    let minimapMarker = null;
+                    let minimapAccuracyCircle = null;
 
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(pos => {
-                if (!isTracking) {
-                    updateMinimap(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
-                }
-            }, () => { }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
-        }
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(pos => {
+                            if (!isTracking) {
+                                updateMinimap(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+                            }
+                        }, () => { }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+                    }
 
-        function updateMinimap(lat, lng, accuracy) {
-            document.getElementById('minimap-container').style.display = 'block';
-            if (!map) {
-                map = L.map('minimap', { zoomControl: false, attributionControl: false }).setView([lat, lng], 16);
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
-            } else {
-                map.setView([lat, lng], map.getZoom());
-                map.invalidateSize();
-            }
+                    function updateMinimap(lat, lng, accuracy) {
+                        document.getElementById('minimap-container').style.display = 'block';
+                        if (!map) {
+                            map = L.map('minimap', { zoomControl: false, attributionControl: false }).setView([lat, lng], 16);
+                            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+                        } else {
+                            map.setView([lat, lng], map.getZoom());
+                            map.invalidateSize();
+                        }
 
-            if (!minimapMarker) {
-                const icon = L.divIcon({ className: 'my-marker', iconSize: [16, 16] });
-                minimapMarker = L.marker([lat, lng], { icon }).addTo(map);
-                minimapAccuracyCircle = L.circle([lat, lng], { radius: accuracy || 10, color: 'var(--primary)', fillOpacity: 0.15 }).addTo(map);
-            } else {
-                minimapMarker.setLatLng([lat, lng]);
-                minimapAccuracyCircle.setLatLng([lat, lng]).setRadius(accuracy || 10);
-            }
-        }
-    </script>
+                        if (!minimapMarker) {
+                            const icon = L.divIcon({ className: 'my-marker', iconSize: [16, 16] });
+                            minimapMarker = L.marker([lat, lng], { icon }).addTo(map);
+                            minimapAccuracyCircle = L.circle([lat, lng], { radius: accuracy || 10, color: 'var(--primary)', fillOpacity: 0.15 }).addTo(map);
+                        } else {
+                            minimapMarker.setLatLng([lat, lng]);
+                            minimapAccuracyCircle.setLatLng([lat, lng]).setRadius(accuracy || 10);
+                        }
+                    }
+                </script>
 </body>
 
 </html>
