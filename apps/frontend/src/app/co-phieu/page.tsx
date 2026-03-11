@@ -796,6 +796,11 @@ export default function StockPage() {
                                         <div className="flex flex-col">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[10px] text-slate-500 uppercase font-black">Thị giá</span>
+                                                {price?.timestamp && (
+                                                    <span className="text-[9px] font-bold text-slate-500 bg-slate-800/50 px-1.5 py-0.5 rounded">
+                                                        {formatDateTime(price.timestamp)}
+                                                    </span>
+                                                )}
                                                 {isRecentlyChanged && (
                                                     <span className="animate-pulse flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[8px] font-black text-emerald-500">
                                                         <span className="h-1 w-1 rounded-full bg-emerald-500"></span>
@@ -803,10 +808,16 @@ export default function StockPage() {
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-1.5">
+                                            <div className="flex items-center gap-2">
                                                 <span className={`text-xl font-black ${getStockPriceColorClass(currentPriceValue, price || null)}`}>
                                                     {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "Đang chờ..."}
                                                 </span>
+                                                {currentPriceValue > 0 && price?.reference && (
+                                                    <div className={`flex items-center gap-1 text-[11px] font-black ${getStockPriceColorClass(currentPriceValue, price || null)}`}>
+                                                        <span>{currentPriceValue >= price.reference ? "+" : ""}{formatMoney(currentPriceValue - price.reference)}</span>
+                                                        <span>({((currentPriceValue - price.reference) / price.reference * 100).toFixed(1)}%)</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
