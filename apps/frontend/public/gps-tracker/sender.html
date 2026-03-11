@@ -589,7 +589,7 @@
 
         function initSocket() {
             if (!socket) {
-                socket = io('/gps', { transports: ['websocket', 'polling'] });
+                socket = io('/gps', { transports: ['polling', 'websocket'] });
                 socket.on('connect', () => addLog("Realtime OK", "success"));
                 socket.on('disconnect', () => addLog("Mất kết nối", "error"));
             }
@@ -779,6 +779,9 @@
             let lng = pos.coords.longitude;
             const accuracy = pos.coords.accuracy;
 
+            // Update map immediately with raw data for responsiveness
+            updateMinimap(lat, lng, accuracy, pos.coords.heading);
+
             if (snapToRoadToggle.checked) {
                 // Throttle snapping for realtime updates (max 1 per 3 seconds)
                 const now = Date.now();
@@ -787,20 +790,34 @@
                     const snapped = await snapToRoad(lat, lng);
                     lat = snapped.lat;
                     lng = snapped.lng;
+                    // Update again with snapped data
+                    updateMinimap(lat, lng, accuracy, pos.coords.heading);
                 }
             }
 
-            updateMinimap(lat, lng, accuracy, pos.coords.heading);
             return { lat, lng };
         }
 
         // Try to get precise location
         if (navigator.geolocation) {
+            statusTxt.textContent = "Chờ GPS...";
             navigator.geolocation.getCurrentPosition(pos => {
+                statusTxt.textContent = "Đã tìm thấy";
                 processPosition(pos);
             }, (err) => {
                 console.log("Initial GPS failed:", err);
-                addLog("Không lấy được GPS khởi tạo", "info");
+                let errMsg = "Lỗi GPS chung";
+                if (err.code === 1) errMsg = "Bị chặn quyền GPS";
+                else if (err.code === 2) errMsg = "Vị trí không khả dụng";
+                else if (err.code === 3) errMsg = "Hết thời gian chờ GPS";
+
+                statusTxt.textContent = "Lỗi GPS";
+                statusTxt.style.color = "#ef4444";
+                statusRing.style.background = "rgba(239, 68, 68, 0.1)";
+                statusRing.style.boxShadow = "inset 0 0 20px rgba(239, 68, 68, 0.2)";
+
+                addLog(errMsg, "error");
+                alert(`${errMsg}. Vui lòng cấp quyền hoặc bật GPS của thiết bị.`);
             }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
         }
     </script>
