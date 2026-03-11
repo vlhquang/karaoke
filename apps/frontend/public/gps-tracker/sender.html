@@ -595,11 +595,9 @@
                 let lng = pos.coords.longitude;
                 const accuracy = pos.coords.accuracy;
 
-                if (snapToRoadToggle.checked) {
-                    const snapped = await snapToRoad(lat, lng);
-                    lat = snapped.lat;
-                    lng = snapped.lng;
-                }
+                const processedPos = await processPosition(pos);
+                lat = processedPos.lat;
+                lng = processedPos.lng;
 
                 if (activeMode === 'distance' && lastSentLocation) {
                     const dist = calculateDistance(lat, lng, lastSentLocation.lat, lastSentLocation.lng);
@@ -694,7 +692,7 @@
 
             sendLocationUpdate();
             watchId = navigator.geolocation.watchPosition(pos => {
-                updateMinimap(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+                processPosition(pos, true); // Real-time update
                 if (pos.coords.speed !== null) speedVal.textContent = (pos.coords.speed * 3.6).toFixed(1);
             }, null, { enableHighAccuracy: true });
         }
@@ -746,10 +744,31 @@
         // Initialize Map with a default Vietnam center immediately
         updateMinimap(16.4637, 107.5909, 0, true);
 
+        let lastSnapTime = 0;
+        async function processPosition(pos, isRealtime = false) {
+            let lat = pos.coords.latitude;
+            let lng = pos.coords.longitude;
+            const accuracy = pos.coords.accuracy;
+
+            if (snapToRoadToggle.checked) {
+                // Throttle snapping for realtime updates (max 1 per 3 seconds)
+                const now = Date.now();
+                if (!isRealtime || (now - lastSnapTime > 3000)) {
+                    if (isRealtime) lastSnapTime = now;
+                    const snapped = await snapToRoad(lat, lng);
+                    lat = snapped.lat;
+                    lng = snapped.lng;
+                }
+            }
+
+            updateMinimap(lat, lng, accuracy);
+            return { lat, lng };
+        }
+
         // Try to get precise location
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
-                updateMinimap(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+                processPosition(pos);
             }, (err) => {
                 console.log("Initial GPS failed:", err);
                 addLog("Không lấy được GPS khởi tạo", "info");
