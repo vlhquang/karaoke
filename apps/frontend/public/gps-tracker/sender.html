@@ -703,12 +703,20 @@
             logArea.style.display = 'none';
             settingsArea.style.opacity = '1';
             settingsArea.style.pointerEvents = 'auto';
-            document.getElementById('minimap-container').style.display = 'none';
             statusRing.classList.remove('active');
             infoGrid.classList.remove('active');
             statusTxt.textContent = "Đã dừng";
             speedVal.textContent = "0.0";
             nextUpdateTxt.textContent = "";
+        }
+
+        // Initial Location Check for Minimap
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(pos => {
+                if (!isTracking) {
+                    updateMinimap(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+                }
+            }, () => { }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
         }
 
         let map = null, mMarker = null, mAcc = null;
