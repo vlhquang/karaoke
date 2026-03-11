@@ -53,8 +53,8 @@ export const initGoogleSheets = async () => {
     }
 };
 
-const saveToSheet = async (data: GPSLocation) => {
-    if (!sheet) return;
+const saveToSheet = async (data: GPSLocation): Promise<boolean> => {
+    if (!sheet) return false;
     try {
         await sheet.addRow({
             timestamp: data.timestamp,
@@ -65,8 +65,10 @@ const saveToSheet = async (data: GPSLocation) => {
             heading: data.heading,
             accuracy: data.accuracy
         });
+        return true;
     } catch (err) {
         console.error("GPS Tracker: Google Sheets save failed:", err);
+        return false;
     }
 };
 
@@ -91,36 +93,38 @@ export const registerGpsTracker = (io: Server | null, app: express.Express | nul
                 socket.leave(trackingId);
             });
 
-            socket.on("send_location", async (data: GPSLocation) => {
+            socket.on("send_location", async (data: GPSLocation, ack?: (res: { ok: boolean; status: string }) => void) => {
                 // Broadcast to viewers
                 gpsIo.to(data.trackingId).emit("location_update", data);
 
                 // Save to memory
                 latestLocations.set(data.trackingId, data);
 
-                // Async save to sheet
-                saveToSheet(data);
+                // Sync to sheet
+                const synced = await saveToSheet(data);
+                if (ack) {
+                    ack({ ok: true, status: synced ? "synced" : "memory_only" });
+                }
             });
         });
     }
 
     // REST API
     if (app) {
-        app.post("/api/gps/location", express.json(), (req, res) => {
+        app.post("/api/gps/location", express.json(), async (req, res) => {
             const data = req.body as GPSLocation;
             if (!data.trackingId || !data.latitude || !data.longitude) {
                 res.status(400).json({ error: "Invalid data" });
                 return;
             }
 
-
             // Fallback for devices that cannot use WebSocket
             data.timestamp = data.timestamp || new Date().toISOString();
 
             latestLocations.set(data.trackingId, data);
-            saveToSheet(data);
+            const synced = await saveToSheet(data);
 
-            res.json({ success: true });
+            res.json({ success: true, status: synced ? "synced" : "memory_only" });
         });
 
         app.get("/api/gps/location", (req, res) => {
