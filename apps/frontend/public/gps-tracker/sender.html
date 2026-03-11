@@ -438,7 +438,7 @@
             </div>
 
             <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05);">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -449,6 +449,22 @@
                     </div>
                     <label class="switch">
                         <input type="checkbox" id="snapToRoadToggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                            <circle cx="12" cy="12" r="4" />
+                        </svg>
+                        <span style="font-size: 13px; color: var(--text-muted);">Luôn sáng màn hình</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="keepScreenOnToggle" checked>
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -495,6 +511,7 @@
         const distCheckInput = document.getElementById('distCheckInterval');
         const settingsArea = document.getElementById('settingsArea');
         const snapToRoadToggle = document.getElementById('snapToRoadToggle');
+        const keepScreenOnToggle = document.getElementById('keepScreenOnToggle');
 
         let watchId = null;
         let socket = null;
@@ -621,6 +638,17 @@
         document.addEventListener('visibilitychange', async () => {
             if (wakeLock !== null && document.visibilityState === 'visible') {
                 await requestWakeLock();
+            }
+        });
+
+        keepScreenOnToggle.addEventListener('change', async () => {
+            if (keepScreenOnToggle.checked) {
+                if (isTracking) await requestWakeLock();
+            } else {
+                if (wakeLock) {
+                    await wakeLock.release();
+                    wakeLock = null;
+                }
             }
         });
 
@@ -769,6 +797,7 @@
             statusTxt.textContent = "Đang phát";
             addLog(`Khởi chạy: ${activeMode === 'time' ? 'Thời gian' : 'Khoảng cách'}`, "info");
 
+            if (keepScreenOnToggle.checked) requestWakeLock();
             startSilentAudio();
             sendLocationUpdate();
             watchId = navigator.geolocation.watchPosition(pos => {
