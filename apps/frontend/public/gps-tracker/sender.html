@@ -666,6 +666,34 @@
             }, { enableHighAccuracy: true, timeout: 15000 });
         }
 
+        shareBtn.addEventListener('click', async () => {
+            const viewerUrl = `${window.location.origin}/gps-tracker/viewer.html?id=${trackingId}`;
+            const shareData = {
+                title: 'Chia sẻ hành trình GPS',
+                text: 'Theo dõi vị trí hiện tại của tôi qua bản đồ trực tiếp.',
+                url: viewerUrl
+            };
+
+            try {
+                if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+                    await navigator.share(shareData);
+                    addLog("Đã mở menu chia sẻ", "success");
+                } else {
+                    throw new Error("Sharing not supported");
+                }
+            } catch (err) {
+                // Fallback to clipboard
+                try {
+                    await navigator.clipboard.writeText(viewerUrl);
+                    addLog("Đã copy link vào bộ nhớ tạm", "success");
+                    alert("Đã copy link hành trình vào bộ nhớ tạm!");
+                } catch (clipErr) {
+                    addLog("Lỗi chia sẻ", "error");
+                    alert(`Link hành trình: ${viewerUrl}`);
+                }
+            }
+        });
+
         function resetTimer() {
             const period = activeMode === 'time' ? (parseInt(timePeriodInput.value) || 30) : (parseInt(distCheckInput.value) || 10);
             nextUpdateTime = Date.now() + (period * 1000);
@@ -732,7 +760,16 @@
             if (loadingText) loadingText.style.display = 'none';
 
             if (!map) {
-                map = L.map('minimap', { zoomControl: false, attributionControl: false }).setView([lat, lng], isDefault ? 5 : 16);
+                map = L.map('minimap', {
+                    zoomControl: false,
+                    attributionControl: false,
+                    dragging: false,
+                    touchZoom: false,
+                    doubleClickZoom: false,
+                    scrollWheelZoom: false,
+                    boxZoom: false,
+                    keyboard: false
+                }).setView([lat, lng], isDefault ? 5 : 16);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
                 setTimeout(() => map.invalidateSize(), 300);
             } else if (!isDefault) {
