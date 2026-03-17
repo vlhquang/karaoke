@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, FormEvent, ChangeEvent } from "react";
+import { createPortal } from "react-dom";
 
 interface Transaction {
     id: number;
@@ -69,9 +70,11 @@ export default function StockPage() {
     const [isWakeLockActive, setIsWakeLockActive] = useState(false);
     const [isAutoUpdateEnabled, setIsAutoUpdateEnabled] = useState(true);
     const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
+    const [isPiPActive, setIsPiPActive] = useState(false);
     const [verificationInput, setVerificationInput] = useState("");
     const [verificationError, setVerificationError] = useState("");
     const wakeLockRef = useRef<any>(null);
+    const pipWindowRef = useRef<any>(null);
 
     const isSyncingPricesRef = useRef(false);
     const highlightTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -206,6 +209,61 @@ export default function StockPage() {
             });
             delete highlightTimersRef.current[normalizedSymbol];
         }, 5000);
+    };
+
+    const handleOpenPiP = async () => {
+        if (!('documentPictureInPicture' in window)) {
+            alert("Trình duyệt của bạn chưa hỗ trợ tính năng Floating Popup (Document PiP). Vui lòng sử dụng Chrome hoặc Edge phiên bản mới nhất.");
+            return;
+        }
+
+        try {
+            if (pipWindowRef.current) {
+                pipWindowRef.current.close();
+            }
+
+            const pipWindow = await (window as any).documentPictureInPicture.requestWindow({
+                width: 400,
+                height: 600,
+            });
+
+            const allStyles = Array.from(document.styleSheets);
+            allStyles.forEach((styleSheet) => {
+                try {
+                    const cssRules = Array.from(styleSheet.cssRules)
+                        .map((rule) => rule.cssText)
+                        .join("");
+                    const styleTag = pipWindow.document.createElement("style");
+                    styleTag.textContent = cssRules;
+                    pipWindow.document.head.appendChild(styleTag);
+                } catch (e) {
+                    if (styleSheet.href) {
+                        const linkTag = pipWindow.document.createElement("link");
+                        linkTag.rel = "stylesheet";
+                        linkTag.href = styleSheet.href;
+                        pipWindow.document.head.appendChild(linkTag);
+                    }
+                }
+            });
+
+            pipWindow.document.title = "Stock Tracker (Mini)";
+            pipWindow.document.body.className = "bg-slate-950 text-slate-200 overflow-x-hidden p-4";
+
+            const pipContainer = pipWindow.document.createElement("div");
+            pipContainer.id = "pip-root";
+            pipWindow.document.body.appendChild(pipContainer);
+
+            pipWindow.addEventListener("pagehide", () => {
+                setIsPiPActive(false);
+                pipWindowRef.current = null;
+            });
+
+            pipWindowRef.current = pipWindow;
+            setIsPiPActive(true);
+            setIsMinimalMode(true);
+        } catch (err) {
+            console.error("Failed to open PiP window", err);
+        }
     };
 
     const syncPricesFromServer = async (code: string) => {
@@ -715,6 +773,12 @@ export default function StockPage() {
                                     className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isWakeLockActive ? "bg-orange-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
                                 >
                                     Sáng màn
+                                </button>
+                                <button
+                                    onClick={handleOpenPiP}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isPiPActive ? "bg-purple-500 text-white" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Popup UI
                                 </button>
                                 <button
                                     onClick={() => {
@@ -1303,7 +1367,7 @@ export default function StockPage() {
             </div>
 
             {/* Minimalist Mode View */}
-            {isMinimalMode && (
+            {isMinimalMode && !isPiPActive && (
                 <div className="fixed inset-0 top-[120px] bg-slate-950 z-10 overflow-y-auto px-4 pb-32">
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {Object.entries(groupedTransactions).map(([symbol, txs]) => {
@@ -1441,6 +1505,81 @@ export default function StockPage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Portal for PiP window */}
+            {isPiPActive && pipWindowRef.current && createPortal(
+                <div className="w-full h-full">
+                    <div className="grid grid-cols-1 gap-3">
+                        {Object.entries(groupedTransactions).map(([symbol, txs]) => {
+                            const holdTxs = txs.filter(t => t.status === "HOLD");
+                            if (holdTxs.length === 0) return null;
+
+                            const info = currentPrices[symbol] || null;
+                            const currentPriceValue = info?.current || 0;
+                            const referenceValue = info?.reference || 0;
+                            const avgPrice = holdTxs.reduce((sum, t) => sum + t.price, 0) / holdTxs.length;
+
+                            const pPerc = currentPriceValue > 0
+                                ? ((currentPriceValue - avgPrice) / avgPrice) * 100
+                                : 0;
+
+                            const isRecentlyUpdated = recentlyUpdatedSymbols[symbol];
+
+                            return (
+                                <div
+                                    key={symbol}
+                                    onClick={() => openAnalysisPopup(symbol)}
+                                    className={`relative rounded-2xl border p-4 transition-all active:scale-95 ${isRecentlyUpdated ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.3)]" : "border-slate-800 bg-slate-900/40"
+                                        }`}
+                                >
+                                    <div className="flex flex-col h-full justify-between gap-1">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-black text-white">{symbol}</span>
+                                            {isRecentlyUpdated && (
+                                                <span className="flex h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                            )}
+                                        </div>
+                                        <div className={`text-xl font-black leading-none ${getStockPriceColorClass(currentPriceValue, info)}`}>
+                                            {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "---"}
+                                        </div>
+                                        <div className="flex items-center justify-between mt-1 border-t border-slate-800/50 pt-1">
+                                            <div className="flex flex-col">
+                                                <span className="text-[8px] font-bold text-slate-500 uppercase">TC / AVG</span>
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                    {referenceValue > 0 ? formatMoney(referenceValue) : "---"} / {formatMoney(avgPrice)}
+                                                </span>
+                                            </div>
+                                            <span className={`text-sm font-black ${pPerc >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                {pPerc >= 0 ? "+" : ""}{pPerc.toFixed(1)}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="mt-8 space-y-4">
+                        <div className="flex items-center justify-between bg-slate-900/40 p-3 rounded-xl border border-slate-800">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Refresh in</span>
+                            <div className="flex items-center gap-3">
+                                {!isAutoUpdateEnabled && (
+                                    <button
+                                        onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
+                                        className="rounded-lg bg-cyan-600 p-2 text-white shadow-lg active:scale-90 transition-all"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                    </button>
+                                )}
+                                <span className="text-xs font-black text-cyan-400">{refreshCountdown}s</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                pipWindowRef.current.document.getElementById("pip-root")
             )}
         </main>
     );
