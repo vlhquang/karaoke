@@ -699,7 +699,7 @@ export default function StockPage() {
                                         setIsMinimalMode(next);
                                         localStorage.setItem("stock_minimal_mode", next.toString());
                                     }}
-                                    className={`rounded-lg px-3 py-1.5 text-[10px] font-black uppercase transition-all ${isMinimalMode ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isMinimalMode ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
                                 >
                                     Tối giản
                                 </button>
@@ -709,7 +709,7 @@ export default function StockPage() {
                                         setIsWakeLockActive(next);
                                         localStorage.setItem("stock_wake_lock", next.toString());
                                     }}
-                                    className={`rounded-lg px-3 py-1.5 text-[10px] font-black uppercase transition-all ${isWakeLockActive ? "bg-orange-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isWakeLockActive ? "bg-orange-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
                                 >
                                     Sáng màn
                                 </button>
@@ -719,7 +719,7 @@ export default function StockPage() {
                                         setIsAutoUpdateEnabled(next);
                                         localStorage.setItem("stock_auto_update", next.toString());
                                     }}
-                                    className={`rounded-lg px-3 py-1.5 text-[10px] font-black uppercase transition-all ${isAutoUpdateEnabled ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isAutoUpdateEnabled ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
                                 >
                                     Auto
                                 </button>
@@ -1309,8 +1309,8 @@ export default function StockPage() {
 
                             const info = currentPrices[symbol] || null;
                             const currentPriceValue = info?.current || 0;
+                            const referenceValue = info?.reference || 0;
                             const avgPrice = holdTxs.reduce((sum, t) => sum + t.price, 0) / holdTxs.length;
-                            const totalQty = holdTxs.reduce((sum, t) => sum + t.quantity, 0);
 
                             const pPerc = currentPriceValue > 0
                                 ? ((currentPriceValue - avgPrice) / avgPrice) * 100
@@ -1332,14 +1332,17 @@ export default function StockPage() {
                                                 <span className="flex h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
                                             )}
                                         </div>
-                                        <div className={`text-xl font-black ${getStockPriceColorClass(currentPriceValue, info)}`}>
+                                        <div className={`text-xl font-black leading-none ${getStockPriceColorClass(currentPriceValue, info)}`}>
                                             {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "---"}
                                         </div>
-                                        <div className="flex items-center justify-between mt-1">
-                                            <span className="text-[10px] font-bold text-slate-600 uppercase">
-                                                {totalQty} cp
-                                            </span>
-                                            <span className={`text-xs font-black ${pPerc >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                        <div className="flex items-center justify-between mt-1 border-t border-slate-800/50 pt-1">
+                                            <div className="flex flex-col">
+                                                <span className="text-[8px] font-bold text-slate-500 uppercase">TC / AVG</span>
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                    {referenceValue > 0 ? formatMoney(referenceValue) : "---"} / {formatMoney(avgPrice)}
+                                                </span>
+                                            </div>
+                                            <span className={`text-sm font-black ${pPerc >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                                                 {pPerc >= 0 ? "+" : ""}{pPerc.toFixed(1)}%
                                             </span>
                                         </div>
@@ -1349,18 +1352,10 @@ export default function StockPage() {
                         })}
                     </div>
 
-                    {/* Quick Summary in Minimal Mode */}
-                    <div className="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 p-4 flex justify-between items-center z-20">
-                        <div className="flex flex-col">
-                            <span className="text-[9px] font-bold text-slate-500 uppercase">Lãi / Lỗ tạm tính</span>
-                            <div className={`text-lg font-black ${totalProfitLossManual >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                {(totalProfitLossManual > 0 ? "+" : "") + formatMoney(totalProfitLossManual)}
-                                <span className="ml-1 text-xs opacity-60">
-                                    ({totalInvestment > 0 ? ((totalProfitLossManual / totalInvestment) * 100).toFixed(2) : "0.00"}%)
-                                </span>
-                            </div>
-                        </div>
+                    {/* Quick Summary in Minimal Mode - Simplified */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 p-4 flex justify-end items-center z-20">
                         <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2">Refresh in</span>
                             {!isAutoUpdateEnabled && (
                                 <button
                                     onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
