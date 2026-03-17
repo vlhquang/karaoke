@@ -68,6 +68,9 @@ export default function StockPage() {
     const [isMinimalMode, setIsMinimalMode] = useState(false);
     const [isWakeLockActive, setIsWakeLockActive] = useState(false);
     const [isAutoUpdateEnabled, setIsAutoUpdateEnabled] = useState(true);
+    const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
+    const [verificationInput, setVerificationInput] = useState("");
+    const [verificationError, setVerificationError] = useState("");
     const wakeLockRef = useRef<any>(null);
 
     const isSyncingPricesRef = useRef(false);
@@ -695,9 +698,9 @@ export default function StockPage() {
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => {
-                                        const next = !isMinimalMode;
-                                        setIsMinimalMode(next);
-                                        localStorage.setItem("stock_minimal_mode", next.toString());
+                                        setIsVerifyingPassword(true);
+                                        setVerificationInput("");
+                                        setVerificationError("");
                                     }}
                                     className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isMinimalMode ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
                                 >
@@ -1370,6 +1373,70 @@ export default function StockPage() {
                                 <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800 text-cyan-400 border border-slate-700`}>
                                     <span className="text-xs font-black">{refreshCountdown}s</span>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Password Verification Modal */}
+            {isVerifyingPassword && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl" onClick={() => setIsVerifyingPassword(false)}></div>
+                    <div className="relative w-full max-w-xs rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl text-center">
+                        <div className="mb-6 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
+                            <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                        </div>
+                        <h3 className="mb-1 text-base font-black text-white uppercase tracking-tight">Xác thực quyền hạn</h3>
+                        <p className="mb-6 text-[10px] font-bold text-slate-500 uppercase">Nhập mật khẩu truy cập để chuyển chế độ</p>
+
+                        <div className="space-y-4">
+                            <input
+                                autoFocus
+                                type="password"
+                                value={verificationInput}
+                                onChange={(e: ChangeEvent<HTMLInputElement>) => setVerificationInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        if (verificationInput === accessCode) {
+                                            const next = !isMinimalMode;
+                                            setIsMinimalMode(next);
+                                            localStorage.setItem("stock_minimal_mode", next.toString());
+                                            setIsVerifyingPassword(false);
+                                        } else {
+                                            setVerificationError("Mật khẩu không đúng");
+                                        }
+                                    }
+                                }}
+                                className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-5 py-4 text-center font-mono text-xl tracking-[0.5em] text-white outline-none focus:border-cyan-500 transition-all"
+                                placeholder="••••••"
+                            />
+                            {verificationError && <p className="text-[10px] font-black text-red-500 uppercase">{verificationError}</p>}
+
+                            <div className="grid grid-cols-2 gap-3 pt-2">
+                                <button
+                                    onClick={() => setIsVerifyingPassword(false)}
+                                    className="rounded-xl border border-slate-700 py-3 text-[10px] font-black text-slate-500 hover:bg-slate-800 transition-all uppercase"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (verificationInput === accessCode) {
+                                            const next = !isMinimalMode;
+                                            setIsMinimalMode(next);
+                                            localStorage.setItem("stock_minimal_mode", next.toString());
+                                            setIsVerifyingPassword(false);
+                                        } else {
+                                            setVerificationError("Mật khẩu không đúng");
+                                        }
+                                    }}
+                                    className="rounded-xl bg-cyan-600 py-3 text-[10px] font-black text-white hover:bg-cyan-500 transition-all uppercase"
+                                >
+                                    Xác nhận
+                                </button>
                             </div>
                         </div>
                     </div>
