@@ -64,6 +64,7 @@ export default function StockPage() {
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
     const [workerStatus, setWorkerStatus] = useState<WorkerStatus | null>(null);
     const [recentlyUpdatedSymbols, setRecentlyUpdatedSymbols] = useState<Record<string, boolean>>({});
+    const [refreshCountdown, setRefreshCountdown] = useState(60);
 
     const isSyncingPricesRef = useRef(false);
     const highlightTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -91,6 +92,41 @@ export default function StockPage() {
             Object.values(highlightTimersRef.current).forEach((timer) => clearTimeout(timer));
         };
     }, []);
+
+    // Auto-refresh countdown logic
+    useEffect(() => {
+        if (!isLoggedIn) return;
+
+        const hasHoldStocks = transactions.some(t => t.status === "HOLD");
+        if (!hasHoldStocks) return;
+
+        if (isRefreshingPrices) return;
+
+        const timer = setInterval(() => {
+            setRefreshCountdown((prev: number) => {
+                if (prev <= 1) {
+                    // Trigger refresh
+                    const holdSymbols = transactions
+                        .filter((t: Transaction) => t.status === "HOLD")
+                        .map((t: Transaction) => t.symbol);
+                    if (holdSymbols.length > 0) {
+                        fetchRealtimePrices(holdSymbols, true);
+                    }
+                    return 60;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [isLoggedIn, isRefreshingPrices, transactions]);
+
+    // Reset countdown when refresh finishes
+    useEffect(() => {
+        if (!isRefreshingPrices) {
+            setRefreshCountdown(60);
+        }
+    }, [isRefreshingPrices]);
 
     const markSymbolRecentlyUpdated = (symbol: string) => {
         const normalizedSymbol = symbol.trim().toUpperCase();
@@ -598,18 +634,9 @@ export default function StockPage() {
                             </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
-                            {lastUpdated && (
-                                <div className="text-[10px] font-bold text-slate-500 uppercase">
-                                    Cập nhật: {formatDateTime(lastUpdated)}
-                                </div>
-                            )}
-                            {workerStatus && (
-                                <div className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-tighter ${workerStatus.running ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>
-                                    <span className={`h-1.5 w-1.5 rounded-full ${workerStatus.running ? 'animate-pulse bg-emerald-400' : 'bg-slate-400'}`}></span>
-                                    Worker {workerStatus.running ? 'Active' : 'Idle'} • {workerStatus.intervalMinutes}m
-                                </div>
-                            )}
+                            {/* Worker status and update time removed */}
                         </div>
+
                     </div>
                 </div>
             </header>
@@ -1153,10 +1180,17 @@ export default function StockPage() {
                         className="group flex h-14 w-14 md:h-16 md:w-auto md:px-6 items-center justify-center gap-3 rounded-2xl bg-cyan-600 text-white shadow-2xl hover:scale-110 active:scale-95 transition-all disabled:opacity-50"
                         title="Làm mới giá thị trường"
                     >
-                        <div className={isRefreshingPrices ? "animate-spin" : ""}>
-                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                            </svg>
+                        <div className="relative flex items-center justify-center">
+                            <div className={isRefreshingPrices ? "animate-spin" : ""}>
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                </svg>
+                            </div>
+                            {!isRefreshingPrices && (
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-900 text-[8px] font-black text-cyan-400 border border-cyan-500/30">
+                                    {refreshCountdown}
+                                </span>
+                            )}
                         </div>
                         <span className="hidden md:block text-xs font-black uppercase tracking-widest">Làm mới giá</span>
                     </button>
