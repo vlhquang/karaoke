@@ -65,6 +65,10 @@ export default function StockPage() {
     const [workerStatus, setWorkerStatus] = useState<WorkerStatus | null>(null);
     const [recentlyUpdatedSymbols, setRecentlyUpdatedSymbols] = useState<Record<string, boolean>>({});
     const [refreshCountdown, setRefreshCountdown] = useState(60);
+    const [isMinimalMode, setIsMinimalMode] = useState(false);
+    const [isWakeLockActive, setIsWakeLockActive] = useState(false);
+    const [isAutoUpdateEnabled, setIsAutoUpdateEnabled] = useState(true);
+    const wakeLockRef = useRef<any>(null);
 
     const isSyncingPricesRef = useRef(false);
     const highlightTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -85,17 +89,70 @@ export default function StockPage() {
         if (savedLoss) setLossTarget(parseFloat(savedLoss));
 
         setIsInitialized(true);
+
+        // Load UI preferences
+        const savedMinimal = localStorage.getItem("stock_minimal_mode");
+        const savedWakeLock = localStorage.getItem("stock_wake_lock");
+        const savedAutoUpdate = localStorage.getItem("stock_auto_update");
+
+        if (savedMinimal === "true") setIsMinimalMode(true);
+        if (savedWakeLock === "true") setIsWakeLockActive(true);
+        if (savedAutoUpdate === "false") setIsAutoUpdateEnabled(false);
     }, []);
 
     useEffect(() => {
         return () => {
             Object.values(highlightTimersRef.current).forEach((timer) => clearTimeout(timer));
+            if (wakeLockRef.current) {
+                wakeLockRef.current.release().catch(console.error);
+            }
         };
     }, []);
 
+    // Wake Lock Logic
+    useEffect(() => {
+        if (!isWakeLockActive) {
+            if (wakeLockRef.current) {
+                wakeLockRef.current.release().then(() => {
+                    wakeLockRef.current = null;
+                }).catch(console.error);
+            }
+            return;
+        }
+
+        const requestWakeLock = async () => {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+                    console.log('Wake Lock is active');
+                }
+            } catch (err: any) {
+                console.error(`${err.name}, ${err.message}`);
+                setIsWakeLockActive(false);
+            }
+        };
+
+        requestWakeLock();
+
+        const handleVisibilityChange = () => {
+            if (wakeLockRef.current !== null && document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            if (wakeLockRef.current) {
+                wakeLockRef.current.release().catch(console.error);
+                wakeLockRef.current = null;
+            }
+        };
+    }, [isWakeLockActive]);
+
     // Auto-refresh countdown logic
     useEffect(() => {
-        if (!isLoggedIn) return;
+        if (!isLoggedIn || !isAutoUpdateEnabled) return;
 
         const hasHoldStocks = transactions.some(t => t.status === "HOLD");
         if (!hasHoldStocks) return;
@@ -635,13 +692,45 @@ export default function StockPage() {
                         </div>
                         <div className="flex flex-col items-end gap-1">
                             {/* Worker status and update time removed */}
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => {
+                                        const next = !isMinimalMode;
+                                        setIsMinimalMode(next);
+                                        localStorage.setItem("stock_minimal_mode", next.toString());
+                                    }}
+                                    className={`rounded-lg px-3 py-1.5 text-[10px] font-black uppercase transition-all ${isMinimalMode ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Tối giản
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const next = !isWakeLockActive;
+                                        setIsWakeLockActive(next);
+                                        localStorage.setItem("stock_wake_lock", next.toString());
+                                    }}
+                                    className={`rounded-lg px-3 py-1.5 text-[10px] font-black uppercase transition-all ${isWakeLockActive ? "bg-orange-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Sáng màn
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const next = !isAutoUpdateEnabled;
+                                        setIsAutoUpdateEnabled(next);
+                                        localStorage.setItem("stock_auto_update", next.toString());
+                                    }}
+                                    className={`rounded-lg px-3 py-1.5 text-[10px] font-black uppercase transition-all ${isAutoUpdateEnabled ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Auto
+                                </button>
+                            </div>
                         </div>
 
                     </div>
                 </div>
             </header>
 
-            <div className="mx-auto max-w-6xl px-4 py-8 space-y-8">
+            <div className={`mx-auto max-w-6xl px-4 py-8 space-y-8 ${isMinimalMode ? "hidden" : "block"}`}>
                 {/* Summary Section moved here */}
                 <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg shadow-cyan-950/10">
@@ -1209,6 +1298,88 @@ export default function StockPage() {
                     </div>
                 )}
             </div>
+
+            {/* Minimalist Mode View */}
+            {isMinimalMode && (
+                <div className="fixed inset-0 top-[120px] bg-slate-950 z-10 overflow-y-auto px-4 pb-32">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {Object.entries(groupedTransactions).map(([symbol, txs]) => {
+                            const holdTxs = txs.filter(t => t.status === "HOLD");
+                            if (holdTxs.length === 0) return null;
+
+                            const info = currentPrices[symbol] || null;
+                            const currentPriceValue = info?.current || 0;
+                            const avgPrice = holdTxs.reduce((sum, t) => sum + t.price, 0) / holdTxs.length;
+                            const totalQty = holdTxs.reduce((sum, t) => sum + t.quantity, 0);
+
+                            const pPerc = currentPriceValue > 0
+                                ? ((currentPriceValue - avgPrice) / avgPrice) * 100
+                                : 0;
+
+                            const isRecentlyUpdated = recentlyUpdatedSymbols[symbol];
+
+                            return (
+                                <div
+                                    key={symbol}
+                                    onClick={() => openAnalysisPopup(symbol)}
+                                    className={`relative rounded-2xl border p-4 transition-all active:scale-95 ${isRecentlyUpdated ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.3)]" : "border-slate-800 bg-slate-900/40"
+                                        }`}
+                                >
+                                    <div className="flex flex-col h-full justify-between gap-1">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-black text-white">{symbol}</span>
+                                            {isRecentlyUpdated && (
+                                                <span className="flex h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                            )}
+                                        </div>
+                                        <div className={`text-xl font-black ${getStockPriceColorClass(currentPriceValue, info)}`}>
+                                            {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "---"}
+                                        </div>
+                                        <div className="flex items-center justify-between mt-1">
+                                            <span className="text-[10px] font-bold text-slate-600 uppercase">
+                                                {totalQty} cp
+                                            </span>
+                                            <span className={`text-xs font-black ${pPerc >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                {pPerc >= 0 ? "+" : ""}{pPerc.toFixed(1)}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Quick Summary in Minimal Mode */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 p-4 flex justify-between items-center z-20">
+                        <div className="flex flex-col">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase">Lãi / Lỗ tạm tính</span>
+                            <div className={`text-lg font-black ${totalProfitLossManual >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                {(totalProfitLossManual > 0 ? "+" : "") + formatMoney(totalProfitLossManual)}
+                                <span className="ml-1 text-xs opacity-60">
+                                    ({totalInvestment > 0 ? ((totalProfitLossManual / totalInvestment) * 100).toFixed(2) : "0.00"}%)
+                                </span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            {!isAutoUpdateEnabled && (
+                                <button
+                                    onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
+                                    className="rounded-xl bg-cyan-600 p-3 text-white shadow-lg active:scale-90 transition-all"
+                                >
+                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                </button>
+                            )}
+                            <div className="relative">
+                                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800 text-cyan-400 border border-slate-700`}>
+                                    <span className="text-xs font-black">{refreshCountdown}s</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }
