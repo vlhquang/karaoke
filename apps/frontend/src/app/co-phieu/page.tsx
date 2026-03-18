@@ -223,8 +223,8 @@ export default function StockPage() {
             }
 
             const pipWindow = await (window as any).documentPictureInPicture.requestWindow({
-                width: 400,
-                height: 600,
+                width: 600,
+                height: 150,
             });
 
             const allStyles = Array.from(document.styleSheets);
@@ -247,7 +247,7 @@ export default function StockPage() {
             });
 
             pipWindow.document.title = "Stock Tracker (Mini)";
-            pipWindow.document.body.className = "bg-slate-950 text-slate-200 overflow-x-hidden p-4";
+            pipWindow.document.body.className = "bg-slate-950 text-slate-200 overflow-x-hidden p-2";
 
             const pipContainer = pipWindow.document.createElement("div");
             pipContainer.id = "pip-root";
@@ -1509,8 +1509,8 @@ export default function StockPage() {
 
             {/* Portal for PiP window */}
             {isPiPActive && pipWindowRef.current && createPortal(
-                <div className="w-full h-full">
-                    <div className="grid grid-cols-1 gap-3">
+                <div className="w-full h-full flex flex-col">
+                    <div className="flex flex-row flex-wrap gap-2 items-start content-start overflow-y-auto flex-1">
                         {Object.entries(groupedTransactions).map(([symbol, txs]) => {
                             const holdTxs = txs.filter(t => t.status === "HOLD");
                             if (holdTxs.length === 0) return null;
@@ -1529,8 +1529,7 @@ export default function StockPage() {
                             return (
                                 <div
                                     key={symbol}
-                                    onClick={() => openAnalysisPopup(symbol)}
-                                    className={`relative rounded-2xl border p-4 transition-all active:scale-95 ${isRecentlyUpdated ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.3)]" : "border-slate-800 bg-slate-900/40"
+                                    className={`relative rounded-xl border p-2 min-w-[140px] flex-1 transition-all active:scale-95 ${isRecentlyUpdated ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.3)]" : "border-slate-800 bg-slate-900/40"
                                         }`}
                                 >
                                     <div className="flex flex-col h-full justify-between gap-1">
@@ -1560,23 +1559,18 @@ export default function StockPage() {
                         })}
                     </div>
 
-                    <div className="mt-8 space-y-4">
-                        <div className="flex items-center justify-between bg-slate-900/40 p-3 rounded-xl border border-slate-800">
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Refresh in</span>
-                            <div className="flex items-center gap-3">
-                                {!isAutoUpdateEnabled && (
-                                    <button
-                                        onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
-                                        className="rounded-lg bg-cyan-600 p-2 text-white shadow-lg active:scale-90 transition-all"
-                                    >
-                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                    </button>
-                                )}
-                                <span className="text-xs font-black text-cyan-400">{refreshCountdown}s</span>
-                            </div>
-                        </div>
+                    <div className="mt-2 flex items-center justify-between bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                        <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Update: {refreshCountdown}s</span>
+                        {!isAutoUpdateEnabled && (
+                            <button
+                                onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
+                                className="rounded-md bg-cyan-600 p-1 text-white shadow-lg active:scale-90 transition-all"
+                            >
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
                 </div>,
                 pipWindowRef.current.document.getElementById("pip-root")
