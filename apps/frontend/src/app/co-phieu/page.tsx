@@ -75,6 +75,10 @@ export default function StockPage() {
     const [verificationError, setVerificationError] = useState("");
     const wakeLockRef = useRef<any>(null);
     const pipWindowRef = useRef<any>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const isFramelessPiPActiveRef = useRef(false);
+    const [isFramelessActive, setIsFramelessActive] = useState(false);
 
     const isSyncingPricesRef = useRef(false);
     const highlightTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -211,6 +215,122 @@ export default function StockPage() {
         }, 5000);
     };
 
+    const drawFramelessContent = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        const holdGroups = Object.entries(groupedTransactions)
+            .filter(([_, txs]) => txs.some(t => t.status === "HOLD"));
+
+        if (holdGroups.length === 0) {
+            ctx.fillStyle = "#020617";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#64748b";
+            ctx.font = "bold 20px sans-serif";
+            ctx.fillText("No Hold Stocks", 20, 50);
+            return;
+        }
+
+        // Layout constants
+        const itemWidth = 150;
+        const itemHeight = 70;
+        const padding = 10;
+        const cols = Math.floor((canvas.width - padding) / (itemWidth + padding)) || 1;
+
+        // Adjust canvas height if needed
+        const rows = Math.ceil(holdGroups.length / cols);
+        const neededHeight = rows * (itemHeight + padding) + padding;
+        if (canvas.height !== neededHeight) {
+            canvas.height = neededHeight;
+        }
+
+        ctx.fillStyle = "#020617";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        holdGroups.forEach(([symbol, txs], index) => {
+            const col = index % cols;
+            const row = Math.floor(index / cols);
+            const x = padding + col * (itemWidth + padding);
+            const y = padding + row * (itemHeight + padding);
+
+            const info = currentPrices[symbol] || null;
+            const currentPriceValue = info?.current || 0;
+            const holdTxs = txs.filter(t => t.status === "HOLD");
+            const avgPrice = holdTxs.reduce((sum, t) => sum + t.price, 0) / holdTxs.length;
+            const pPerc = currentPriceValue > 0 ? ((currentPriceValue - avgPrice) / avgPrice) * 100 : 0;
+
+            // Card background
+            ctx.fillStyle = "#0f172a";
+            ctx.strokeStyle = "#1e293b";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(x, y, itemWidth, itemHeight, 8);
+            ctx.fill();
+            ctx.stroke();
+
+            // Symbol
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "black 14px sans-serif";
+            ctx.fillText(symbol, x + 10, y + 25);
+
+            // Price color
+            let color = "#94a3b8"; // slate-400
+            const ref = info?.reference || info?.opening || 0;
+            if (currentPriceValue > 0) {
+                if (info?.color === "purple" || currentPriceValue >= ref * 1.069) color = "#d946ef"; // fuchsia-500
+                else if (info?.color === "blue" || currentPriceValue <= ref * 0.931) color = "#06b6d4"; // cyan-500
+                else if (currentPriceValue > ref) color = "#34d399"; // emerald-400
+                else if (currentPriceValue < ref) color = "#f87171"; // red-400
+            }
+
+            ctx.fillStyle = color;
+            ctx.font = "black 18px sans-serif";
+            ctx.fillText(currentPriceValue > 0 ? formatMoney(currentPriceValue) : "---", x + 10, y + 50);
+
+            // P/L %
+            ctx.fillStyle = pPerc >= 0 ? "#34d399" : "#f87171";
+            ctx.font = "bold 12px sans-serif";
+            const pPercText = (pPerc >= 0 ? "+" : "") + pPerc.toFixed(1) + "%";
+            const metrics = ctx.measureText(pPercText);
+            ctx.fillText(pPercText, x + itemWidth - metrics.width - 10, y + 25);
+
+            // AVG label
+            ctx.fillStyle = "#475569";
+            ctx.font = "bold 9px sans-serif";
+            ctx.fillText("AVG: " + formatMoney(avgPrice), x + 10, y + 62);
+        });
+    };
+
+    const handleOpenFramelessPiP = async () => {
+        if (!videoRef.current || !canvasRef.current) return;
+
+        try {
+            // Initial draw
+            drawFramelessContent();
+
+            // Create stream
+            const stream = canvasRef.current.captureStream(5); // 5 fps is enough for stocks
+            videoRef.current.srcObject = stream;
+
+            await videoRef.current.play();
+            await (videoRef.current as any).requestPictureInPicture();
+
+            isFramelessPiPActiveRef.current = true;
+            setIsFramelessActive(true);
+
+            videoRef.current.addEventListener('leavepictureinpicture', () => {
+                isFramelessPiPActiveRef.current = false;
+                setIsFramelessActive(false);
+            }, { once: true });
+
+        } catch (err) {
+            console.error("Failed to open Frameless PiP", err);
+            alert("Không thể mở Frameless PiP. Có thể trình duyệt của bạn không hỗ trợ.");
+        }
+    };
+
     const handleOpenPiP = async () => {
         if (!('documentPictureInPicture' in window)) {
             alert("Trình duyệt của bạn chưa hỗ trợ tính năng Floating Popup (Document PiP). Vui lòng sử dụng Chrome hoặc Edge phiên bản mới nhất.");
@@ -225,6 +345,7 @@ export default function StockPage() {
             const pipWindow = await (window as any).documentPictureInPicture.requestWindow({
                 width: 600,
                 height: 150,
+                disallowReturnToOpener: true,
             });
 
             const allStyles = Array.from(document.styleSheets);
@@ -246,8 +367,8 @@ export default function StockPage() {
                 }
             });
 
-            pipWindow.document.title = "Stock Tracker (Mini)";
-            pipWindow.document.body.className = "bg-slate-950 text-slate-200 overflow-x-hidden p-2";
+            pipWindow.document.title = "Stock";
+            pipWindow.document.body.className = "bg-slate-950 text-slate-200 overflow-x-hidden p-1 select-none";
 
             const pipContainer = pipWindow.document.createElement("div");
             pipContainer.id = "pip-root";
@@ -324,6 +445,9 @@ export default function StockPage() {
                 });
                 changedSymbols.forEach(markSymbolRecentlyUpdated);
                 setLastUpdated(latestTs);
+                if (isFramelessPiPActiveRef.current) {
+                    drawFramelessContent();
+                }
             }
         } catch (err) {
             console.error("Failed to sync stock prices from server", err);
@@ -417,6 +541,9 @@ export default function StockPage() {
                                 }
                                 return prev;
                             });
+                        }
+                        if (isFramelessPiPActiveRef.current) {
+                            drawFramelessContent();
                         }
                     }
                 } catch (err) {
@@ -779,6 +906,12 @@ export default function StockPage() {
                                     className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isPiPActive ? "bg-purple-500 text-white" : "bg-slate-800 text-slate-400"}`}
                                 >
                                     Popup UI
+                                </button>
+                                <button
+                                    onClick={handleOpenFramelessPiP}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isFramelessActive ? "bg-red-500 text-white" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Frameless
                                 </button>
                                 <button
                                     onClick={() => {
@@ -1575,6 +1708,9 @@ export default function StockPage() {
                 </div>,
                 pipWindowRef.current.document.getElementById("pip-root")
             )}
+            {/* Hidden elements for Frameless Mode */}
+            <canvas ref={canvasRef} width={600} height={150} className="hidden" />
+            <video ref={videoRef} className="hidden" muted playsInline />
         </main>
     );
 }
