@@ -30,8 +30,7 @@ function doPost(e) {
     if (action === "list") return handleList();
     if (action === "sell") return handleSell(payload);
     if (action === "delete") return handleDelete(payload);
-    
-    // New actions for server-side auto-refresh
+    if (action === "update_status") return handleUpdateStatus(payload);
     if (action === "get_prices") return handleGetPrices();
     if (action === "update_prices") return handleUpdatePrices(payload);
     if (action === "get_config") return handleGetConfig();
@@ -92,8 +91,8 @@ function handleList() {
     var row = values[i];
     var status = String(row[5] || "HOLD").toUpperCase();
     
-    // Skip if status is not HOLD or SOLD (e.g. DELETED, ARCHIVED)
-    if (status !== "HOLD" && status !== "SOLD") continue;
+    // Skip if status is not HOLD, SOLD, or HIDDEN (e.g. DELETED)
+    if (status !== "HOLD" && status !== "SOLD" && status !== "HIDDEN") continue;
 
     var tx = {
       id: Number(row[0]),
@@ -180,6 +179,27 @@ function handleDelete(payload) {
 
   return jsonResponse({ ok: false, message: "Khong tim thay giao dich" });
 }
+
+function handleUpdateStatus(payload) {
+  var id = Number(payload.id);
+  var status = String(payload.status || "").trim().toUpperCase();
+  if (!isFinite(id)) return jsonResponse({ ok: false, message: "ID khong hop le" });
+  if (!status) return jsonResponse({ ok: false, message: "Status khong hop le" });
+
+  var sheet = getSheet(TRANSACTION_SHEET);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return jsonResponse({ ok: false, message: "Khong tim thay giao dich" });
+
+  var values = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (Number(values[i][0]) === id) {
+      sheet.getRange(i + 2, 6).setValue(status);
+      return jsonResponse({ ok: true });
+    }
+  }
+  return jsonResponse({ ok: false, message: "Khong tim thay giao dich" });
+}
+
 
 function isValidAccessCode(inputCode) {
   const code = String(inputCode || "").trim();

@@ -9,7 +9,7 @@ interface Transaction {
     date: string;
     price: number;
     quantity: number;
-    status: "HOLD" | "SOLD";
+    status: "HOLD" | "SOLD" | "HIDDEN";
     sellPrice?: number;
     sellDate?: string;
 }
@@ -81,6 +81,7 @@ export default function StockPage() {
     const [isFramelessActive, setIsFramelessActive] = useState(false);
 
     const [isAnalysisMode, setIsAnalysisMode] = useState(false);
+    const [showHidden, setShowHidden] = useState(false);
     const isSyncingPricesRef = useRef(false);
     const highlightTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -260,8 +261,8 @@ export default function StockPage() {
 
             const info = currentPrices[symbol] || null;
             const currentPriceValue = info?.current || 0;
-            const holdTxs = txs.filter(t => t.status === "HOLD");
-            const avgPrice = holdTxs.reduce((sum, t) => sum + t.price, 0) / holdTxs.length;
+            const holdTxs = txs.filter(t => (t.status === "HOLD" || (showHidden && t.status === "HIDDEN")));
+            const avgPrice = holdTxs.reduce((sum, t) => sum + t.price, 0) / (holdTxs.length || 1);
             const pPerc = currentPriceValue > 0 ? ((currentPriceValue - avgPrice) / avgPrice) * 100 : 0;
 
             // Card background
@@ -575,7 +576,7 @@ export default function StockPage() {
                 const list = (data.data || []).map((tx: any) => ({
                     ...tx,
                     symbol: String(tx.symbol || "").trim().toUpperCase(),
-                    status: String(tx.status || "").trim().toUpperCase() as "HOLD" | "SOLD"
+                    status: String(tx.status || "").trim().toUpperCase() as "HOLD" | "SOLD" | "HIDDEN"
                 }));
                 setTransactions(list);
                 if (!isSilent) showToast("Tải dữ liệu từ Google Sheets xong");
@@ -700,6 +701,36 @@ export default function StockPage() {
         }
     };
 
+    const handleToggleHide = async (tx: Transaction) => {
+        const newStatus = tx.status === "HIDDEN" ? "HOLD" : "HIDDEN";
+        setIsLoading(true);
+        try {
+            const res = await fetch("/api/stocks", {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({
+                    action: "update_status",
+                    accessCode,
+                    id: tx.id,
+                    status: newStatus,
+                }),
+            });
+            const data = await res.json();
+            if (data.ok) {
+                setTransactions(transactions.map((t: Transaction) =>
+                    t.id === tx.id ? { ...t, status: newStatus } : t
+                ));
+                showToast(newStatus === "HIDDEN" ? "Đã ẩn giao dịch" : "Đã hiện lại giao dịch");
+            } else {
+                alert(data.message || "Thao tác thất bại");
+            }
+        } catch (err) {
+            alert("Lỗi kết nối server");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleOpenSellDialog = (tx: Transaction) => {
         setSellTx(tx);
         const current = currentPrices[tx.symbol]?.current || tx.price;
@@ -754,18 +785,18 @@ export default function StockPage() {
 
     const totalInvestment = useMemo(() => {
         return transactions
-            .filter((tx: Transaction) => tx.status === "HOLD")
+            .filter((tx: Transaction) => (tx.status === "HOLD" || (showHidden && tx.status === "HIDDEN")))
             .reduce((sum: number, tx: Transaction) => sum + tx.price * tx.quantity, 0);
-    }, [transactions]);
+    }, [transactions, showHidden]);
 
     const totalMarketValue = useMemo(() => {
         return transactions
-            .filter((tx: Transaction) => tx.status === "HOLD")
+            .filter((tx: Transaction) => (tx.status === "HOLD" || (showHidden && tx.status === "HIDDEN")))
             .reduce((sum: number, tx: Transaction) => {
                 const current = currentPrices[tx.symbol]?.current || 0;
                 return sum + (current > 0 ? current : tx.price) * tx.quantity;
             }, 0);
-    }, [transactions, currentPrices]);
+    }, [transactions, currentPrices, showHidden]);
 
     const totalProfitLossManual = totalMarketValue - totalInvestment;
     const totalProfitValueSold = useMemo(() => {
@@ -786,11 +817,12 @@ export default function StockPage() {
     const groupedTransactions = useMemo(() => {
         const groups: Record<string, Transaction[]> = {};
         transactions.forEach((tx: Transaction) => {
+            if (tx.status === "HIDDEN" && !showHidden) return;
             if (!groups[tx.symbol]) groups[tx.symbol] = [];
             groups[tx.symbol].push(tx);
         });
         return groups;
-    }, [transactions]);
+    }, [transactions, showHidden]);
 
     const analysisUrl = analysisSymbol ? `https://fireant.vn/ma-chung-khoan/${analysisSymbol}` : "";
 
@@ -915,6 +947,12 @@ export default function StockPage() {
                                     className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isWakeLockActive ? "bg-orange-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
                                 >
                                     Sáng màn
+                                </button>
+                                <button
+                                    onClick={() => setShowHidden(!showHidden)}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${showHidden ? "bg-purple-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Hiện Ẩn
                                 </button>
                                 <button
                                     onClick={handleOpenPiP}
@@ -1283,6 +1321,15 @@ export default function StockPage() {
                                                                         CHỐT BÁN
                                                                     </button>
                                                                 )}
+                                                                {!isSold && (
+                                                                    <button
+                                                                        onClick={() => handleToggleHide(tx)}
+                                                                        className="rounded-lg bg-slate-800 px-3 py-2 text-[10px] font-black text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
+                                                                        title={tx.status === "HIDDEN" ? "Hiện lại" : "Ẩn giao dịch"}
+                                                                    >
+                                                                        {tx.status === "HIDDEN" ? "HIỆN" : "ẨN"}
+                                                                    </button>
+                                                                )}
                                                                 <button
                                                                     onClick={() => handleDelete(tx.id)}
                                                                     className="p-2 text-slate-700 hover:text-red-500 transition-colors"
@@ -1352,12 +1399,20 @@ export default function StockPage() {
                                                 </div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     {!isSold && (
-                                                        <button
-                                                            onClick={() => handleOpenSellDialog(tx)}
-                                                            className="flex-1 rounded-xl bg-emerald-600/20 py-3 text-[10px] font-black text-emerald-400 active:bg-emerald-600/40"
-                                                        >
-                                                            BÁN GIAO DỊCH NÀY
-                                                        </button>
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleOpenSellDialog(tx)}
+                                                                className="flex-1 rounded-xl bg-emerald-600/20 py-3 text-[10px] font-black text-emerald-400 active:bg-emerald-600/40"
+                                                            >
+                                                                BÁN GIAO DỊCH NÀY
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleToggleHide(tx)}
+                                                                className="rounded-xl border border-slate-800 bg-slate-800 px-4 py-3 text-[10px] font-black text-slate-400 active:text-white"
+                                                            >
+                                                                {tx.status === "HIDDEN" ? "HIỆN" : "ẨN"}
+                                                            </button>
+                                                        </>
                                                     )}
                                                     <button
                                                         onClick={() => handleDelete(tx.id)}
@@ -1593,26 +1648,41 @@ export default function StockPage() {
 
             {/* Analysis Mode View */}
             {isAnalysisMode && !isPiPActive && (
-                <div className="fixed inset-0 top-[120px] bg-slate-950 z-10 overflow-y-auto px-4 pb-32">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {Array.from(new Set(transactions.filter(t => t.status === "HOLD").map(t => t.symbol))).map((symbol) => (
-                            <div key={symbol} className="rounded-3xl border border-slate-800 bg-slate-900/40 overflow-hidden flex flex-col h-[600px]">
-                                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
-                                    <h3 className="text-lg font-black text-white uppercase tracking-tight">{symbol}</h3>
-                                    <a
-                                        href={`https://fireant.vn/ma-chung-khoan/${symbol}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-[10px] font-black text-cyan-400 uppercase tracking-widest hover:text-cyan-300 transition-colors"
-                                    >
-                                        Mở Fireant
-                                    </a>
+                <div className="fixed inset-0 top-[100px] bg-slate-950 z-10 overflow-y-auto px-0 pb-32 snap-y snap-mandatory scroll-smooth">
+                    <div className="flex flex-col gap-0 w-full">
+                        {Array.from(new Set(transactions.filter(t => (t.status === "HOLD" || (showHidden && t.status === "HIDDEN"))).map(t => t.symbol))).map((symbol) => (
+                            <div key={symbol} className="flex flex-col h-[calc(100vh-100px)] w-full border-b border-slate-800 snap-start shrink-0">
+                                <div className="flex items-center justify-between px-6 py-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800/50 z-20">
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                                            <span className="font-black text-xs">Chart</span>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-black text-white uppercase tracking-tight">{symbol}</h3>
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fireant Deep Analysis</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <a
+                                            href={`https://fireant.vn/ma-chung-khoan/${symbol}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-2 text-[10px] font-black text-slate-400 hover:text-white hover:bg-slate-800 transition-all uppercase"
+                                        >
+                                            View Original
+                                        </a>
+                                        <div className="h-8 w-[1px] bg-slate-800 mx-2"></div>
+                                        <div className="text-right hidden sm:block">
+                                            <p className="text-[10px] font-black text-cyan-500 uppercase tracking-tighter">Live Chart</p>
+                                            <p className="text-[8px] font-medium text-slate-600 uppercase tracking-widest">Scroll for next</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="flex-1 relative">
+                                <div className="flex-1 relative bg-slate-950">
                                     <iframe
                                         src={`https://fireant.vn/ma-chung-khoan/${symbol}`}
                                         title={`Fireant ${symbol}`}
-                                        className="absolute inset-0 h-full w-full"
+                                        className="absolute inset-0 h-full w-full border-none"
                                         referrerPolicy="strict-origin-when-cross-origin"
                                     />
                                 </div>
