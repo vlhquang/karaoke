@@ -702,7 +702,12 @@ export default function StockPage() {
     };
 
     const handleToggleHide = async (tx: Transaction) => {
-        const newStatus = tx.status === "HIDDEN" ? "HOLD" : "HIDDEN";
+        let newStatus: "HOLD" | "HIDDEN" | "SOLD";
+        if (tx.status === "HIDDEN") {
+            newStatus = (tx.sellPrice && tx.sellPrice > 0) ? "SOLD" : "HOLD";
+        } else {
+            newStatus = "HIDDEN";
+        }
         setIsLoading(true);
         try {
             const res = await fetch("/api/stocks", {
@@ -1321,15 +1326,13 @@ export default function StockPage() {
                                                                         CHỐT BÁN
                                                                     </button>
                                                                 )}
-                                                                {!isSold && (
-                                                                    <button
-                                                                        onClick={() => handleToggleHide(tx)}
-                                                                        className="rounded-lg bg-slate-800 px-3 py-2 text-[10px] font-black text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
-                                                                        title={tx.status === "HIDDEN" ? "Hiện lại" : "Ẩn giao dịch"}
-                                                                    >
-                                                                        {tx.status === "HIDDEN" ? "HIỆN" : "ẨN"}
-                                                                    </button>
-                                                                )}
+                                                                <button
+                                                                    onClick={() => handleToggleHide(tx)}
+                                                                    className="rounded-lg bg-slate-800 px-3 py-2 text-[10px] font-black text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
+                                                                    title={tx.status === "HIDDEN" ? "Hiện lại" : "Ẩn giao dịch"}
+                                                                >
+                                                                    {tx.status === "HIDDEN" ? "HIỆN" : "ẨN"}
+                                                                </button>
                                                                 <button
                                                                     onClick={() => handleDelete(tx.id)}
                                                                     className="p-2 text-slate-700 hover:text-red-500 transition-colors"
@@ -1399,21 +1402,19 @@ export default function StockPage() {
                                                 </div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     {!isSold && (
-                                                        <>
-                                                            <button
-                                                                onClick={() => handleOpenSellDialog(tx)}
-                                                                className="flex-1 rounded-xl bg-emerald-600/20 py-3 text-[10px] font-black text-emerald-400 active:bg-emerald-600/40"
-                                                            >
-                                                                BÁN GIAO DỊCH NÀY
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleToggleHide(tx)}
-                                                                className="rounded-xl border border-slate-800 bg-slate-800 px-4 py-3 text-[10px] font-black text-slate-400 active:text-white"
-                                                            >
-                                                                {tx.status === "HIDDEN" ? "HIỆN" : "ẨN"}
-                                                            </button>
-                                                        </>
+                                                        <button
+                                                            onClick={() => handleOpenSellDialog(tx)}
+                                                            className="flex-1 rounded-xl bg-emerald-600/20 py-3 text-[10px] font-black text-emerald-400 active:bg-emerald-600/40"
+                                                        >
+                                                            BÁN GIAO DỊCH NÀY
+                                                        </button>
                                                     )}
+                                                    <button
+                                                        onClick={() => handleToggleHide(tx)}
+                                                        className="rounded-xl border border-slate-800 bg-slate-800 px-4 py-3 text-[10px] font-black text-slate-400 active:text-white"
+                                                    >
+                                                        {tx.status === "HIDDEN" ? "HIỆN" : "ẨN"}
+                                                    </button>
                                                     <button
                                                         onClick={() => handleDelete(tx.id)}
                                                         className="h-10 w-10 flex items-center justify-center rounded-xl border border-slate-800 text-slate-700 active:bg-red-500/10 active:text-red-500"
