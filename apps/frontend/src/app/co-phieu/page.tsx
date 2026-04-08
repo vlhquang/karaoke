@@ -80,6 +80,7 @@ export default function StockPage() {
     const isFramelessPiPActiveRef = useRef(false);
     const [isFramelessActive, setIsFramelessActive] = useState(false);
 
+    const [isAnalysisMode, setIsAnalysisMode] = useState(false);
     const isSyncingPricesRef = useRef(false);
     const highlightTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -102,10 +103,12 @@ export default function StockPage() {
 
         // Load UI preferences
         const savedMinimal = localStorage.getItem("stock_minimal_mode");
+        const savedAnalysis = localStorage.getItem("stock_analysis_mode");
         const savedWakeLock = localStorage.getItem("stock_wake_lock");
         const savedAutoUpdate = localStorage.getItem("stock_auto_update");
 
         if (savedMinimal === "true") setIsMinimalMode(true);
+        if (savedAnalysis === "true") setIsAnalysisMode(true);
         if (savedWakeLock === "true") setIsWakeLockActive(true);
         if (savedAutoUpdate === "false") setIsAutoUpdateEnabled(false);
     }, []);
@@ -893,6 +896,18 @@ export default function StockPage() {
                                 </button>
                                 <button
                                     onClick={() => {
+                                        const next = !isAnalysisMode;
+                                        setIsAnalysisMode(next);
+                                        if (next) setIsMinimalMode(false);
+                                        localStorage.setItem("stock_analysis_mode", next.toString());
+                                        localStorage.setItem("stock_minimal_mode", "false");
+                                    }}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isAnalysisMode ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Phân tích
+                                </button>
+                                <button
+                                    onClick={() => {
                                         const next = !isWakeLockActive;
                                         setIsWakeLockActive(next);
                                         localStorage.setItem("stock_wake_lock", next.toString());
@@ -930,7 +945,7 @@ export default function StockPage() {
                 </div>
             </header>
 
-            <div className={`mx-auto max-w-6xl px-4 py-8 space-y-8 ${isMinimalMode ? "hidden" : "block"}`}>
+            <div className={`mx-auto max-w-6xl px-4 py-8 space-y-8 ${isMinimalMode || isAnalysisMode ? "hidden" : "block"}`}>
                 {/* Summary Section moved here */}
                 <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg shadow-cyan-950/10">
@@ -1553,6 +1568,59 @@ export default function StockPage() {
                     </div>
 
                     {/* Quick Summary in Minimal Mode - Simplified */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 p-4 flex justify-end items-center z-20">
+                        <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2">Refresh in</span>
+                            {!isAutoUpdateEnabled && (
+                                <button
+                                    onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
+                                    className="rounded-xl bg-cyan-600 p-3 text-white shadow-lg active:scale-90 transition-all"
+                                >
+                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                </button>
+                            )}
+                            <div className="relative">
+                                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800 text-cyan-400 border border-slate-700`}>
+                                    <span className="text-xs font-black">{refreshCountdown}s</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Analysis Mode View */}
+            {isAnalysisMode && !isPiPActive && (
+                <div className="fixed inset-0 top-[120px] bg-slate-950 z-10 overflow-y-auto px-4 pb-32">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {Array.from(new Set(transactions.filter(t => t.status === "HOLD").map(t => t.symbol))).map((symbol) => (
+                            <div key={symbol} className="rounded-3xl border border-slate-800 bg-slate-900/40 overflow-hidden flex flex-col h-[600px]">
+                                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+                                    <h3 className="text-lg font-black text-white uppercase tracking-tight">{symbol}</h3>
+                                    <a
+                                        href={`https://fireant.vn/ma-chung-khoan/${symbol}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-[10px] font-black text-cyan-400 uppercase tracking-widest hover:text-cyan-300 transition-colors"
+                                    >
+                                        Mở Fireant
+                                    </a>
+                                </div>
+                                <div className="flex-1 relative">
+                                    <iframe
+                                        src={`https://fireant.vn/ma-chung-khoan/${symbol}`}
+                                        title={`Fireant ${symbol}`}
+                                        className="absolute inset-0 h-full w-full"
+                                        referrerPolicy="strict-origin-when-cross-origin"
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Quick Summary in Analysis Mode */}
                     <div className="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 p-4 flex justify-end items-center z-20">
                         <div className="flex items-center gap-3">
                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2">Refresh in</span>
