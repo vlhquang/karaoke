@@ -244,10 +244,21 @@ export default function HUDPage() {
   };
 
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(err => console.error(err));
+    const doc = document as any;
+    const de = document.documentElement as any;
+
+    if (!doc.fullscreenElement && !doc.webkitFullscreenElement && !doc.mozFullScreenElement && !doc.msFullscreenElement) {
+      if (de.requestFullscreen) de.requestFullscreen();
+      else if (de.webkitRequestFullscreen) de.webkitRequestFullscreen();
+      else if (de.mozRequestFullScreen) de.mozRequestFullScreen();
+      else if (de.msRequestFullscreen) de.msRequestFullscreen();
+      setIsFullscreen(true);
     } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(err => console.error(err));
+      if (doc.exitFullscreen) doc.exitFullscreen();
+      else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
+      else if (doc.mozCancelFullScreen) doc.mozCancelFullScreen();
+      else if (doc.msExitFullscreen) doc.msExitFullscreen();
+      setIsFullscreen(false);
     }
   };
 
@@ -269,11 +280,19 @@ export default function HUDPage() {
 
   return (
     <main 
-      className={`min-h-[100dvh] text-white flex flex-col transition-colors duration-300 ${
+      id="hud-main"
+      className={`min-h-[100dvh] h-[100dvh] w-full overflow-hidden text-white flex flex-col transition-colors duration-300 fixed inset-0 select-none touch-none ${
         isOverSpeed && !showSettings ? "bg-red-950" : "bg-black"
       }`}
     >
-      <div className={`flex flex-col w-full h-full min-h-[100dvh] ${mode === "car" && !showSettings ? "scale-y-[-1]" : ""}`}>
+      <style jsx global>{`
+        body, html {
+          overflow: hidden;
+          overscroll-behavior: none;
+          touch-action: none;
+        }
+      `}</style>
+      <div className={`flex flex-col w-full h-full ${mode === "car" && !showSettings ? "scale-y-[-1]" : ""}`}>
         {/* Top Navigation */}
         <div className="flex items-center justify-between p-4 bg-slate-900/30">
           <Link href="/" className="flex items-center gap-2 text-slate-300 hover:text-white">
@@ -325,15 +344,17 @@ export default function HUDPage() {
             </div>
           )}
 
-          {/* Nút Mic */}
-          <button 
-            onClick={toggleListening}
-            className={`absolute bottom-10 left-10 w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-colors z-10 ${
-              isListening ? "bg-red-600 animate-pulse" : "bg-slate-800 border-2 border-slate-700"
-            }`}
-          >
-            {isListening ? <Mic size={40} className="text-white" /> : <MicOff size={40} className="text-slate-400" />}
-          </button>
+          {/* Nút Mic - Chỉ hiện khi không phát sóng */}
+          {!isHosting && (
+            <button 
+              onClick={toggleListening}
+              className={`absolute bottom-10 left-10 w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-colors z-10 ${
+                isListening ? "bg-red-600 animate-pulse" : "bg-slate-800 border-2 border-slate-700"
+              }`}
+            >
+              {isListening ? <Mic size={40} className="text-white" /> : <MicOff size={40} className="text-slate-400" />}
+            </button>
+          )}
           {/* Speed Number & Offset Controls */}
           <div className="flex items-center justify-center gap-2 md:gap-8 w-full max-w-4xl px-4">
             <button 
@@ -344,7 +365,7 @@ export default function HUDPage() {
               <Minus size={36} className="md:w-12 md:h-12" />
             </button>
 
-            <div className={`text-[11rem] md:text-[16rem] font-bold leading-none tabular-nums tracking-tighter ${isOverSpeed ? "text-red-500 animate-pulse" : "text-white"}`}>
+            <div className={`text-[14rem] md:text-[20rem] font-black leading-none tabular-nums tracking-tighter ${isOverSpeed ? "text-red-500 animate-pulse" : "text-white"}`}>
               {finalSpeed}
             </div>
 
@@ -366,15 +387,17 @@ export default function HUDPage() {
             )}
           </div>
 
-          {/* Hiển thị Zone (KDC / Ngoài KDC) bên dưới */}
-          <button 
-            onClick={toggleZone}
-            className={`mt-6 px-8 py-3 rounded-full border-2 text-2xl md:text-3xl font-bold uppercase tracking-wide shadow-lg transition-transform hover:scale-105 ${
-              zone === "residential" ? "border-orange-500 text-orange-400 bg-orange-950/50" : "border-green-500 text-green-400 bg-green-950/50"
-            }`}
-          >
-            {zone === "residential" ? "Khu dân cư" : "Ngoài khu dân cư"}
-          </button>
+          {/* Hiển thị Zone (KDC / Ngoài KDC) bên dưới - Thu gọn lại và chỉ hiện khi không phát sóng */}
+          {!isHosting && (
+            <button 
+              onClick={toggleZone}
+              className={`mt-4 px-5 py-2 rounded-full border text-lg md:text-xl font-bold uppercase tracking-widest shadow-lg transition-transform hover:scale-105 active:scale-95 ${
+                zone === "residential" ? "border-orange-500/50 text-orange-400 bg-orange-950/40" : "border-green-500/50 text-green-400 bg-green-950/40"
+              }`}
+            >
+              {zone === "residential" ? "Khu dân cư" : "Ngoài KDC"}
+            </button>
+          )}
 
           {/* Max Speed Sign (To góc trái) */}
           <button 
@@ -384,20 +407,22 @@ export default function HUDPage() {
             <span className="text-4xl md:text-6xl font-bold text-black tabular-nums tracking-tighter">{currentMaxSpeed}</span>
           </button>
 
-          {/* Thanh chọn tốc độ dọc bên phải */}
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 md:gap-4 z-10">
-            {[50, 60, 80, 90, 100, 120].map(s => (
-              <button 
-                key={s}
-                onClick={() => handleQuickSelect("manual", s)}
-                className={`w-14 h-14 md:w-16 md:h-16 rounded-full border-[4px] flex items-center justify-center font-bold text-xl md:text-2xl transition-all ${
-                  currentMaxSpeed === s && roadType === "manual" ? "border-red-600 bg-white text-black scale-110 shadow-[0_0_15px_rgba(239,68,68,0.6)]" : "border-slate-600 bg-slate-800/80 text-slate-300 opacity-70 hover:opacity-100"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+          {/* Thanh chọn tốc độ dọc bên phải - Chỉ hiện khi không phát sóng */}
+          {!isHosting && (
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 md:gap-4 z-10">
+              {[50, 60, 80, 90, 100, 120].map(s => (
+                <button 
+                  key={s}
+                  onClick={() => handleQuickSelect("manual", s)}
+                  className={`w-14 h-14 md:w-16 md:h-16 rounded-full border-[4px] flex items-center justify-center font-bold text-xl md:text-2xl transition-all ${
+                    currentMaxSpeed === s && roadType === "manual" ? "border-red-600 bg-white text-black scale-110 shadow-[0_0_15px_rgba(239,68,68,0.6)]" : "border-slate-600 bg-slate-800/80 text-slate-300 opacity-70 hover:opacity-100"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Quick Menu Overlay */}
           {showQuickMenu && (
@@ -439,6 +464,19 @@ export default function HUDPage() {
             <h2 className="text-2xl font-bold mb-6 text-cyan-400">Cài đặt HUD</h2>
             
             <div className="space-y-8 max-w-2xl mx-auto">
+              {/* Điều khiển giọng nói */}
+              <section>
+                <h3 className="text-lg font-semibold mb-3 text-slate-300">Điều khiển giọng nói</h3>
+                <button 
+                  onClick={toggleListening}
+                  className={`w-full py-4 flex items-center justify-center gap-3 rounded-xl border-2 transition ${isListening ? "border-red-500 bg-red-900/30 text-white animate-pulse" : "border-slate-700 bg-slate-800 text-slate-400"}`}
+                >
+                  {isListening ? <Mic size={24} /> : <MicOff size={24} />}
+                  <span className="font-bold">{isListening ? "Đang lắng nghe..." : "Bật nhận diện giọng nói"}</span>
+                </button>
+                <p className="text-xs text-slate-500 mt-2">Dùng giọng nói để chuyển "Khu dân cư", "1 làn", "2 làn" hoặc đọc số tốc độ.</p>
+              </section>
+
               {/* Chế độ hiển thị */}
               <section>
                 <h3 className="text-lg font-semibold mb-3 text-slate-300">Chế độ hiển thị</h3>
