@@ -7,7 +7,9 @@ import { ArrowLeft, Car, Bike, Settings, Plus, Minus, Mic, MicOff, X, Maximize, 
 import { useHudStore } from "../../store/hud-store";
 
 export default function HUDPage() {
-  const [speed, setSpeed] = useState<number>(0);
+  const [speed, setSpeed] = useState<number>(0); // Tốc độ mục tiêu từ GPS
+  const [displaySpeed, setDisplaySpeed] = useState<number>(0); // Tốc độ mượt để hiển thị
+
   const [status, setStatus] = useState<"Đang tìm GPS..." | "Đã kết nối GPS" | "Lỗi GPS">("Đang tìm GPS...");
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showQuickMenu, setShowQuickMenu] = useState<boolean>(false);
@@ -44,7 +46,11 @@ export default function HUDPage() {
     currentMaxSpeed = zone === "residential" ? 60 : 90;
   }
 
-  const finalSpeed = Math.max(0, Math.round(speed + offset));
+  // Tốc độ hiển thị cuối cùng sau khi làm mượt và áp dụng offset
+  // Thêm deadband: nếu tốc độ quá thấp (< 0.5km/h) thì coi như đứng yên
+  const effectiveDisplaySpeed = displaySpeed < 0.5 ? 0 : displaySpeed;
+  const finalSpeed = Math.max(0, Math.round(effectiveDisplaySpeed + offset));
+
   const isOverSpeed = finalSpeed > currentMaxSpeed;
 
   // Load state từ localStorage khi khởi động
@@ -69,6 +75,27 @@ export default function HUDPage() {
   useEffect(() => {
     localStorage.setItem("hud_config", JSON.stringify(hudStore.state));
   }, [hudStore.state]);
+
+  // Vòng lặp animation để làm mượt tốc độ (Speed Smoothing)
+  useEffect(() => {
+    let animationId: number;
+    
+    const smoothUpdate = () => {
+      setDisplaySpeed(prev => {
+        const diff = speed - prev;
+        // Nếu chênh lệch rất nhỏ thì khớp luôn vào mục tiêu
+        if (Math.abs(diff) < 0.1) return speed;
+        
+        // Interpolation: Tiến về mục tiêu khoảng 12% mỗi frame (tương đương ~0.3-0.5s để đạt mục tiêu)
+        // Điều này giúp con số "chạy" mượt mà thay vì nhảy cóc
+        return prev + diff * 0.12;
+      });
+      animationId = requestAnimationFrame(smoothUpdate);
+    };
+    
+    animationId = requestAnimationFrame(smoothUpdate);
+    return () => cancelAnimationFrame(animationId);
+  }, [speed]);
 
   useEffect(() => {
     // WakeLock
