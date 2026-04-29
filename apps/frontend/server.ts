@@ -238,6 +238,31 @@ interface LotoInternalRoom {
 
 const lotoRooms = new Map<string, LotoInternalRoom>();
 
+// ── HUD Remote Control room data ──
+
+interface HudInternalRoom {
+  roomCode: string;
+  state: {
+    roadType: "1_lane" | "2_lane" | "manual";
+    zone: "residential" | "outside";
+    manualMax: number;
+    offset: number;
+    mode: "car" | "moto";
+  };
+  createdAt: string;
+}
+
+const hudRooms = new Map<string, HudInternalRoom>();
+
+const generateHudRoomCode = (): string => {
+  const hudChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 4; i++) {
+    code += hudChars.charAt(Math.floor(Math.random() * hudChars.length));
+  }
+  return hudRooms.has(code) ? generateHudRoomCode() : code;
+};
+
 const computeNearWin = (member: LotoMember, calledNumbers: number[]): { waitingNumber: number }[] => {
   if (!member.board || !member.ready) return [];
   const calledSet = new Set(calledNumbers);
@@ -1245,6 +1270,64 @@ app.prepare().then(() => {
       io.to(code).emit("room-closed", { roomCode: code, message: "Chủ phòng đã đóng phòng." });
       racingRooms.delete(code);
       cleanupRacingRoomSessionRefs(code);
+    });
+
+    // ── HUD Remote Control socket handlers ──
+
+    anySocket.on("hud_create_room", (ack: any) => {
+      try {
+        const roomCode = generateHudRoomCode();
+        const room: HudInternalRoom = {
+          roomCode,
+          state: { roadType: "1_lane", zone: "residential", manualMax: 60, offset: 0, mode: "moto" },
+          createdAt: new Date().toISOString(),
+        };
+        hudRooms.set(roomCode, room);
+        anySocket.join(`hud:${roomCode}`);
+        // Auto-cleanup 12h
+        setTimeout(() => hudRooms.delete(roomCode), 12 * 60 * 60 * 1000);
+        if (typeof ack === "function") ack({ ok: true, roomCode, state: room.state });
+      } catch (err) {
+        if (typeof ack === "function") ack({ ok: false, message: err instanceof Error ? err.message : "Error" });
+      }
+    });
+
+    anySocket.on("hud_join_room", (payload: { roomCode: string }, ack: any) => {
+      try {
+        const roomCode = String(payload?.roomCode ?? "").toUpperCase().trim();
+        const room = hudRooms.get(roomCode);
+        if (!room) {
+          if (typeof ack === "function") ack({ ok: false, message: "Không tìm thấy phòng HUD. Kiểm tra lại mã phòng." });
+          return;
+        }
+        anySocket.join(`hud:${roomCode}`);
+        if (typeof ack === "function") ack({ ok: true, state: room.state });
+      } catch (err) {
+        if (typeof ack === "function") ack({ ok: false, message: err instanceof Error ? err.message : "Error" });
+      }
+    });
+
+    anySocket.on("hud_update_state", (payload: { roomCode: string; state: Partial<HudInternalRoom["state"]> }, ack: any) => {
+      try {
+        const roomCode = String(payload?.roomCode ?? "").toUpperCase().trim();
+        const room = hudRooms.get(roomCode);
+        if (!room) {
+          if (typeof ack === "function") ack({ ok: false, message: "Phòng HUD không tồn tại." });
+          return;
+        }
+        room.state = { ...room.state, ...payload.state };
+        // Broadcast đến các thiết bị KHÁC trong phòng (loại trừ sender để tránh loop)
+        anySocket.to(`hud:${roomCode}`).emit("hud_state_updated" as any, { state: room.state });
+        if (typeof ack === "function") ack({ ok: true });
+      } catch (err) {
+        if (typeof ack === "function") ack({ ok: false, message: err instanceof Error ? err.message : "Error" });
+      }
+    });
+
+    anySocket.on("hud_leave_room", (payload: { roomCode: string }, ack: any) => {
+      const roomCode = String(payload?.roomCode ?? "").toUpperCase().trim();
+      anySocket.leave(`hud:${roomCode}`);
+      if (typeof ack === "function") ack({ ok: true });
     });
 
     socket.on("disconnect", () => {

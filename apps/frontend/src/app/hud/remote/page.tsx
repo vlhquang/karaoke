@@ -1,12 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Car, Bike, Plus, Minus, Wifi, WifiOff, Loader2 } from "lucide-react";
 import { useHudStore } from "../../../store/hud-store";
 import type { HudState } from "@karaoke/shared";
 
 export default function HudRemotePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Đang tải...</div>}>
+      <HudRemoteContent />
+    </Suspense>
+  );
+}
+
+function HudRemoteContent() {
   const {
     connected, roomCode, role, state, error,
     connect, joinRoom, updateState, leaveRoom, clearError,
@@ -15,14 +24,24 @@ export default function HudRemotePage() {
   const [inputCode, setInputCode] = useState("");
   const [joining, setJoining] = useState(false);
 
+  const searchParams = useSearchParams();
+
   useEffect(() => {
     connect();
-  }, [connect]);
+    
+    // Tự động điền và kết nối nếu có mã phòng trong URL
+    const roomParam = searchParams.get("room");
+    if (roomParam && !role) {
+      setInputCode(roomParam.toUpperCase());
+      void joinRoom(roomParam.toUpperCase());
+    }
+  }, [connect, searchParams, role, joinRoom]);
 
-  const handleJoin = async () => {
-    if (!inputCode.trim()) return;
+  const handleJoin = async (codeOverride?: string) => {
+    const code = codeOverride || inputCode;
+    if (!code.trim()) return;
     setJoining(true);
-    await joinRoom(inputCode.trim());
+    await joinRoom(code.trim());
     setJoining(false);
   };
 
@@ -74,7 +93,7 @@ export default function HudRemotePage() {
             />
 
             <button
-              onClick={handleJoin}
+              onClick={() => handleJoin()}
               disabled={!connected || joining || inputCode.length < 4}
               className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 rounded-xl text-xl font-bold transition flex items-center justify-center gap-2"
             >

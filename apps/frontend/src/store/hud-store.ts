@@ -18,6 +18,7 @@ interface HudStore {
   createRoom: () => Promise<{ roomCode: string } | null>;
   joinRoom: (roomCode: string) => Promise<boolean>;
   updateState: (patch: Partial<HudState>) => Promise<void>;
+  syncState: (newState: HudState) => void;
   leaveRoom: () => Promise<void>;
   clearError: () => void;
 }
@@ -146,9 +147,10 @@ export const useHudStore = create<HudStore>((set, get) => ({
 
   updateState: async (patch: Partial<HudState>) => {
     const { roomCode, state } = get();
-    // Optimistic update ngay lập tức
-    set(() => ({ state: { ...state, ...patch } }));
-
+    // Optimistic update
+    const newState = { ...state, ...patch };
+    set({ state: newState });
+    
     if (!roomCode) return;
     try {
       const socket = await getSocket();
@@ -156,6 +158,11 @@ export const useHudStore = create<HudStore>((set, get) => ({
     } catch {
       // ignore
     }
+  },
+
+  // Dùng để sync state từ localStorage hoặc nguồn khác vào store mà không emit
+  syncState: (newState: HudState) => {
+    set({ state: newState });
   },
 
   leaveRoom: async () => {
