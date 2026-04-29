@@ -250,12 +250,11 @@ export default function HUDPage() {
   };
 
   const handleStartHosting = async () => {
-    hudStore.connect();
+    await hudStore.connect();
     const result = await hudStore.createRoom();
     if (result) {
       setIsHosting(true);
       setHostRoomCode(result.roomCode);
-      // Push current state to server
       void hudStore.updateState({ mode, roadType, zone, manualMax, offset });
     }
   };
