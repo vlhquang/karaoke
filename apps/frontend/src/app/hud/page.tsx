@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Car, Bike, Settings, Plus, Minus, Mic, MicOff, X } from "lucide-react";
+import { ArrowLeft, Car, Bike, Settings, Plus, Minus, Mic, MicOff, X, Maximize, Minimize } from "lucide-react";
 
 export default function HUDPage() {
   const [speed, setSpeed] = useState<number>(0);
@@ -16,6 +16,7 @@ export default function HUDPage() {
   
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showQuickMenu, setShowQuickMenu] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   
   const [isListening, setIsListening] = useState<boolean>(false);
   const [speechFeedback, setSpeechFeedback] = useState<string>("");
@@ -35,6 +36,27 @@ export default function HUDPage() {
 
   const finalSpeed = Math.max(0, Math.round(speed + offset));
   const isOverSpeed = finalSpeed > currentMaxSpeed;
+
+  // Load state từ localStorage khi khởi động
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("hud_config");
+      if (saved) {
+        const config = JSON.parse(saved);
+        if (config.mode) setMode(config.mode);
+        if (config.roadType) setRoadType(config.roadType);
+        if (config.zone) setZone(config.zone);
+        if (config.manualMax) setManualMax(config.manualMax);
+        if (config.offset !== undefined) setOffset(config.offset);
+      }
+    } catch (e) { console.error("Lỗi đọc cache", e); }
+  }, []);
+
+  // Lưu state vào localStorage khi có thay đổi
+  useEffect(() => {
+    const config = { mode, roadType, zone, manualMax, offset };
+    localStorage.setItem("hud_config", JSON.stringify(config));
+  }, [mode, roadType, zone, manualMax, offset]);
 
   useEffect(() => {
     // WakeLock
@@ -191,6 +213,21 @@ export default function HUDPage() {
     setShowQuickMenu(false);
   };
 
+  const toggleZone = () => {
+    if (roadType === "manual") {
+      setRoadType("1_lane"); // Khôi phục về chế độ tính theo biển
+    }
+    setZone(z => z === "residential" ? "outside" : "residential");
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(err => console.error(err));
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(err => console.error(err));
+    }
+  };
+
   return (
     <main 
       className={`min-h-[100dvh] text-white flex flex-col transition-colors duration-300 ${
@@ -211,14 +248,24 @@ export default function HUDPage() {
             
             {/* Cảnh báo chế độ lật gương (chỉ hiển thị icon nếu không ở trang Setting để tránh ngược chữ) */}
             {!showSettings && (
-              <button 
-                onClick={() => setMode(m => m === "car" ? "moto" : "car")}
-                className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 rounded-full text-cyan-300 hover:bg-slate-700 transition"
-                title="Bấm để đổi phương tiện"
-              >
-                {mode === "car" ? <Car size={18} /> : <Bike size={18} />}
-                <span className="text-xs font-semibold uppercase">{mode === "car" ? "Ô tô (HUD)" : "Xe máy"}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={toggleFullscreen}
+                  className="p-1.5 bg-slate-800 rounded-full text-slate-300 hover:text-white"
+                  title="Toàn màn hình"
+                >
+                  {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+                </button>
+
+                <button 
+                  onClick={() => setMode(m => m === "car" ? "moto" : "car")}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 rounded-full text-cyan-300 hover:bg-slate-700 transition"
+                  title="Bấm để đổi phương tiện"
+                >
+                  {mode === "car" ? <Car size={18} /> : <Bike size={18} />}
+                  <span className="text-xs font-semibold uppercase hidden sm:inline">{mode === "car" ? "Ô tô (HUD)" : "Xe máy"}</span>
+                </button>
+              </div>
             )}
 
             <button 
@@ -248,19 +295,70 @@ export default function HUDPage() {
           >
             {isListening ? <Mic size={40} className="text-white" /> : <MicOff size={40} className="text-slate-400" />}
           </button>
-          {/* Speed Number */}
-          <div className={`text-[12rem] md:text-[16rem] font-bold leading-none tabular-nums tracking-tighter ${isOverSpeed ? "text-red-500 animate-pulse" : "text-white"}`}>
-            {finalSpeed}
-          </div>
-          <div className="text-4xl md:text-5xl font-semibold text-slate-400 mt-2">km/h</div>
+          {/* Speed Number & Offset Controls */}
+          <div className="flex items-center justify-center gap-2 md:gap-8 w-full max-w-4xl px-4">
+            <button 
+              onClick={() => setOffset(o => o - 1)}
+              className="p-3 md:p-6 rounded-full bg-slate-800/40 text-slate-500 hover:text-white hover:bg-slate-700 transition-colors z-10"
+              title="Giảm 1 km/h"
+            >
+              <Minus size={36} className="md:w-12 md:h-12" />
+            </button>
 
-          {/* Max Speed Sign (Clickable for Quick Menu) */}
+            <div className={`text-[11rem] md:text-[16rem] font-bold leading-none tabular-nums tracking-tighter ${isOverSpeed ? "text-red-500 animate-pulse" : "text-white"}`}>
+              {finalSpeed}
+            </div>
+
+            <button 
+              onClick={() => setOffset(o => o + 1)}
+              className="p-3 md:p-6 rounded-full bg-slate-800/40 text-slate-500 hover:text-white hover:bg-slate-700 transition-colors z-10"
+              title="Tăng 1 km/h"
+            >
+              <Plus size={36} className="md:w-12 md:h-12" />
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-3 mt-2">
+            <div className="text-4xl md:text-5xl font-semibold text-slate-400">km/h</div>
+            {offset !== 0 && (
+              <div className="text-xl md:text-2xl font-bold text-cyan-400 bg-slate-800/80 px-3 py-1 rounded-lg border border-cyan-500/30">
+                {offset > 0 ? `+${offset}` : offset}
+              </div>
+            )}
+          </div>
+
+          {/* Hiển thị Zone (KDC / Ngoài KDC) bên dưới */}
+          <button 
+            onClick={toggleZone}
+            className={`mt-6 px-8 py-3 rounded-full border-2 text-2xl md:text-3xl font-bold uppercase tracking-wide shadow-lg transition-transform hover:scale-105 ${
+              zone === "residential" ? "border-orange-500 text-orange-400 bg-orange-950/50" : "border-green-500 text-green-400 bg-green-950/50"
+            }`}
+          >
+            {zone === "residential" ? "Khu dân cư" : "Ngoài khu dân cư"}
+          </button>
+
+          {/* Max Speed Sign (To góc trái) */}
           <button 
             onClick={() => setShowQuickMenu(true)}
-            className="absolute top-10 right-10 w-28 h-28 md:w-40 md:h-40 rounded-full border-[12px] border-red-600 bg-white flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.5)] hover:scale-105 transition-transform"
+            className="absolute top-10 left-10 md:top-20 md:left-20 w-24 h-24 md:w-36 md:h-36 rounded-full border-[10px] border-red-600 bg-white flex items-center justify-center shadow-[0_0_25px_rgba(220,38,38,0.4)] hover:scale-105 transition-transform z-10"
           >
-            <span className="text-5xl md:text-7xl font-bold text-black tabular-nums tracking-tighter">{currentMaxSpeed}</span>
+            <span className="text-4xl md:text-6xl font-bold text-black tabular-nums tracking-tighter">{currentMaxSpeed}</span>
           </button>
+
+          {/* Thanh chọn tốc độ dọc bên phải */}
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 md:gap-4 z-10">
+            {[50, 60, 80, 90, 100, 120].map(s => (
+              <button 
+                key={s}
+                onClick={() => handleQuickSelect("manual", s)}
+                className={`w-14 h-14 md:w-16 md:h-16 rounded-full border-[4px] flex items-center justify-center font-bold text-xl md:text-2xl transition-all ${
+                  currentMaxSpeed === s && roadType === "manual" ? "border-red-600 bg-white text-black scale-110 shadow-[0_0_15px_rgba(239,68,68,0.6)]" : "border-slate-600 bg-slate-800/80 text-slate-300 opacity-70 hover:opacity-100"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
 
           {/* Quick Menu Overlay */}
           {showQuickMenu && (
