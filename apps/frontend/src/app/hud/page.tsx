@@ -123,6 +123,27 @@ export default function HUDPage() {
     };
   }, []);
 
+  // Theo dõi sự kiện thay đổi fullscreen của trình duyệt để cập nhật state đồng nhất
+  useEffect(() => {
+    const handleFsChange = () => {
+      const doc = document as any;
+      const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+      setIsFullscreen(isFs);
+    };
+
+    document.addEventListener("fullscreenchange", handleFsChange);
+    document.addEventListener("webkitfullscreenchange", handleFsChange);
+    document.addEventListener("mozfullscreenchange", handleFsChange);
+    document.addEventListener("MSFullscreenChange", handleFsChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFsChange);
+      document.removeEventListener("webkitfullscreenchange", handleFsChange);
+      document.removeEventListener("mozfullscreenchange", handleFsChange);
+      document.removeEventListener("MSFullscreenChange", handleFsChange);
+    };
+  }, []);
+
   // Thiết lập Speech Recognition
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -245,20 +266,26 @@ export default function HUDPage() {
 
   const toggleFullscreen = () => {
     const doc = document as any;
-    const de = document.documentElement as any;
+    const de = document.getElementById("hud-main") as any || document.documentElement;
 
-    if (!doc.fullscreenElement && !doc.webkitFullscreenElement && !doc.mozFullScreenElement && !doc.msFullscreenElement) {
-      if (de.requestFullscreen) de.requestFullscreen();
-      else if (de.webkitRequestFullscreen) de.webkitRequestFullscreen();
-      else if (de.mozRequestFullScreen) de.mozRequestFullScreen();
-      else if (de.msRequestFullscreen) de.msRequestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      if (doc.exitFullscreen) doc.exitFullscreen();
-      else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
-      else if (doc.mozCancelFullScreen) doc.mozCancelFullScreen();
-      else if (doc.msExitFullscreen) doc.msExitFullscreen();
-      setIsFullscreen(false);
+    try {
+      if (!doc.fullscreenElement && !doc.webkitFullscreenElement && !doc.mozFullScreenElement && !doc.msFullscreenElement) {
+        if (de.requestFullscreen) de.requestFullscreen().catch(() => {});
+        else if (de.webkitRequestFullscreen) de.webkitRequestFullscreen();
+        else if (de.mozRequestFullScreen) de.mozRequestFullScreen();
+        else if (de.msRequestFullscreen) de.msRequestFullscreen();
+        // State sẽ được cập nhật bởi listener handleFsChange
+      } else {
+        if (doc.exitFullscreen) doc.exitFullscreen().catch(() => {});
+        else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
+        else if (doc.mozCancelFullScreen) doc.mozCancelFullScreen();
+        else if (doc.msExitFullscreen) doc.msExitFullscreen();
+        // State sẽ được cập nhật bởi listener handleFsChange
+      }
+    } catch (err) {
+      console.error("Fullscreen error:", err);
+      // Fallback: chỉ cập nhật state nếu API thất bại (dành cho iOS)
+      setIsFullscreen(!isFullscreen);
     }
   };
 
