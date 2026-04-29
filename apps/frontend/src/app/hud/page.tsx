@@ -14,6 +14,7 @@ export default function HUDPage() {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isHosting, setIsHosting] = useState<boolean>(false);
   const [hostRoomCode, setHostRoomCode] = useState<string>("");
+  const mainRef = useRef<HTMLElement>(null);
   
   const [remoteUrl, setRemoteUrl] = useState<string>("");
   useEffect(() => {
@@ -266,25 +267,30 @@ export default function HUDPage() {
 
   const toggleFullscreen = () => {
     const doc = document as any;
-    const de = document.getElementById("hud-main") as any || document.documentElement;
+    const de = mainRef.current || document.documentElement;
 
     try {
+      const hasFsApi = !!(de.requestFullscreen || de.webkitRequestFullscreen || de.mozRequestFullScreen || de.msRequestFullscreen);
+      
+      if (!hasFsApi) {
+        // Fallback cho iOS/Trình duyệt không hỗ trợ API: Chế độ Toàn màn hình ảo
+        setIsFullscreen(!isFullscreen);
+        return;
+      }
+
       if (!doc.fullscreenElement && !doc.webkitFullscreenElement && !doc.mozFullScreenElement && !doc.msFullscreenElement) {
-        if (de.requestFullscreen) de.requestFullscreen().catch(() => {});
+        if (de.requestFullscreen) de.requestFullscreen();
         else if (de.webkitRequestFullscreen) de.webkitRequestFullscreen();
         else if (de.mozRequestFullScreen) de.mozRequestFullScreen();
         else if (de.msRequestFullscreen) de.msRequestFullscreen();
-        // State sẽ được cập nhật bởi listener handleFsChange
       } else {
-        if (doc.exitFullscreen) doc.exitFullscreen().catch(() => {});
+        if (doc.exitFullscreen) doc.exitFullscreen();
         else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
         else if (doc.mozCancelFullScreen) doc.mozCancelFullScreen();
         else if (doc.msExitFullscreen) doc.msExitFullscreen();
-        // State sẽ được cập nhật bởi listener handleFsChange
       }
     } catch (err) {
       console.error("Fullscreen error:", err);
-      // Fallback: chỉ cập nhật state nếu API thất bại (dành cho iOS)
       setIsFullscreen(!isFullscreen);
     }
   };
@@ -307,6 +313,7 @@ export default function HUDPage() {
 
   return (
     <main 
+      ref={mainRef}
       id="hud-main"
       className={`min-h-[100dvh] h-[100dvh] w-full overflow-hidden text-white flex flex-col transition-colors duration-300 fixed inset-0 select-none touch-none ${
         isOverSpeed && !showSettings ? "bg-red-950" : "bg-black"
@@ -319,27 +326,27 @@ export default function HUDPage() {
           touch-action: none;
         }
       `}</style>
-      <div className={`flex flex-col w-full h-full ${mode === "car" && !showSettings ? "scale-y-[-1]" : ""}`}>
-        {/* Top Navigation */}
-        <div className="flex items-center justify-between p-4 bg-slate-900/30">
-          <Link href="/" className="flex items-center gap-2 text-slate-300 hover:text-white">
-            <ArrowLeft size={24} />
-            <span className="font-semibold">Portal</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <div className={`text-sm font-medium ${status === "Đã kết nối GPS" ? "text-green-400" : "text-yellow-400"}`}>
-              {status}
-            </div>
-            
-            {/* Cảnh báo chế độ lật gương (chỉ hiển thị icon nếu không ở trang Setting để tránh ngược chữ) */}
-            {!showSettings && (
+
+      <div className={`flex flex-col w-full h-full relative ${mode === "car" && !showSettings ? "scale-y-[-1]" : ""}`}>
+        {/* Top Navigation - Ẩn khi ở chế độ Fullscreen để tối ưu diện tích */}
+        {!isFullscreen && (
+          <div className="flex items-center justify-between p-4 bg-slate-900/30 z-20">
+            <Link href="/" className="flex items-center gap-2 text-slate-300 hover:text-white">
+              <ArrowLeft size={20} />
+              <span className="font-semibold">Portal</span>
+            </Link>
+            <div className="flex items-center gap-4">
+              <div className={`text-sm font-medium ${status === "Đã kết nối GPS" ? "text-green-400" : "text-yellow-400"}`}>
+                {status}
+              </div>
+              
               <div className="flex items-center gap-2">
                 <button 
                   onClick={toggleFullscreen}
                   className="p-1.5 bg-slate-800 rounded-full text-slate-300 hover:text-white"
                   title="Toàn màn hình"
                 >
-                  {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+                  <Maximize size={18} />
                 </button>
 
                 <button 
@@ -351,16 +358,27 @@ export default function HUDPage() {
                   <span className="text-xs font-semibold uppercase hidden sm:inline">{mode === "car" ? "Ô tô (HUD)" : "Xe máy"}</span>
                 </button>
               </div>
-            )}
 
-            <button 
-              onClick={() => setShowSettings(!showSettings)}
-              className="p-2 bg-slate-800 rounded-full text-slate-300 hover:text-white"
-            >
-              <Settings size={24} />
-            </button>
+              <button 
+                onClick={() => setShowSettings(!showSettings)}
+                className="p-2 bg-slate-800 rounded-full text-slate-300 hover:text-white"
+              >
+                <Settings size={24} />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Nút thoát Fullscreen nổi khi đang ở chế độ Fullscreen HUD */}
+        {isFullscreen && !showSettings && (
+          <button 
+            onClick={toggleFullscreen}
+            className="absolute top-4 right-4 p-2 bg-slate-800/50 rounded-full text-slate-400 hover:text-white z-50 transition-opacity opacity-20 hover:opacity-100"
+            title="Thoát toàn màn hình"
+          >
+            <Minimize size={24} />
+          </button>
+        )}
 
         {/* HUD Speed Display */}
         <div className={`flex-1 flex flex-col items-center justify-center relative ${showSettings ? "hidden" : "flex"}`}>
