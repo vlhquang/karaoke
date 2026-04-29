@@ -297,24 +297,27 @@ export default function HUDPage() {
     const de = (mainRef.current || document.documentElement) as any;
 
     try {
-      const hasFsApi = !!(de.requestFullscreen || de.webkitRequestFullscreen || de.mozRequestFullScreen || de.msRequestFullscreen);
+      const isCurrentlyFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+      const hasFsApi = !!(de.requestFullscreen || de.webkitRequestFullscreen || de.mozRequestFullScreen || de.msRequestFullscreen || doc.exitFullscreen || doc.webkitExitFullscreen);
       
       if (!hasFsApi) {
-        // Fallback cho iOS/Trình duyệt không hỗ trợ API: Chế độ Toàn màn hình ảo
         setIsFullscreen(!isFullscreen);
         return;
       }
 
-      if (!doc.fullscreenElement && !doc.webkitFullscreenElement && !doc.mozFullScreenElement && !doc.msFullscreenElement) {
+      if (!isCurrentlyFs) {
         if (de.requestFullscreen) de.requestFullscreen();
         else if (de.webkitRequestFullscreen) de.webkitRequestFullscreen();
         else if (de.mozRequestFullScreen) de.mozRequestFullScreen();
         else if (de.msRequestFullscreen) de.msRequestFullscreen();
+        // Cập nhật state ngay lập tức cho trường hợp API không tự trigger event kịp
+        setIsFullscreen(true);
       } else {
         if (doc.exitFullscreen) doc.exitFullscreen();
         else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
         else if (doc.mozCancelFullScreen) doc.mozCancelFullScreen();
         else if (doc.msExitFullscreen) doc.msExitFullscreen();
+        setIsFullscreen(false);
       }
     } catch (err) {
       console.error("Fullscreen error:", err);
@@ -481,12 +484,12 @@ export default function HUDPage() {
 
           {/* Thanh chọn tốc độ dọc bên phải - Chỉ hiện khi không phát sóng */}
           {!isHosting && (
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 md:gap-4 z-10">
-              {[50, 60, 80, 90, 100, 120].map(s => (
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 md:gap-4 z-10">
+              {[50, 60, 70, 80, 90, 100, 120].map(s => (
                 <button 
                   key={s}
                   onClick={() => handleQuickSelect("manual", s)}
-                  className={`w-14 h-14 md:w-16 md:h-16 rounded-full border-[4px] flex items-center justify-center font-bold text-xl md:text-2xl transition-all ${
+                  className={`w-12 h-12 md:w-16 md:h-16 rounded-full border-[3px] md:border-[4px] flex items-center justify-center font-bold text-lg md:text-2xl transition-all ${
                     currentMaxSpeed === s && roadType === "manual" ? "border-red-600 bg-white text-black scale-110 shadow-[0_0_15px_rgba(239,68,68,0.6)]" : "border-slate-600 bg-slate-800/80 text-slate-300 opacity-70 hover:opacity-100"
                   }`}
                 >
@@ -516,7 +519,7 @@ export default function HUDPage() {
                   Hết khu dân cư (Ngoài KDC)
                 </button>
                 
-                {[40, 50, 60, 80, 90, 100, 120].map(s => (
+                {[40, 50, 60, 70, 80, 90, 100, 120].map(s => (
                   <button 
                     key={s}
                     onClick={() => handleQuickSelect("manual", s)}
@@ -611,7 +614,7 @@ export default function HUDPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-4 gap-3">
-                      {[40, 50, 60, 80, 90, 100, 120].map(s => (
+                      {[40, 50, 60, 70, 80, 90, 100, 120].map(s => (
                         <button 
                           key={s} 
                           onClick={() => hudStore.updateState({ manualMax: s })}
