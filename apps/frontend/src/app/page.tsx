@@ -52,6 +52,12 @@ export default function HomePage() {
       title: "Chia sẻ hành trình",
       description: "Trình theo dõi GPS realtime, ứng dụng web chuyên dụng chia sẻ vị trí xe.",
       badge: "New"
+    },
+    {
+      href: "/hud",
+      title: "HUD Tốc độ",
+      description: "Đồng hồ đo tốc độ GPS cảnh báo giới hạn, hỗ trợ hắt kính lái ô tô.",
+      badge: "New"
     }
   ];
 
