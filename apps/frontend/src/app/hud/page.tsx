@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Car, Bike, Settings, Plus, Minus, Mic, MicOff, X, Maximize, Minimize } from "lucide-react";
+import { ArrowLeft, Car, Bike, Settings, Plus, Minus, Mic, MicOff, X, Maximize, Minimize, Radio, QrCode } from "lucide-react";
+import { useHudStore } from "../../store/hud-store";
 
 export default function HUDPage() {
   const [speed, setSpeed] = useState<number>(0);
@@ -17,7 +18,23 @@ export default function HUDPage() {
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showQuickMenu, setShowQuickMenu] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isHosting, setIsHosting] = useState<boolean>(false);
+  const [hostRoomCode, setHostRoomCode] = useState<string>("");
   
+  // HUD Remote Store
+  const hudStore = useHudStore();
+
+  // Khi remote cập nhật state, sync vào local state
+  useEffect(() => {
+    if (!hudStore.roomCode || hudStore.role !== "host") return;
+    const s = hudStore.state;
+    setMode(s.mode);
+    setRoadType(s.roadType);
+    setZone(s.zone);
+    setManualMax(s.manualMax);
+    setOffset(s.offset);
+  }, [hudStore.state, hudStore.roomCode, hudStore.role]);
+
   const [isListening, setIsListening] = useState<boolean>(false);
   const [speechFeedback, setSpeechFeedback] = useState<string>("");
   const recognitionRef = useRef<any>(null);
@@ -52,11 +69,15 @@ export default function HUDPage() {
     } catch (e) { console.error("Lỗi đọc cache", e); }
   }, []);
 
-  // Lưu state vào localStorage khi có thay đổi
+  // Lưu state vào localStorage và sync lên remote nếu đang host
   useEffect(() => {
     const config = { mode, roadType, zone, manualMax, offset };
     localStorage.setItem("hud_config", JSON.stringify(config));
-  }, [mode, roadType, zone, manualMax, offset]);
+    // Nếu đang phát sóng thì sync lên server
+    if (hudStore.roomCode && hudStore.role === "host") {
+      void hudStore.updateState({ mode, roadType, zone, manualMax, offset });
+    }
+  }, [mode, roadType, zone, manualMax, offset]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // WakeLock
@@ -226,6 +247,23 @@ export default function HUDPage() {
     } else {
       document.exitFullscreen().then(() => setIsFullscreen(false)).catch(err => console.error(err));
     }
+  };
+
+  const handleStartHosting = async () => {
+    hudStore.connect();
+    const result = await hudStore.createRoom();
+    if (result) {
+      setIsHosting(true);
+      setHostRoomCode(result.roomCode);
+      // Push current state to server
+      void hudStore.updateState({ mode, roadType, zone, manualMax, offset });
+    }
+  };
+
+  const handleStopHosting = async () => {
+    await hudStore.leaveRoom();
+    setIsHosting(false);
+    setHostRoomCode("");
   };
 
   return (
@@ -479,6 +517,47 @@ export default function HUDPage() {
                     <span className="text-3xl font-bold text-red-400">{currentMaxSpeed} km/h</span>
                   </div>
                 </div>
+              </section>
+
+              {/* Phát sóng Remote */}
+              <section>
+                <h3 className="text-lg font-semibold mb-3 text-slate-300 flex items-center gap-2">
+                  <Radio size={20} className={isHosting ? "text-green-400 animate-pulse" : "text-slate-400"} />
+                  Điều khiển từ xa
+                </h3>
+                {!isHosting ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-slate-400">Tạo một phòng để điều khiển HUD từ thiết bị thứ hai (điện thoại phụ)</p>
+                    <button
+                      onClick={handleStartHosting}
+                      className="w-full py-4 bg-green-700 hover:bg-green-600 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition"
+                    >
+                      <Radio size={22} /> Phát sóng HUD
+                    </button>
+                    <a
+                      href="/hud/remote"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-3 border border-cyan-500/50 rounded-xl font-semibold text-cyan-400 hover:bg-cyan-900/20 text-center text-sm flex items-center justify-center gap-2 transition"
+                    >
+                      <QrCode size={18} /> Mở màn hình điều khiển
+                    </a>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="bg-slate-900 border border-green-500/40 rounded-xl p-4 text-center">
+                      <p className="text-sm text-slate-400 mb-2">Mã phòng HUD</p>
+                      <div className="text-5xl font-black tracking-[0.3em] text-green-300 font-mono mb-2">{hostRoomCode}</div>
+                      <p className="text-xs text-slate-500">Nhập mã này vào màn hình điều khiển (/hud/remote)</p>
+                    </div>
+                    <button
+                      onClick={handleStopHosting}
+                      className="w-full py-3 border border-red-500/50 rounded-xl font-semibold text-red-400 hover:bg-red-900/20 text-sm transition"
+                    >
+                      Dừng phát sóng
+                    </button>
+                  </div>
+                )}
               </section>
             </div>
           </div>

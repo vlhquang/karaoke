@@ -5,6 +5,7 @@ import { RoomService } from "../services/room-service.js";
 import { QueueService } from "../services/queue/queue-service.js";
 import { AppError } from "../utils/errors.js";
 import { SocketRateLimiter } from "../services/socket-rate-limiter.js";
+import { hudService } from "../services/hud-service.js";
 
 interface SocketUserContext {
   userId: string;
@@ -191,4 +192,50 @@ export const registerHandlers = (
   });
 
   // Host can emit skip_song when YouTube player reaches ended state.
+
+  // ── HUD Remote Control Handlers ──
+
+  socket.on("hud_create_room" as any, (ack: any) => {
+    try {
+      const { roomCode, state } = hudService.createRoom();
+      socket.join(`hud:${roomCode}`);
+      ack({ ok: true, roomCode, state });
+    } catch (error) {
+      ack({ ok: false, message: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  socket.on("hud_join_room" as any, (payload: { roomCode: string }, ack: any) => {
+    try {
+      const room = hudService.getRoom(payload.roomCode);
+      if (!room) {
+        ack({ ok: false, message: "Không tìm thấy phòng HUD. Kiểm tra lại mã phòng." });
+        return;
+      }
+      socket.join(`hud:${room.roomCode}`);
+      ack({ ok: true, state: room.state });
+    } catch (error) {
+      ack({ ok: false, message: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  socket.on("hud_update_state" as any, (payload: { roomCode: string; state: any }, ack: any) => {
+    try {
+      const newState = hudService.updateState(payload.roomCode, payload.state);
+      if (!newState) {
+        ack({ ok: false, message: "Phòng HUD không tồn tại." });
+        return;
+      }
+      // Broadcast to all devices in this HUD room (excluding sender)
+      socket.to(`hud:${payload.roomCode}`).emit("hud_state_updated" as any, { state: newState });
+      ack({ ok: true });
+    } catch (error) {
+      ack({ ok: false, message: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  socket.on("hud_leave_room" as any, (payload: { roomCode: string }, ack: any) => {
+    socket.leave(`hud:${payload.roomCode}`);
+    ack({ ok: true });
+  });
 };

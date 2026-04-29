@@ -373,21 +373,22 @@ export default function LotoHostPage() {
                                 <div className="mb-2 text-sm font-semibold text-slate-200">Người chơi trong phòng (sẵn sàng {readyCount}/{memberCount})</div>
                                 <div className="grid gap-2 sm:grid-cols-2">
                                     {members.map((member) => {
-                                        const uniqueWaiting = [...new Set(member.nearWinRows.map(r => r.waitingNumber))];
+                                        const nearWinRows = member.nearWinRows || [];
+                                        const uniqueWaiting = [...new Set(nearWinRows.map(r => r?.waitingNumber).filter(n => n !== undefined))];
                                         const uncalled = config.maxNumber - calledNumbers.length;
                                         const probability = uncalled > 0 ? Math.min((uniqueWaiting.length / uncalled) * 100, 100) : 0;
                                         return (
-                                            <div key={member.userId} className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-all ${member.nearWinRows.length > 0 ? "border-amber-400/40 bg-amber-500/10" : "border-slate-700 bg-slate-800/50"}`}>
+                                            <div key={member.userId} className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-all ${nearWinRows.length > 0 ? "border-amber-400/40 bg-amber-500/10" : "border-slate-700 bg-slate-800/50"}`}>
                                                 <div className="min-w-0 flex-1">
                                                     <span className="truncate text-slate-200 block">{member.displayName}</span>
-                                                    {member.nearWinRows.length > 0 && (
+                                                    {nearWinRows.length > 0 && (
                                                         <span className="text-[10px] font-semibold text-amber-300 animate-pulse">
-                                                            🎯 Đợi {uniqueWaiting.sort((a, b) => a - b).join(", ")} · {member.nearWinRows.length} hàng
+                                                            🎯 Đợi {uniqueWaiting.sort((a, b) => a - b).join(", ")} · {nearWinRows.length} hàng
                                                         </span>
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-2 ml-2 shrink-0">
-                                                    {member.nearWinRows.length > 0 && (
+                                                    {nearWinRows.length > 0 && (
                                                         <span className="text-xs font-bold text-amber-300">{probability.toFixed(1)}%</span>
                                                     )}
                                                     {member.bankingInfo && <span className="text-[10px] text-cyan-300">STK</span>}

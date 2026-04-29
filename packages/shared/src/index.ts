@@ -283,3 +283,41 @@ export type LotoClientToServerEvents = {
     ack: (response: { ok: true; roomCode: string; userId: string; displayName: string; role: "host" | "guest" } | { ok: false; message: string }) => void
   ) => void;
 };
+
+// ── HUD Remote Control types ──
+
+export type HudRoadType = "1_lane" | "2_lane" | "manual";
+export type HudZone = "residential" | "outside";
+export type HudVehicleMode = "car" | "moto";
+
+export interface HudState {
+  roadType: HudRoadType;
+  zone: HudZone;
+  manualMax: number;
+  offset: number;
+  mode: HudVehicleMode;
+}
+
+export interface HudRoom {
+  roomCode: string;
+  state: HudState;
+  createdAt: string;
+}
+
+export type HudClientToServerEvents = {
+  hud_create_room: (
+    ack: (response: { ok: true; roomCode: string } | { ok: false; message: string }) => void
+  ) => void;
+  hud_join_room: (
+    payload: { roomCode: string },
+    ack: (response: { ok: true; state: HudState } | { ok: false; message: string }) => void
+  ) => void;
+  hud_update_state: (
+    payload: { roomCode: string; state: Partial<HudState> },
+    ack: (response: { ok: true } | { ok: false; message: string }) => void
+  ) => void;
+  hud_leave_room: (
+    payload: { roomCode: string },
+    ack: (response: { ok: true } | { ok: false; message: string }) => void
+  ) => void;
+};
