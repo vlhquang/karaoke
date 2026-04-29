@@ -294,7 +294,7 @@ export default function HUDPage() {
 
   const toggleFullscreen = () => {
     const doc = document as any;
-    const de = mainRef.current || document.documentElement;
+    const de = (mainRef.current || document.documentElement) as any;
 
     try {
       const hasFsApi = !!(de.requestFullscreen || de.webkitRequestFullscreen || de.mozRequestFullScreen || de.msRequestFullscreen);
