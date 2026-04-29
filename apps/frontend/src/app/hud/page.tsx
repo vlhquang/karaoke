@@ -126,13 +126,21 @@ export default function HUDPage() {
             setSpeechFeedback("Đã chuyển: Đường 2 làn");
             parsed = true;
           } else {
-            // Cố gắng tìm số trong câu nói
-            const match = command.match(/\b(40|50|60|80|90|100|120)\b/);
-            if (match) {
-              const speed = parseInt(match[0], 10);
+            // Tối ưu nhận diện giọng nói: bắt cả chữ và số (rất hay bị lỗi API trả về chữ thay vì số)
+            let parsedSpeed = null;
+            if (command.match(/\b(40|bốn mươi|bốn chục)\b/)) parsedSpeed = 40;
+            else if (command.match(/\b(50|năm mươi|năm chục)\b/)) parsedSpeed = 50;
+            else if (command.match(/\b(60|sáu mươi|sáu chục)\b/)) parsedSpeed = 60;
+            else if (command.match(/\b(70|bảy mươi|bảy chục)\b/)) parsedSpeed = 70;
+            else if (command.match(/\b(80|tám mươi|tám chục)\b/)) parsedSpeed = 80;
+            else if (command.match(/\b(90|chín mươi|chín chục)\b/)) parsedSpeed = 90;
+            else if (command.match(/\b(100|một trăm|trăm chẵn)\b/)) parsedSpeed = 100;
+            else if (command.match(/\b(120|trăm hai|một trăm hai)\b/)) parsedSpeed = 120;
+
+            if (parsedSpeed !== null) {
               setRoadType("manual");
-              setManualMax(speed);
-              setSpeechFeedback(`Giới hạn: ${speed} km/h`);
+              setManualMax(parsedSpeed);
+              setSpeechFeedback(`Giới hạn: ${parsedSpeed} km/h`);
               parsed = true;
             }
           }
@@ -203,10 +211,14 @@ export default function HUDPage() {
             
             {/* Cảnh báo chế độ lật gương (chỉ hiển thị icon nếu không ở trang Setting để tránh ngược chữ) */}
             {!showSettings && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 rounded-full text-cyan-300">
+              <button 
+                onClick={() => setMode(m => m === "car" ? "moto" : "car")}
+                className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 rounded-full text-cyan-300 hover:bg-slate-700 transition"
+                title="Bấm để đổi phương tiện"
+              >
                 {mode === "car" ? <Car size={18} /> : <Bike size={18} />}
                 <span className="text-xs font-semibold uppercase">{mode === "car" ? "Ô tô (HUD)" : "Xe máy"}</span>
-              </div>
+              </button>
             )}
 
             <button 
