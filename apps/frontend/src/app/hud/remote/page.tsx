@@ -33,6 +33,9 @@ function HudRemoteContent() {
   const [joining, setJoining] = useState(false);
   const [showZones, setShowZones] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "map">("map");
+  const [adminOnly, setAdminOnly] = useState(false);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
 
   const searchParams = useSearchParams();
 
@@ -55,9 +58,9 @@ function HudRemoteContent() {
 
   const patch = (p: Partial<HudState>) => updateState(p);
 
-  const currentMaxSpeed = state.manualMax;
+  const currentMaxSpeed = state?.manualMax || 60;
 
-  if (!role) {
+  if (!role && !adminOnly) {
     return (
       <main className="min-h-[100dvh] bg-slate-950 text-white flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-sm space-y-6">
@@ -107,6 +110,59 @@ function HudRemoteContent() {
           <div className="text-center text-slate-500 text-xs">
             Mã phòng hiển thị trên màn hình HUD sau khi bấm nút <strong className="text-slate-300">Phát sóng</strong>
           </div>
+
+          <div className="mt-8 border-t border-slate-800 pt-6 text-center">
+            {!showAdminLogin ? (
+              <button 
+                onClick={() => setShowAdminLogin(true)}
+                className="text-sm text-slate-400 hover:text-cyan-400 underline transition"
+              >
+                Vào màn hình Quản lý Biển báo (Admin)
+              </button>
+            ) : (
+              <div className="space-y-3 bg-slate-900 p-4 rounded-xl border border-slate-800">
+                <div className="text-sm text-slate-300 font-semibold mb-2">Đăng nhập Admin</div>
+                <input
+                  type="password"
+                  className="w-full bg-slate-800 border border-slate-700 focus:border-cyan-500 rounded-lg px-3 py-2 text-center outline-none transition"
+                  placeholder="Nhập mật khẩu..."
+                  value={adminPassword}
+                  onChange={e => setAdminPassword(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      if (adminPassword === (process.env.NEXT_PUBLIC_ADMIN_ACCESS_CODE || "123456")) {
+                        setAdminOnly(true);
+                        speedZoneStore.loadZones();
+                        setShowZones(true);
+                      } else {
+                        alert("Sai mật khẩu!");
+                      }
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (adminPassword === (process.env.NEXT_PUBLIC_ADMIN_ACCESS_CODE || "123456")) {
+                      setAdminOnly(true);
+                      speedZoneStore.loadZones();
+                      setShowZones(true);
+                    } else {
+                      alert("Sai mật khẩu!");
+                    }
+                  }}
+                  className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-bold transition"
+                >
+                  Đăng nhập
+                </button>
+                <button 
+                  onClick={() => setShowAdminLogin(false)}
+                  className="w-full py-2 text-slate-400 hover:text-white text-xs transition"
+                >
+                  Huỷ
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     );
@@ -115,71 +171,81 @@ function HudRemoteContent() {
   return (
     <main className="min-h-[100dvh] bg-slate-950 text-white flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900">
         <div className="flex items-center gap-3">
-          <button onClick={leaveRoom} className="p-1.5 bg-slate-800 rounded-full text-slate-300">
+          <Link href="/hud" className="p-1.5 bg-slate-800 rounded-full text-slate-300 hover:text-white transition">
             <ArrowLeft size={18} />
-          </button>
+          </Link>
           <div>
-            <div className="text-xs text-slate-400">Điều khiển HUD</div>
-            <div className="font-mono font-bold text-cyan-300 tracking-widest">{roomCode}</div>
+            <div className="text-xs text-slate-400 font-bold">{adminOnly ? "Quản lý Speed Zones" : "Điều khiển HUD"}</div>
+            {!adminOnly && <div className="font-mono font-bold text-cyan-300 tracking-widest">{roomCode}</div>}
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs">
-          {connected
-            ? <><Wifi size={14} className="text-green-400" /><span className="text-green-400">Đã kết nối</span></>
-            : <><WifiOff size={14} className="text-red-400" /><span className="text-red-400">Mất kết nối</span></>
-          }
+          {!adminOnly ? (
+            connected
+              ? <><Wifi size={14} className="text-green-400" /><span className="text-green-400">Đã kết nối</span></>
+              : <><WifiOff size={14} className="text-red-400" /><span className="text-red-400">Mất kết nối</span></>
+          ) : (
+            <button
+              onClick={() => setAdminOnly(false)}
+              className="px-3 py-1 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg text-xs font-bold transition"
+            >
+              Đăng xuất
+            </button>
+          )}
         </div>
       </div>
 
       <div className="flex-1 flex flex-col gap-5 p-4 overflow-y-auto">
 
-        {/* Tốc độ giới hạn hiện tại */}
-        <div className="flex items-center justify-center gap-4 py-4">
-          <div className="w-28 h-28 rounded-full border-[10px] border-red-600 bg-white flex items-center justify-center shadow-[0_0_25px_rgba(220,38,38,0.4)]">
-            <span className="text-5xl font-bold text-black">{currentMaxSpeed}</span>
-          </div>
-          <div className="text-slate-400 text-sm">
-            <div className="text-white font-bold text-xl">Giới hạn hiện tại</div>
-            <div>Biển báo: {currentMaxSpeed} km/h</div>
-            <div className={state.zone === "residential" ? "text-orange-400" : "text-green-400"}>
-              {state.zone === "residential" ? "Khu dân cư" : "Ngoài khu dân cư"}
+        {!adminOnly && (
+          <>
+            {/* Tốc độ giới hạn hiện tại */}
+            <div className="flex items-center justify-center gap-4 py-4">
+              <div className="w-28 h-28 rounded-full border-[10px] border-red-600 bg-white flex items-center justify-center shadow-[0_0_25px_rgba(220,38,38,0.4)]">
+                <span className="text-5xl font-bold text-black">{currentMaxSpeed}</span>
+              </div>
+              <div className="text-slate-400 text-sm">
+                <div className="text-white font-bold text-xl">Giới hạn hiện tại</div>
+                <div>Biển báo: {currentMaxSpeed} km/h</div>
+                <div className={state.zone === "residential" ? "text-orange-400" : "text-green-400"}>
+                  {state.zone === "residential" ? "Khu dân cư" : "Ngoài khu dân cư"}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Chuyển Khu dân cư */}
-        <button
-          onClick={() => patch({ zone: state.zone === "residential" ? "outside" : "residential" })}
-          className={`w-full py-5 rounded-2xl border-2 text-2xl font-bold transition-all ${
-            state.zone === "residential"
-              ? "bg-orange-950/60 border-orange-500 text-orange-300"
-              : "bg-green-950/60 border-green-500 text-green-300"
-          }`}
-        >
-          {state.zone === "residential" ? "🏘 Khu dân cư → Ngoài KDC" : "🌿 Ngoài KDC → Khu dân cư"}
-        </button>
+            {/* Chuyển Khu dân cư */}
+            <button
+              onClick={() => patch({ zone: state.zone === "residential" ? "outside" : "residential" })}
+              className={`w-full py-5 rounded-2xl border-2 text-2xl font-bold transition-all ${
+                state.zone === "residential"
+                  ? "bg-orange-950/60 border-orange-500 text-orange-300"
+                  : "bg-green-950/60 border-green-500 text-green-300"
+              }`}
+            >
+              {state.zone === "residential" ? "🏘 Khu dân cư → Ngoài KDC" : "🌿 Ngoài KDC → Khu dân cư"}
+            </button>
 
-        {/* Biển báo tốc độ */}
-        <div>
-          <div className="text-sm text-slate-400 mb-3 font-semibold uppercase tracking-wide">Biển báo thủ công</div>
-          <div className="grid grid-cols-4 gap-3">
-            {[40, 50, 60, 80, 90, 100, 120].map(s => (
-              <button
-                key={s}
-                onClick={() => patch({ manualMax: s })}
-                className={`py-4 rounded-full border-[3px] text-2xl font-bold flex items-center justify-center transition-all ${
-                  state.manualMax === s
-                    ? "border-red-500 bg-white text-black scale-110 shadow-[0_0_15px_rgba(239,68,68,0.5)]"
-                    : "border-slate-600 bg-slate-800/60 text-slate-300"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
+            {/* Biển báo tốc độ */}
+            <div>
+              <div className="text-sm text-slate-400 mb-3 font-semibold uppercase tracking-wide">Biển báo thủ công</div>
+              <div className="grid grid-cols-4 gap-3">
+                {[40, 50, 60, 80, 90, 100, 120].map(s => (
+                  <button
+                    key={s}
+                    onClick={() => patch({ manualMax: s })}
+                    className={`py-4 rounded-full border-[3px] text-2xl font-bold flex items-center justify-center transition-all ${
+                      state.manualMax === s
+                        ? "border-red-500 bg-white text-black scale-110 shadow-[0_0_15px_rgba(239,68,68,0.5)]"
+                        : "border-slate-600 bg-slate-800/60 text-slate-300"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
 
         {/* Sai số GPS */}
         <div>
@@ -229,9 +295,11 @@ function HudRemoteContent() {
             </button>
           </div>
         </div>
+        </>
+        )}
 
         {/* Speed Zones Management */}
-        <div>
+        <div className={adminOnly ? "mt-4" : ""}>
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm text-slate-400 font-semibold uppercase tracking-wide flex items-center gap-2">
               <MapPin size={16} /> Dữ liệu Speed Zones
