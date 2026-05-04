@@ -5,7 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
 import { ArrowLeft, Car, Bike, Settings, Plus, Minus, Mic, MicOff, X, Maximize, Minimize, Radio, QrCode, AlertTriangle, MapPin, Save, Loader2 } from "lucide-react";
 import { useHudStore } from "../../store/hud-store";
-import { useSpeedZoneStore, calcHeading } from "../../store/speed-zone-store";
+import { useSpeedZoneStore, calcHeading, haversineDistance } from "../../store/speed-zone-store";
 import type { SpeedZoneRecord } from "@karaoke/shared";
 
 export default function HUDPage() {
@@ -22,6 +22,7 @@ export default function HUDPage() {
   const [showSaveConfirm, setShowSaveConfirm] = useState<boolean>(false);
   const mainRef = useRef<HTMLElement>(null);
   const prevCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const lastSavedZoneRef = useRef<{ lat: number; lng: number; heading: number; maxSpeed: number; zone: "residential" | "outside" } | null>(null);
 
   const [remoteUrl, setRemoteUrl] = useState<string>("");
   useEffect(() => {
@@ -117,8 +118,38 @@ export default function HUDPage() {
             if (dist > 0.00005) { // ~5m threshold
               const h = calcHeading(prevCoordsRef.current.lat, prevCoordsRef.current.lng, newCoords.lat, newCoords.lng);
               setHeading(h);
+
+              // Get fresh state instead of stale closure variables
+              const freshState = useHudStore.getState().state;
+              const freshMaxSpeed = freshState.manualMax;
+              const freshZone = freshState.zone as "residential" | "outside";
+              const freshRoadType = freshState.roadType;
+
               // Update prediction
-              speedZoneStore.updatePrediction(newCoords.lat, newCoords.lng, h, currentMaxSpeed);
+              speedZoneStore.updatePrediction(newCoords.lat, newCoords.lng, h, freshMaxSpeed);
+
+              // Tự động lưu khi bẻ lái chuyển đường (heading thay đổi > 45 độ, khoảng cách > 50m)
+              if (!lastSavedZoneRef.current) {
+                lastSavedZoneRef.current = { lat: newCoords.lat, lng: newCoords.lng, heading: h, maxSpeed: freshMaxSpeed, zone: freshZone };
+              } else {
+                const angleDiff = Math.abs(h - lastSavedZoneRef.current.heading);
+                const normalizedAngleDiff = Math.min(angleDiff, 360 - angleDiff);
+                const distSinceSave = haversineDistance(newCoords.lat, newCoords.lng, lastSavedZoneRef.current.lat, lastSavedZoneRef.current.lng);
+
+                if (normalizedAngleDiff >= 45 && distSinceSave > 50 && lastSavedZoneRef.current.maxSpeed === freshMaxSpeed && lastSavedZoneRef.current.zone === freshZone) {
+                  // Lưu vết trước để tránh lưu liên tục
+                  lastSavedZoneRef.current = { lat: newCoords.lat, lng: newCoords.lng, heading: h, maxSpeed: freshMaxSpeed, zone: freshZone };
+                  
+                  // Tạo record mới
+                  const record: SpeedZoneRecord = {
+                    lat: newCoords.lat, lng: newCoords.lng, heading: h,
+                    zone: freshZone, roadType: freshRoadType, maxSpeed: freshMaxSpeed,
+                    createdAt: new Date().toISOString(),
+                    status: "active"
+                  };
+                  speedZoneStore.recordZone(record);
+                }
+              }
             }
           }
           prevCoordsRef.current = newCoords;
@@ -215,7 +246,7 @@ export default function HUDPage() {
     };
     const ok = await speedZoneStore.recordZone(record);
     if (ok) {
-      // Optional UI feedback could go here
+      lastSavedZoneRef.current = { lat: coords.lat, lng: coords.lng, heading, maxSpeed: newMaxSpeed, zone: newZone };
     }
   };
 

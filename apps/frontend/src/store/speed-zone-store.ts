@@ -6,7 +6,7 @@ import type { SpeedZoneRecord, SpeedZonePrediction, HudZone, HudRoadType } from 
 // ── Geo utilities ──
 
 /** Haversine distance in meters */
-function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+export function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
@@ -61,6 +61,7 @@ interface SpeedZoneState {
   setPendingZone: (zone: SpeedZoneRecord | null) => void;
   confirmPendingZone: () => Promise<boolean>;
   toggleZoneStatus: (id: string, newStatus: "active" | "inactive") => Promise<boolean>;
+  updateZonePosition: (id: string, lat: number, lng: number) => Promise<boolean>;
   clearError: () => void;
 }
 
@@ -207,6 +208,29 @@ export const useSpeedZoneStore = create<SpeedZoneState>((set, get) => ({
         return true;
       } else {
         set({ error: data.message || "Lỗi cập nhật trạng thái" });
+        return false;
+      }
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Lỗi kết nối" });
+      return false;
+    }
+  },
+
+  updateZonePosition: async (id: string, lat: number, lng: number) => {
+    try {
+      const res = await fetch("/api/hud-zones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update_position", id, lat, lng }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        set((s) => ({
+          zones: s.zones.map((z) => (z.id === id ? { ...z, lat, lng } : z)),
+        }));
+        return true;
+      } else {
+        set({ error: data.message || "Lỗi cập nhật vị trí" });
         return false;
       }
     } catch (err) {

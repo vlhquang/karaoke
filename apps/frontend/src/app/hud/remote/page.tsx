@@ -355,6 +355,7 @@ function HudRemoteContent() {
                   zones={speedZoneStore.zones} 
                   onToggleStatus={speedZoneStore.toggleZoneStatus}
                   onDelete={speedZoneStore.deleteZone}
+                  onUpdatePosition={speedZoneStore.updateZonePosition}
                 />
               ) : (
                 <div className="space-y-2 max-h-80 overflow-y-auto pr-1">

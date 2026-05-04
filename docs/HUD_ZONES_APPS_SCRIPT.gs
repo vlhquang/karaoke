@@ -38,6 +38,8 @@ function doPost(e) {
       return handleDeleteZone(body.id);
     } else if (action === "toggle_status") {
       return handleToggleStatus(body.id, body.status);
+    } else if (action === "update_position") {
+      return handleUpdatePosition(body.id, body.lat, body.lng);
     } else {
       return jsonResponse({ ok: false, message: "Unsupported action: " + action });
     }
@@ -144,6 +146,32 @@ function handleToggleStatus(id, newStatus) {
     if (data[i][0] === id) {
       sheet.getRange(i + 1, colToUpdate).setValue(newStatus);
       return jsonResponse({ ok: true, message: "Status updated to " + newStatus });
+    }
+  }
+
+  return jsonResponse({ ok: false, message: "Zone not found: " + id });
+}
+
+function handleUpdatePosition(id, lat, lng) {
+  if (!id || lat === undefined || lng === undefined) {
+    return jsonResponse({ ok: false, message: "Missing id, lat, or lng" });
+  }
+
+  const sheet = getOrCreateSheet();
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const latCol = headers.indexOf("lat") + 1;
+  const lngCol = headers.indexOf("lng") + 1;
+
+  if (latCol === 0 || lngCol === 0) {
+     return jsonResponse({ ok: false, message: "Sheet is missing lat or lng columns" });
+  }
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === id) {
+      sheet.getRange(i + 1, latCol).setValue(lat);
+      sheet.getRange(i + 1, lngCol).setValue(lng);
+      return jsonResponse({ ok: true, message: "Position updated" });
     }
   }
 

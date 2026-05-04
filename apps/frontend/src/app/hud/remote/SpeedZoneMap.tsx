@@ -19,6 +19,7 @@ interface SpeedZoneMapProps {
   zones: SpeedZoneRecord[];
   onToggleStatus: (id: string, newStatus: "active" | "inactive") => void;
   onDelete: (id: string) => void;
+  onUpdatePosition: (id: string, lat: number, lng: number) => void;
 }
 
 // Component to dynamically change map view
@@ -30,7 +31,7 @@ function ChangeView({ center }: { center: [number, number] }) {
   return null;
 }
 
-export default function SpeedZoneMap({ zones, onToggleStatus, onDelete }: SpeedZoneMapProps) {
+export default function SpeedZoneMap({ zones, onToggleStatus, onDelete, onUpdatePosition }: SpeedZoneMapProps) {
   // Find map center based on the most recently added zone, fallback to HCM center
   let defaultCenter: [number, number] = [10.762622, 106.660172];
   if (zones.length > 0) {
@@ -81,6 +82,16 @@ export default function SpeedZoneMap({ zones, onToggleStatus, onDelete }: SpeedZ
             key={z.id} 
             position={[z.lat, z.lng]}
             icon={createCustomIcon(z)}
+            draggable={true}
+            eventHandlers={{
+              dragend: (e) => {
+                const marker = e.target;
+                const position = marker.getLatLng();
+                if (z.id) {
+                  onUpdatePosition(z.id, position.lat, position.lng);
+                }
+              },
+            }}
           >
             <Popup>
               <div className="p-0.5 min-w-[200px]">
@@ -106,8 +117,8 @@ export default function SpeedZoneMap({ zones, onToggleStatus, onDelete }: SpeedZ
                       <b>{z.label}</b>
                     </div>
                   )}
-                  <div className="text-[10px] text-slate-400 text-center pt-1">
-                    {z.lat.toFixed(5)}, {z.lng.toFixed(5)}
+                  <div className="text-[10px] text-slate-400 text-center pt-1 italic">
+                    (Có thể kéo thả chấm tròn để sửa vị trí)
                   </div>
                 </div>
                 
