@@ -3,8 +3,9 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Car, Bike, Plus, Minus, Wifi, WifiOff, Loader2 } from "lucide-react";
+import { ArrowLeft, Car, Bike, Plus, Minus, Wifi, WifiOff, Loader2, MapPin, Trash2, RefreshCw } from "lucide-react";
 import { useHudStore } from "../../../store/hud-store";
+import { useSpeedZoneStore } from "../../../store/speed-zone-store";
 import type { HudState } from "@karaoke/shared";
 
 export default function HudRemotePage() {
@@ -21,15 +22,15 @@ function HudRemoteContent() {
     connect, joinRoom, updateState, leaveRoom, clearError,
   } = useHudStore();
 
+  const speedZoneStore = useSpeedZoneStore();
   const [inputCode, setInputCode] = useState("");
   const [joining, setJoining] = useState(false);
+  const [showZones, setShowZones] = useState(false);
 
   const searchParams = useSearchParams();
 
   useEffect(() => {
     connect();
-    
-    // Tự động điền và kết nối nếu có mã phòng trong URL
     const roomParam = searchParams.get("room");
     if (roomParam && !role) {
       setInputCode(roomParam.toUpperCase());
@@ -47,12 +48,7 @@ function HudRemoteContent() {
 
   const patch = (p: Partial<HudState>) => updateState(p);
 
-  // Tính tốc độ tối đa hiện tại
-  const currentMaxSpeed = (() => {
-    if (state.roadType === "manual") return state.manualMax;
-    if (state.roadType === "1_lane") return state.zone === "residential" ? 50 : 80;
-    return state.zone === "residential" ? 60 : 90;
-  })();
+  const currentMaxSpeed = state.manualMax;
 
   if (!role) {
     return (
@@ -139,7 +135,7 @@ function HudRemoteContent() {
           </div>
           <div className="text-slate-400 text-sm">
             <div className="text-white font-bold text-xl">Giới hạn hiện tại</div>
-            <div>{state.roadType === "manual" ? "Tự chọn" : state.roadType === "1_lane" ? "Đường 1 làn" : "Đường 2 làn"}</div>
+            <div>Biển báo: {currentMaxSpeed} km/h</div>
             <div className={state.zone === "residential" ? "text-orange-400" : "text-green-400"}>
               {state.zone === "residential" ? "Khu dân cư" : "Ngoài khu dân cư"}
             </div>
@@ -148,7 +144,7 @@ function HudRemoteContent() {
 
         {/* Chuyển Khu dân cư */}
         <button
-          onClick={() => patch({ zone: state.zone === "residential" ? "outside" : "residential", roadType: state.roadType === "manual" ? "1_lane" : state.roadType })}
+          onClick={() => patch({ zone: state.zone === "residential" ? "outside" : "residential" })}
           className={`w-full py-5 rounded-2xl border-2 text-2xl font-bold transition-all ${
             state.zone === "residential"
               ? "bg-orange-950/60 border-orange-500 text-orange-300"
@@ -158,22 +154,6 @@ function HudRemoteContent() {
           {state.zone === "residential" ? "🏘 Khu dân cư → Ngoài KDC" : "🌿 Ngoài KDC → Khu dân cư"}
         </button>
 
-        {/* Loại đường */}
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => patch({ roadType: "1_lane" })}
-            className={`py-4 rounded-xl border-2 text-lg font-bold transition-all ${state.roadType === "1_lane" ? "bg-blue-900/60 border-blue-400 text-blue-200" : "bg-slate-800/60 border-slate-700 text-slate-400"}`}
-          >
-            🛣 Đường 1 làn
-          </button>
-          <button
-            onClick={() => patch({ roadType: "2_lane" })}
-            className={`py-4 rounded-xl border-2 text-lg font-bold transition-all ${state.roadType === "2_lane" ? "bg-blue-900/60 border-blue-400 text-blue-200" : "bg-slate-800/60 border-slate-700 text-slate-400"}`}
-          >
-            🛤 Đường 2 làn
-          </button>
-        </div>
-
         {/* Biển báo tốc độ */}
         <div>
           <div className="text-sm text-slate-400 mb-3 font-semibold uppercase tracking-wide">Biển báo thủ công</div>
@@ -181,9 +161,9 @@ function HudRemoteContent() {
             {[40, 50, 60, 80, 90, 100, 120].map(s => (
               <button
                 key={s}
-                onClick={() => patch({ roadType: "manual", manualMax: s })}
+                onClick={() => patch({ manualMax: s })}
                 className={`py-4 rounded-full border-[3px] text-2xl font-bold flex items-center justify-center transition-all ${
-                  state.roadType === "manual" && state.manualMax === s
+                  state.manualMax === s
                     ? "border-red-500 bg-white text-black scale-110 shadow-[0_0_15px_rgba(239,68,68,0.5)]"
                     : "border-slate-600 bg-slate-800/60 text-slate-300"
                 }`}
@@ -241,6 +221,75 @@ function HudRemoteContent() {
               <Car size={22} /> Ô tô (HUD)
             </button>
           </div>
+        </div>
+
+        {/* Speed Zones Management */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm text-slate-400 font-semibold uppercase tracking-wide flex items-center gap-2">
+              <MapPin size={16} /> Dữ liệu Speed Zones
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => speedZoneStore.loadZones()}
+                disabled={speedZoneStore.loading}
+                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition disabled:opacity-50"
+                title="Nạp lại dữ liệu"
+              >
+                <RefreshCw size={16} className={speedZoneStore.loading ? "animate-spin" : ""} />
+              </button>
+              <button
+                onClick={() => { setShowZones(!showZones); if (!showZones && speedZoneStore.zones.length === 0) speedZoneStore.loadZones(); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${showZones ? "bg-cyan-600 text-white" : "bg-slate-800 text-slate-400 hover:text-white"}`}
+              >
+                {showZones ? "Ẩn" : `Xem (${speedZoneStore.zones.length})`}
+              </button>
+            </div>
+          </div>
+
+          {speedZoneStore.error && (
+            <div className="bg-red-900/40 border border-red-500/40 rounded-xl px-3 py-2 text-red-300 text-xs mb-3 flex justify-between">
+              <span>{speedZoneStore.error}</span>
+              <button onClick={() => speedZoneStore.clearError()} className="text-red-400">✕</button>
+            </div>
+          )}
+
+          {showZones && (
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {speedZoneStore.zones.length === 0 ? (
+                <div className="text-center text-slate-500 text-sm py-4">Chưa có dữ liệu zone nào</div>
+              ) : (
+                speedZoneStore.zones.map((z) => (
+                  <div key={z.id} className="flex items-center gap-3 bg-slate-800/60 rounded-xl px-3 py-2">
+                    <div className={`w-10 h-10 rounded-full border-[3px] flex items-center justify-center font-bold text-sm shrink-0 ${z.zone === "residential" ? "border-orange-500 text-orange-300" : "border-green-500 text-green-300"}`}>
+                      {z.maxSpeed}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-slate-300 truncate">
+                        {z.lat.toFixed(5)}, {z.lng.toFixed(5)}
+                        {z.label && <span className="text-cyan-400 ml-1">• {z.label}</span>}
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        {z.zone === "residential" ? "KDC" : "Ngoài KDC"} • {z.maxSpeed} km/h • {Math.round(z.heading)}°
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => z.id && speedZoneStore.deleteZone(z.id)}
+                      className="p-1.5 text-slate-500 hover:text-red-400 transition shrink-0"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {speedZoneStore.lastSyncTime && (
+            <div className="text-[10px] text-slate-600 mt-2 text-center">
+              Cập nhật lúc: {new Date(speedZoneStore.lastSyncTime).toLocaleTimeString("vi-VN")}
+            </div>
+          )}
         </div>
       </div>
     </main>

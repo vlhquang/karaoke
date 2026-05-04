@@ -243,7 +243,7 @@ const lotoRooms = new Map<string, LotoInternalRoom>();
 interface HudInternalRoom {
   roomCode: string;
   state: {
-    roadType: "1_lane" | "2_lane" | "manual";
+    roadType: "manual";
     zone: "residential" | "outside";
     manualMax: number;
     offset: number;
@@ -1279,7 +1279,7 @@ app.prepare().then(() => {
         const roomCode = generateHudRoomCode();
         const room: HudInternalRoom = {
           roomCode,
-          state: { roadType: "1_lane", zone: "residential", manualMax: 60, offset: 0, mode: "moto" },
+          state: { roadType: "manual", zone: "residential", manualMax: 60, offset: 0, mode: "moto" },
           createdAt: new Date().toISOString(),
         };
         hudRooms.set(roomCode, room);

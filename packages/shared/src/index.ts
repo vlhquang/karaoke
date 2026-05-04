@@ -286,7 +286,7 @@ export type LotoClientToServerEvents = {
 
 // ── HUD Remote Control types ──
 
-export type HudRoadType = "1_lane" | "2_lane" | "manual";
+export type HudRoadType = "manual";
 export type HudZone = "residential" | "outside";
 export type HudVehicleMode = "car" | "moto";
 
@@ -302,6 +302,27 @@ export interface HudRoom {
   roomCode: string;
   state: HudState;
   createdAt: string;
+}
+
+export interface SpeedZoneRecord {
+  id?: string;
+  lat: number;
+  lng: number;
+  heading: number;         // GPS heading 0-360
+  roadId?: string;         // Optional road identifier
+  zone: HudZone;
+  roadType: HudRoadType;
+  maxSpeed: number;
+  label?: string;          // e.g. "QL1A", "Đầu cầu X"
+  createdAt: string;
+}
+
+export interface SpeedZonePrediction {
+  nextMaxSpeed: number;
+  distanceMeters: number;
+  zone: HudZone;
+  roadType: HudRoadType;
+  label?: string;
 }
 
 export type HudClientToServerEvents = {

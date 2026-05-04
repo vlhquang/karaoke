@@ -1,7 +1,7 @@
 import type { HudState, HudRoom } from "@karaoke/shared";
 
 const DEFAULT_HUD_STATE: HudState = {
-  roadType: "1_lane",
+  roadType: "manual",
   zone: "residential",
   manualMax: 60,
   offset: 0,

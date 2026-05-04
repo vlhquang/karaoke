@@ -24,7 +24,7 @@ interface HudStore {
 }
 
 const DEFAULT_STATE: HudState = {
-  roadType: "1_lane",
+  roadType: "manual",
   zone: "residential",
   manualMax: 60,
   offset: 0,
