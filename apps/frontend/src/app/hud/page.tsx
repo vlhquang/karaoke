@@ -264,24 +264,24 @@ export default function HUDPage() {
       alert("Chưa có toạ độ GPS hiện tại!");
       return;
     }
-    const heading = coords.heading || 0;
+    const currentHeading = heading || 0;
     const lat1 = coords.lat * Math.PI / 180;
     const lng1 = coords.lng * Math.PI / 180;
     const d = 500; // 500 meters
     const R = 6371000;
-    const brng = heading * Math.PI / 180;
+    const brng = currentHeading * Math.PI / 180;
     
     const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d / R) + Math.cos(lat1) * Math.sin(d / R) * Math.cos(brng));
     const lng2 = lng1 + Math.atan2(Math.sin(brng) * Math.sin(d / R) * Math.cos(lat1), Math.cos(d / R) - Math.sin(lat1) * Math.sin(lat2));
     
-    const record = {
+    const record: SpeedZoneRecord = {
       id: "mock-" + Date.now(),
       lat: lat2 * 180 / Math.PI,
       lng: lng2 * 180 / Math.PI,
-      heading: heading,
+      heading: currentHeading,
       maxSpeed: currentMaxSpeed === 60 ? 50 : 60,
       zone: zone === "residential" ? "outside" : "residential",
-      roadType: "manual" as any,
+      roadType: "manual",
       createdAt: new Date().toISOString(),
       label: "Biển báo giả lập",
     };
