@@ -3,10 +3,16 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Car, Bike, Plus, Minus, Wifi, WifiOff, Loader2, MapPin, Trash2, RefreshCw, Eye, EyeOff } from "lucide-react";
+import dynamic from "next/dynamic";
+import { ArrowLeft, Car, Bike, Plus, Minus, Wifi, WifiOff, Loader2, MapPin, Trash2, RefreshCw, Eye, EyeOff, Map as MapIcon, List } from "lucide-react";
 import { useHudStore } from "../../../store/hud-store";
 import { useSpeedZoneStore } from "../../../store/speed-zone-store";
 import type { HudState } from "@karaoke/shared";
+
+const SpeedZoneMap = dynamic(() => import("./SpeedZoneMap"), {
+  ssr: false,
+  loading: () => <div className="w-full h-[500px] bg-slate-900 animate-pulse rounded-xl flex items-center justify-center text-slate-500 mt-3">Đang tải bản đồ...</div>
+});
 
 export default function HudRemotePage() {
   return (
@@ -26,6 +32,7 @@ function HudRemoteContent() {
   const [inputCode, setInputCode] = useState("");
   const [joining, setJoining] = useState(false);
   const [showZones, setShowZones] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "map">("map");
 
   const searchParams = useSearchParams();
 
@@ -242,10 +249,27 @@ function HudRemoteContent() {
                 onClick={() => { setShowZones(!showZones); if (!showZones && speedZoneStore.zones.length === 0) speedZoneStore.loadZones(); }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${showZones ? "bg-cyan-600 text-white" : "bg-slate-800 text-slate-400 hover:text-white"}`}
               >
-                {showZones ? "Ẩn" : `Xem (${speedZoneStore.zones.length})`}
+                {showZones ? "Đóng" : `Mở (${speedZoneStore.zones.length})`}
               </button>
             </div>
           </div>
+
+          {showZones && (
+            <div className="flex bg-slate-800/60 p-1 rounded-lg mb-3">
+              <button
+                onClick={() => setViewMode("map")}
+                className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-bold transition ${viewMode === "map" ? "bg-slate-700 text-white shadow-sm" : "text-slate-400 hover:text-slate-300"}`}
+              >
+                <MapIcon size={14} /> Bản đồ
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-bold transition ${viewMode === "list" ? "bg-slate-700 text-white shadow-sm" : "text-slate-400 hover:text-slate-300"}`}
+              >
+                <List size={14} /> Danh sách
+              </button>
+            </div>
+          )}
 
           {speedZoneStore.error && (
             <div className="bg-red-900/40 border border-red-500/40 rounded-xl px-3 py-2 text-red-300 text-xs mb-3 flex justify-between">
@@ -255,11 +279,18 @@ function HudRemoteContent() {
           )}
 
           {showZones && (
-            <div className="space-y-2 max-h-60 overflow-y-auto">
+            <>
               {speedZoneStore.zones.length === 0 ? (
                 <div className="text-center text-slate-500 text-sm py-4">Chưa có dữ liệu zone nào</div>
+              ) : viewMode === "map" ? (
+                <SpeedZoneMap 
+                  zones={speedZoneStore.zones} 
+                  onToggleStatus={speedZoneStore.toggleZoneStatus}
+                  onDelete={speedZoneStore.deleteZone}
+                />
               ) : (
-                speedZoneStore.zones.map((z) => (
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                  {speedZoneStore.zones.map((z) => (
                   <div key={z.id} className={`flex items-center gap-3 rounded-xl px-3 py-2 ${z.status === "inactive" ? "bg-slate-900/60 opacity-60" : "bg-slate-800/60"}`}>
                     <div className={`w-10 h-10 rounded-full border-[3px] flex items-center justify-center font-bold text-sm shrink-0 ${z.zone === "residential" ? "border-orange-500 text-orange-300" : "border-green-500 text-green-300"}`}>
                       {z.maxSpeed}
@@ -299,9 +330,10 @@ function HudRemoteContent() {
                       <Trash2 size={16} />
                     </button>
                   </div>
-                ))
+                ))}
+                </div>
               )}
-            </div>
+            </>
           )}
 
           {speedZoneStore.lastSyncTime && (
