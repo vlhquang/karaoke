@@ -60,6 +60,7 @@ interface SpeedZoneState {
   updatePrediction: (lat: number, lng: number, heading: number, currentMaxSpeed: number) => void;
   setPendingZone: (zone: SpeedZoneRecord | null) => void;
   confirmPendingZone: () => Promise<boolean>;
+  toggleZoneStatus: (id: string, newStatus: "active" | "inactive") => Promise<boolean>;
   clearError: () => void;
 }
 
@@ -147,6 +148,8 @@ export const useSpeedZoneStore = create<SpeedZoneState>((set, get) => ({
     let bestDist = Infinity;
 
     for (const zone of zones) {
+      if (zone.status === "inactive") continue;
+      
       const dist = haversineDistance(lat, lng, zone.lat, zone.lng);
       // Chỉ quan tâm zones trong bán kính 5km
       if (dist > 5000) continue;
@@ -187,6 +190,29 @@ export const useSpeedZoneStore = create<SpeedZoneState>((set, get) => ({
     const ok = await recordZone(pendingZone);
     if (ok) set({ pendingZone: null });
     return ok;
+  },
+
+  toggleZoneStatus: async (id: string, newStatus: "active" | "inactive") => {
+    try {
+      const res = await fetch("/api/hud-zones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle_status", id, status: newStatus }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        set((s) => ({
+          zones: s.zones.map((z) => (z.id === id ? { ...z, status: newStatus } : z)),
+        }));
+        return true;
+      } else {
+        set({ error: data.message || "Lỗi cập nhật trạng thái" });
+        return false;
+      }
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Lỗi kết nối" });
+      return false;
+    }
   },
 
   clearError: () => set({ error: "" }),

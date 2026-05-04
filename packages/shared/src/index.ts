@@ -315,6 +315,7 @@ export interface SpeedZoneRecord {
   maxSpeed: number;
   label?: string;          // e.g. "QL1A", "Đầu cầu X"
   createdAt: string;
+  status?: "active" | "inactive";
 }
 
 export interface SpeedZonePrediction {

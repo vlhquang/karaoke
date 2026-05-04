@@ -8,7 +8,7 @@
  */
 
 const SHEET_NAME = "SpeedZones";
-const HEADERS = ["id", "lat", "lng", "heading", "roadId", "zone", "roadType", "maxSpeed", "label", "createdAt"];
+const HEADERS = ["id", "lat", "lng", "heading", "roadId", "zone", "roadType", "maxSpeed", "label", "createdAt", "status"];
 
 function getOrCreateSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -36,6 +36,8 @@ function doPost(e) {
       return handleAddZone(body.data);
     } else if (action === "delete_zone") {
       return handleDeleteZone(body.id);
+    } else if (action === "toggle_status") {
+      return handleToggleStatus(body.id, body.status);
     } else {
       return jsonResponse({ ok: false, message: "Unsupported action: " + action });
     }
@@ -70,6 +72,8 @@ function handleGetZones() {
       }
       zone[key] = val === "" ? undefined : val;
     }
+    // Default status if missing
+    if (!zone.status) zone.status = "active";
     zones.push(zone);
   }
 
@@ -90,10 +94,11 @@ function handleAddZone(data) {
     data.heading || 0,
     data.roadId || "",
     data.zone || "outside",
-    data.roadType || "1_lane",
+    data.roadType || "manual",
     data.maxSpeed || 60,
     data.label || "",
-    data.createdAt || new Date().toISOString()
+    data.createdAt || new Date().toISOString(),
+    data.status || "active"
   ];
 
   sheet.appendRow(row);
@@ -112,6 +117,33 @@ function handleDeleteZone(id) {
     if (data[i][0] === id) {
       sheet.deleteRow(i + 1); // 1-indexed
       return jsonResponse({ ok: true, message: "Zone deleted" });
+    }
+  }
+
+  return jsonResponse({ ok: false, message: "Zone not found: " + id });
+}
+
+function handleToggleStatus(id, newStatus) {
+  if (!id || !newStatus) {
+    return jsonResponse({ ok: false, message: "Missing id or status" });
+  }
+
+  const sheet = getOrCreateSheet();
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const statusColIndex = headers.indexOf("status");
+
+  // If status column doesn't exist, append it
+  let colToUpdate = statusColIndex + 1;
+  if (statusColIndex === -1) {
+    sheet.getRange(1, headers.length + 1).setValue("status");
+    colToUpdate = headers.length + 1;
+  }
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === id) {
+      sheet.getRange(i + 1, colToUpdate).setValue(newStatus);
+      return jsonResponse({ ok: true, message: "Status updated to " + newStatus });
     }
   }
 

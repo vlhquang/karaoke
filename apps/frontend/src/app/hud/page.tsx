@@ -205,17 +205,39 @@ export default function HUDPage() {
     }
   };
 
+  const autoSaveZone = async (newMaxSpeed: number, newZone: "residential" | "outside") => {
+    if (!coords) return;
+    const record: SpeedZoneRecord = {
+      lat: coords.lat, lng: coords.lng, heading,
+      zone: newZone, roadType, maxSpeed: newMaxSpeed,
+      createdAt: new Date().toISOString(),
+      status: "active"
+    };
+    const ok = await speedZoneStore.recordZone(record);
+    if (ok) {
+      // Optional UI feedback could go here
+    }
+  };
+
   const handleQuickSelect = (type: string, val?: number | string) => {
+    let newZone = zone;
+    let newMaxSpeed = currentMaxSpeed;
+
     if (type === "zone") {
-      hudStore.updateState({ zone: val as "residential" | "outside" });
+      newZone = val as "residential" | "outside";
+      hudStore.updateState({ zone: newZone });
     } else if (type === "manual") {
-      hudStore.updateState({ manualMax: val as number });
+      newMaxSpeed = val as number;
+      hudStore.updateState({ manualMax: newMaxSpeed });
     }
     setShowQuickMenu(false);
+    autoSaveZone(newMaxSpeed, newZone);
   };
 
   const toggleZone = () => {
-    hudStore.updateState({ zone: zone === "residential" ? "outside" : "residential" });
+    const newZone = zone === "residential" ? "outside" : "residential";
+    hudStore.updateState({ zone: newZone });
+    autoSaveZone(currentMaxSpeed, newZone);
   };
 
   const toggleFullscreen = () => {

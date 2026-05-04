@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Car, Bike, Plus, Minus, Wifi, WifiOff, Loader2, MapPin, Trash2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Car, Bike, Plus, Minus, Wifi, WifiOff, Loader2, MapPin, Trash2, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { useHudStore } from "../../../store/hud-store";
 import { useSpeedZoneStore } from "../../../store/speed-zone-store";
 import type { HudState } from "@karaoke/shared";
@@ -260,7 +260,7 @@ function HudRemoteContent() {
                 <div className="text-center text-slate-500 text-sm py-4">Chưa có dữ liệu zone nào</div>
               ) : (
                 speedZoneStore.zones.map((z) => (
-                  <div key={z.id} className="flex items-center gap-3 bg-slate-800/60 rounded-xl px-3 py-2">
+                  <div key={z.id} className={`flex items-center gap-3 rounded-xl px-3 py-2 ${z.status === "inactive" ? "bg-slate-900/60 opacity-60" : "bg-slate-800/60"}`}>
                     <div className={`w-10 h-10 rounded-full border-[3px] flex items-center justify-center font-bold text-sm shrink-0 ${z.zone === "residential" ? "border-orange-500 text-orange-300" : "border-green-500 text-green-300"}`}>
                       {z.maxSpeed}
                     </div>
@@ -269,15 +269,34 @@ function HudRemoteContent() {
                         {z.lat.toFixed(5)}, {z.lng.toFixed(5)}
                         {z.label && <span className="text-cyan-400 ml-1">• {z.label}</span>}
                       </div>
-                      <div className="text-[10px] text-slate-500">
-                        {z.zone === "residential" ? "KDC" : "Ngoài KDC"} • {z.maxSpeed} km/h • {Math.round(z.heading)}°
+                      <div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5">
+                        <span>{z.zone === "residential" ? "KDC" : "Ngoài KDC"} • {z.maxSpeed} km/h • {Math.round(z.heading)}°</span>
+                        {z.status === "inactive" ? (
+                          <span className="px-1.5 py-0.5 bg-red-900/40 text-red-400 rounded text-[8px] font-bold uppercase tracking-wider border border-red-500/20">Inactive</span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 bg-green-900/40 text-green-400 rounded text-[8px] font-bold uppercase tracking-wider border border-green-500/20">Active</span>
+                        )}
                       </div>
                     </div>
+                    
                     <button
-                      onClick={() => z.id && speedZoneStore.deleteZone(z.id)}
-                      className="p-1.5 text-slate-500 hover:text-red-400 transition shrink-0"
+                      onClick={() => z.id && speedZoneStore.toggleZoneStatus(z.id, z.status === "inactive" ? "active" : "inactive")}
+                      className={`p-2 transition shrink-0 rounded-lg ${z.status === "inactive" ? "text-slate-500 hover:text-green-400 hover:bg-green-950/30" : "text-slate-400 hover:text-yellow-400 hover:bg-yellow-950/30"}`}
+                      title={z.status === "inactive" ? "Bật cảnh báo (Active)" : "Tắt cảnh báo (Deactivate)"}
                     >
-                      <Trash2 size={14} />
+                      {z.status === "inactive" ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (confirm("Bạn có chắc chắn muốn xoá vĩnh viễn biển báo này khỏi Google Sheet không?")) {
+                          z.id && speedZoneStore.deleteZone(z.id);
+                        }
+                      }}
+                      className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-950/30 transition shrink-0 rounded-lg"
+                      title="Xoá vĩnh viễn"
+                    >
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 ))
