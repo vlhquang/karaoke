@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
-import { ArrowLeft, Car, Bike, Settings, Plus, Minus, Mic, MicOff, X, Maximize, Minimize, Radio, QrCode, AlertTriangle, MapPin, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Car, Bike, Settings, Plus, Minus, Mic, MicOff, X, Maximize, Minimize, Radio, QrCode, AlertTriangle, MapPin, Save, Loader2, Clock } from "lucide-react";
 import { useHudStore } from "../../store/hud-store";
 import { useSpeedZoneStore, calcHeading, haversineDistance } from "../../store/speed-zone-store";
 import type { SpeedZoneRecord } from "@karaoke/shared";
@@ -26,6 +26,15 @@ export default function HUDPage() {
   const mainRef = useRef<HTMLElement>(null);
   const prevCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const lastSavedZoneRef = useRef<{ lat: number; lng: number; heading: number; maxSpeed: number; zone: "residential" | "outside" } | null>(null);
+
+  const [currentTime, setCurrentTime] = useState<string>("");
+
+  useEffect(() => {
+    const updateTime = () => setCurrentTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const [remoteUrl, setRemoteUrl] = useState<string>("");
   useEffect(() => {
@@ -396,53 +405,61 @@ export default function HUDPage() {
           )}
 
           {/* ── LEFT PANEL: Next Zone / Prediction ── */}
-          <div className="w-[35%] bg-[#1E1E1E] rounded-3xl flex flex-col p-2 relative border border-[#2C2C2E] overflow-hidden gap-2">
-            {/* Top compact indicator */}
-            {prediction ? (
-              <div className="flex items-center justify-center gap-3 bg-black/40 rounded-xl py-2 shrink-0">
-                <div className="text-xl font-bold text-[#B5FF00] font-digital tabular-nums">{prediction.distanceMeters}m</div>
-                <div className="text-[#B5FF00] font-bold text-xl">↑</div>
-                <div className="w-10 h-10 rounded-full bg-white border-[3px] border-red-600 flex items-center justify-center font-bold text-black text-lg tabular-nums shadow-lg">
-                  {prediction.nextMaxSpeed}
+          <div className="w-[45%] bg-[#0f172a]/80 backdrop-blur-md rounded-2xl flex flex-col p-6 relative border-2 border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.2)] overflow-hidden">
+            {/* Pagination "1/3" top right */}
+            <div className="absolute top-4 right-5 text-cyan-500/70 font-mono text-base font-bold tracking-widest">1/3</div>
+            
+            <div className="flex items-center gap-6 mb-6 mt-2">
+              <div className="w-16 h-16 rounded-full bg-white border-[6px] border-red-600 flex items-center justify-center font-bold text-black text-2xl tabular-nums shadow-[0_0_15px_rgba(220,38,38,0.4)] shrink-0">
+                {prediction ? prediction.nextMaxSpeed : "--"}
+              </div>
+              {prediction ? (
+                <div className="text-2xl md:text-3xl font-bold text-[#22c55e] uppercase tracking-wider" style={{ textShadow: "0 0 15px rgba(34,197,94,0.6)" }}>
+                  CÒN LẠI: {prediction.distanceMeters} M
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center py-3 bg-black/40 rounded-xl shrink-0 text-slate-500 text-xs">
-                Không có biển báo (500m)
-              </div>
-            )}
+              ) : (
+                <div className="text-xl md:text-2xl font-bold text-slate-500 uppercase tracking-wider">
+                  KHÔNG CÓ BIỂN
+                </div>
+              )}
+            </div>
+
+            {/* Separator line */}
+            <div className="w-full h-px bg-gradient-to-r from-cyan-500/0 via-cyan-500/50 to-cyan-500/0 mb-6"></div>
 
             {/* Bottom Map */}
-            <div className="flex-1 w-full rounded-2xl overflow-hidden relative">
+            <div className="flex-1 w-full rounded-xl overflow-hidden relative border border-cyan-500/20">
               <HudMiniMap coords={coords} heading={heading} prediction={prediction} />
             </div>
           </div>
 
           {/* ── RIGHT PANEL: Current Speed / Limit ── */}
-          <div className="flex-1 bg-[#1E1E1E] rounded-3xl relative flex flex-col items-center justify-center border border-[#2C2C2E]">
-            
-            {/* Top-Right Max Speed Sign */}
+          <div className="flex-1 bg-[#0f172a]/80 backdrop-blur-md rounded-2xl relative flex flex-col items-center justify-center border-2 border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
+            {/* Pagination "2/3" top right */}
+            <div className="absolute top-4 right-5 text-cyan-500/70 font-mono text-base font-bold tracking-widest">2/3</div>
+
+            {/* Top-Center Max Speed Sign */}
             <button onClick={() => setShowQuickMenu(!showQuickMenu)} 
-              className="absolute top-4 right-4 bg-transparent border border-white/20 rounded-xl p-2 flex flex-col items-center justify-center w-20 hover:scale-105 transition-transform"
+              className="absolute top-8 left-1/2 -translate-x-1/2 bg-transparent rounded-xl p-2 flex flex-col items-center justify-center hover:scale-105 transition-transform group z-10"
             >
-              <div className="w-14 h-14 rounded-full bg-white border-[5px] border-red-600 flex items-center justify-center font-bold text-black text-2xl tabular-nums">
+              <div className="w-16 h-16 rounded-full bg-white border-[6px] border-red-600 flex items-center justify-center font-bold text-black text-2xl tabular-nums shadow-[0_0_15px_rgba(220,38,38,0.5)]">
                 {currentMaxSpeed}
               </div>
-              <div className="text-[9px] font-bold text-white mt-1.5 tracking-wider">MAX LIMIT</div>
+              <div className="text-sm font-bold text-white mt-2 tracking-widest group-hover:text-cyan-300 transition-colors">MAX KM/H</div>
             </button>
 
             {/* Current Speed */}
-            <div className="flex flex-col items-center justify-center mt-6">
-              <div className={`font-digital text-[min(38vw,30vh)] font-black leading-none tabular-nums tracking-tighter transition-all ${isOverSpeed ? "text-red-500 animate-pulse" : "text-[#B5FF00]"}`}>
+            <div className="flex flex-col items-center justify-center mt-16">
+              <div className={`font-digital text-[28vh] font-black leading-none tabular-nums tracking-tighter transition-all ${isOverSpeed ? "text-red-500 animate-pulse" : "text-[#22c55e]"}`} style={{ textShadow: isOverSpeed ? "0 0 30px rgba(239,68,68,0.8)" : "0 0 30px rgba(34,197,94,0.6)" }}>
                 {finalSpeed}
               </div>
-              <div className="text-4xl font-bold text-white -mt-2">
-                km/h
+              <div className={`text-3xl font-bold mt-2 tracking-widest ${isOverSpeed ? "text-red-400" : "text-[#22c55e]"}`} style={{ textShadow: "0 0 10px currentColor" }}>
+                KM/H
               </div>
             </div>
 
             {/* Hidden Offset controls / Mic for clickability */}
-            <div className="absolute bottom-4 left-4 flex gap-2">
+            <div className="absolute bottom-6 left-6 flex gap-2 z-10">
                <button onClick={() => hudStore.updateState({ offset: offset - 1 })} className="w-10 h-10 rounded-full bg-slate-800/50 text-slate-400 flex items-center justify-center active:scale-90"><Minus size={16}/></button>
                <button onClick={() => hudStore.updateState({ offset: offset + 1 })} className="w-10 h-10 rounded-full bg-slate-800/50 text-slate-400 flex items-center justify-center active:scale-90"><Plus size={16}/></button>
                {offset !== 0 && <div className="flex items-center text-cyan-400 text-xs font-bold px-2">{offset > 0 ? `+${offset}` : offset}</div>}
@@ -454,16 +471,26 @@ export default function HUDPage() {
                )}
             </div>
 
+            {/* Bottom Info: Gear and Time */}
+            <div className="absolute bottom-8 w-full px-16 flex justify-between items-center text-cyan-500/80 font-bold text-2xl pointer-events-none">
+              <div className="flex items-center gap-3">
+                <Settings size={28} /> <span className="font-mono mt-1">D</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Clock size={28} /> <span className="font-mono mt-1">{currentTime}</span>
+              </div>
+            </div>
+
             {/* Save Zone button */}
             {!isHosting && coords && (
-              <button onClick={handleSaveZone} className="absolute bottom-4 right-4 w-10 h-10 rounded-full bg-slate-800/50 text-slate-400 flex items-center justify-center active:scale-90 transition-all hover:text-cyan-400" title="Ghi nhận toạ độ">
-                <MapPin size={18} />
+              <button onClick={handleSaveZone} className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-slate-800/50 text-slate-400 flex items-center justify-center active:scale-90 transition-all hover:text-cyan-400 z-10" title="Ghi nhận toạ độ">
+                <MapPin size={20} />
               </button>
             )}
 
             {/* Side Speed Presets (Quick Menu) */}
             {!isHosting && showQuickMenu && (
-              <div className="absolute right-24 top-4 flex gap-2 z-10 bg-black/80 p-2 rounded-xl backdrop-blur">
+              <div className="absolute right-24 top-8 flex gap-2 z-20 bg-black/80 p-2 rounded-xl backdrop-blur">
                 {[50, 60, 80, 100].map(s => (
                   <button key={s} onClick={() => handleQuickSelect("manual", s)}
                     className={`w-10 h-10 rounded-full border-2 flex items-center justify-center font-bold text-xs transition-all ${currentMaxSpeed === s ? "border-red-500 bg-white text-black scale-110 shadow-[0_0_15px_rgba(239,68,68,0.7)]" : "border-[#2C2C2E] bg-[#1c1c1e] text-slate-400 hover:border-slate-500"}`}
