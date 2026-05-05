@@ -152,8 +152,8 @@ export const useSpeedZoneStore = create<SpeedZoneState>((set, get) => ({
       if (zone.status === "inactive") continue;
       
       const dist = haversineDistance(lat, lng, zone.lat, zone.lng);
-      // Chỉ quan tâm zones trong bán kính 5km
-      if (dist > 5000) continue;
+      // Chỉ quan tâm zones trong bán kính 500m
+      if (dist > 500) continue;
       // Chỉ lấy zone phía trước
       const bearingToZone = bearing(lat, lng, zone.lat, zone.lng);
       if (!isAhead(heading, bearingToZone)) continue;
@@ -174,6 +174,8 @@ export const useSpeedZoneStore = create<SpeedZoneState>((set, get) => ({
           zone: bestZone.zone,
           roadType: bestZone.roadType,
           label: bestZone.label,
+          lat: bestZone.lat,
+          lng: bestZone.lng,
         },
       });
     } else {

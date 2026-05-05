@@ -7,6 +7,9 @@ import { ArrowLeft, Car, Bike, Settings, Plus, Minus, Mic, MicOff, X, Maximize, 
 import { useHudStore } from "../../store/hud-store";
 import { useSpeedZoneStore, calcHeading, haversineDistance } from "../../store/speed-zone-store";
 import type { SpeedZoneRecord } from "@karaoke/shared";
+import dynamic from "next/dynamic";
+
+const HudMiniMap = dynamic(() => import("./HudMiniMap"), { ssr: false });
 
 export default function HUDPage() {
   const [speed, setSpeed] = useState<number>(0);
@@ -393,58 +396,26 @@ export default function HUDPage() {
           )}
 
           {/* ── LEFT PANEL: Next Zone / Prediction ── */}
-          <div className="w-[35%] bg-[#1E1E1E] rounded-3xl flex flex-col py-4 px-3 relative border border-[#2C2C2E] overflow-hidden justify-between">
+          <div className="w-[35%] bg-[#1E1E1E] rounded-3xl flex flex-col p-2 relative border border-[#2C2C2E] overflow-hidden gap-2">
+            {/* Top compact indicator */}
             {prediction ? (
-              <>
-                {/* Top Signs */}
-                <div className="flex justify-center items-center gap-3 relative z-10 mt-2">
-                  <div className="w-[3.5rem] h-[3.5rem] rounded-full bg-white border-[4px] border-red-600 flex items-center justify-center font-bold text-black text-2xl tabular-nums">
-                    {prediction.nextMaxSpeed}
-                  </div>
-                  <div className={`w-12 h-10 rounded border border-white flex items-center justify-center text-white ${prediction.zone === "residential" ? "bg-blue-600" : "bg-green-600"}`}>
-                    {prediction.zone === "residential" ? (
-                      <div className="flex items-end h-5 gap-[2px]">
-                         <div className="w-[6px] h-3 bg-white rounded-t-sm"></div>
-                         <div className="w-[6px] h-5 bg-white rounded-t-sm"></div>
-                         <div className="w-[6px] h-4 bg-white rounded-t-sm"></div>
-                      </div>
-                    ) : (
-                      <span className="font-bold text-lg">↑</span>
-                    )}
-                  </div>
+              <div className="flex items-center justify-center gap-3 bg-black/40 rounded-xl py-2 shrink-0">
+                <div className="text-xl font-bold text-[#B5FF00] font-digital tabular-nums">{prediction.distanceMeters}m</div>
+                <div className="text-[#B5FF00] font-bold text-xl">↑</div>
+                <div className="w-10 h-10 rounded-full bg-white border-[3px] border-red-600 flex items-center justify-center font-bold text-black text-lg tabular-nums shadow-lg">
+                  {prediction.nextMaxSpeed}
                 </div>
-
-                {/* Road Graphic */}
-                <div className="flex-1 flex justify-center relative my-2">
-                  <div className="w-5 h-full bg-[#B5FF00] rounded-full relative">
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                      <svg width="24" height="48" viewBox="0 0 24 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-lg">
-                        <rect x="2" y="2" width="20" height="44" rx="6" fill="white"/>
-                        <rect x="4" y="10" width="16" height="10" rx="2" fill="#1c1c1e"/>
-                        <rect x="4" y="28" width="16" height="12" rx="2" fill="#1c1c1e"/>
-                      </svg>
-                    </div>
-                  </div>
-                  {/* Subtle connecting line */}
-                  <div className="absolute top-[-1rem] left-1/2 w-[calc(50%+1rem)] h-[2px] bg-[#B5FF00] -translate-x-full z-0"></div>
-                </div>
-
-                {/* Distance Text */}
-                <div className="text-center relative z-10 mb-2">
-                  <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Đến biển báo tiếp theo</div>
-                  <div className="text-5xl font-bold text-[#B5FF00] font-digital tabular-nums leading-none">
-                    {prediction.distanceMeters >= 1000 ? `${(prediction.distanceMeters / 1000).toFixed(1)}` : prediction.distanceMeters}
-                    <span className="text-3xl ml-2">{prediction.distanceMeters >= 1000 ? 'KM' : 'M'}</span>
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">khoảng cách</div>
-                </div>
-              </>
+              </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-600">
-                <Radio size={32} className="opacity-30 mb-2" />
-                <span className="text-xs text-center">Không có dữ liệu<br />cảnh báo phía trước</span>
+              <div className="flex items-center justify-center py-3 bg-black/40 rounded-xl shrink-0 text-slate-500 text-xs">
+                Không có biển báo (500m)
               </div>
             )}
+
+            {/* Bottom Map */}
+            <div className="flex-1 w-full rounded-2xl overflow-hidden relative">
+              <HudMiniMap coords={coords} heading={heading} prediction={prediction} />
+            </div>
           </div>
 
           {/* ── RIGHT PANEL: Current Speed / Limit ── */}

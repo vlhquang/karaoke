@@ -324,6 +324,8 @@ export interface SpeedZonePrediction {
   zone: HudZone;
   roadType: HudRoadType;
   label?: string;
+  lat: number;
+  lng: number;
 }
 
 export type HudClientToServerEvents = {
