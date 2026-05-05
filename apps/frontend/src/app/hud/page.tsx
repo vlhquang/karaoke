@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
-import { ArrowLeft, Car, Bike, Settings, Plus, Minus, Mic, MicOff, X, Maximize, Minimize, Radio, QrCode, AlertTriangle, MapPin, Save, Loader2, Clock } from "lucide-react";
+import { ArrowLeft, Car, Bike, Settings, Plus, Minus, Mic, MicOff, X, Maximize, Minimize, Radio, QrCode, AlertTriangle, MapPin, Save, Loader2 } from "lucide-react";
 import { useHudStore } from "../../store/hud-store";
 import { useSpeedZoneStore, calcHeading, haversineDistance } from "../../store/speed-zone-store";
 import type { SpeedZoneRecord } from "@karaoke/shared";
@@ -26,15 +26,6 @@ export default function HUDPage() {
   const mainRef = useRef<HTMLElement>(null);
   const prevCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const lastSavedZoneRef = useRef<{ lat: number; lng: number; heading: number; maxSpeed: number; zone: "residential" | "outside" } | null>(null);
-
-  const [currentTime, setCurrentTime] = useState<string>("");
-
-  useEffect(() => {
-    const updateTime = () => setCurrentTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
-    updateTime();
-    const timer = setInterval(updateTime, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   const [remoteUrl, setRemoteUrl] = useState<string>("");
   useEffect(() => {
@@ -406,8 +397,6 @@ export default function HUDPage() {
 
           {/* ── LEFT PANEL: Next Zone / Prediction ── */}
           <div className="w-[45%] bg-[#0f172a]/80 backdrop-blur-md rounded-2xl flex flex-col p-6 relative border-2 border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.2)] overflow-hidden">
-            {/* Pagination "1/3" top right */}
-            <div className="absolute top-4 right-5 text-cyan-500/70 font-mono text-base font-bold tracking-widest">1/3</div>
             
             <div className="flex items-center gap-6 mb-6 mt-2">
               <div className="w-16 h-16 rounded-full bg-white border-[6px] border-red-600 flex items-center justify-center font-bold text-black text-2xl tabular-nums shadow-[0_0_15px_rgba(220,38,38,0.4)] shrink-0">
@@ -435,8 +424,6 @@ export default function HUDPage() {
 
           {/* ── RIGHT PANEL: Current Speed / Limit ── */}
           <div className="flex-1 bg-[#0f172a]/80 backdrop-blur-md rounded-2xl relative flex flex-col items-center justify-center border-2 border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
-            {/* Pagination "2/3" top right */}
-            <div className="absolute top-4 right-5 text-cyan-500/70 font-mono text-base font-bold tracking-widest">2/3</div>
 
             {/* Top-Center Max Speed Sign */}
             <button onClick={() => setShowQuickMenu(!showQuickMenu)} 
@@ -469,16 +456,6 @@ export default function HUDPage() {
                    {isListening ? <Mic size={16} className="text-white" /> : <MicOff size={16} />}
                  </button>
                )}
-            </div>
-
-            {/* Bottom Info: Gear and Time */}
-            <div className="absolute bottom-8 w-full px-16 flex justify-between items-center text-cyan-500/80 font-bold text-2xl pointer-events-none">
-              <div className="flex items-center gap-3">
-                <Settings size={28} /> <span className="font-mono mt-1">D</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Clock size={28} /> <span className="font-mono mt-1">{currentTime}</span>
-              </div>
             </div>
 
             {/* Save Zone button */}
