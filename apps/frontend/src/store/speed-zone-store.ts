@@ -157,6 +157,12 @@ export const useSpeedZoneStore = create<SpeedZoneState>((set, get) => ({
       // Chỉ lấy zone phía trước
       const bearingToZone = bearing(lat, lng, zone.lat, zone.lng);
       if (!isAhead(heading, bearingToZone)) continue;
+      
+      // Chỉ lấy zone cùng chiều di chuyển (lệch tối đa 60 độ)
+      const angleDiff = Math.abs(heading - zone.heading);
+      const normalizedAngleDiff = Math.min(angleDiff, 360 - angleDiff);
+      if (normalizedAngleDiff > 60) continue;
+
       // Chỉ cảnh báo khi tốc độ tối đa sắp thay đổi
       if (zone.maxSpeed === currentMaxSpeed) continue;
       // Gần nhất

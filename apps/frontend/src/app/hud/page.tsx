@@ -250,6 +250,8 @@ export default function HUDPage() {
     const ok = await speedZoneStore.recordZone(record);
     if (ok) {
       lastSavedZoneRef.current = { lat: coords.lat, lng: coords.lng, heading, maxSpeed: newMaxSpeed, zone: newZone };
+      setSpeechFeedback("Đã cập nhật biển báo mới!");
+      setTimeout(() => setSpeechFeedback(""), 3000);
     }
   };
 
