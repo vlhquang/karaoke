@@ -387,96 +387,101 @@ export default function HUDPage() {
           <button onClick={toggleFullscreen} className="absolute top-2 right-2 p-1.5 bg-slate-800/40 rounded-full text-slate-500 hover:text-white z-50 opacity-20 hover:opacity-100 transition-opacity"><Minimize size={18} /></button>
         )}
 
-        {/* ═══ MAIN HUD - LANDSCAPE 2 PANELS ═══ */}
-        <div className={`flex-1 flex gap-3 p-3 relative ${showSettings ? "hidden" : "flex"} bg-black`}>
+        {/* ═══ MAIN HUD - FULL SCREEN MAP + OVERLAY ═══ */}
+        <div className={`flex-1 relative ${showSettings ? "hidden" : "flex"} bg-black overflow-hidden`}>
           
-          {/* Speech Feedback */}
-          {speechFeedback && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-800 text-cyan-300 px-3 py-1 rounded-full shadow-lg z-30 border border-cyan-500/30 text-sm">
-              {speechFeedback}
-            </div>
-          )}
-
-          {/* ── LEFT PANEL: Next Zone / Prediction ── */}
-          <div className="w-[45%] bg-[#0f172a]/80 backdrop-blur-md rounded-2xl flex flex-col p-6 relative border-2 border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.2)] overflow-hidden">
-            
-            <div className="flex items-center gap-6 mb-6 mt-2">
-              <div className="w-16 h-16 rounded-full bg-white border-[6px] border-red-600 flex items-center justify-center font-bold text-black text-2xl tabular-nums shadow-[0_0_15px_rgba(220,38,38,0.4)] shrink-0">
-                {prediction ? prediction.nextMaxSpeed : "--"}
-              </div>
-              {prediction ? (
-                <div className="text-2xl md:text-3xl font-bold text-[#22c55e] uppercase tracking-wider" style={{ textShadow: "0 0 15px rgba(34,197,94,0.6)" }}>
-                  CÒN LẠI: {prediction.distanceMeters} M
-                </div>
-              ) : (
-                <div className="text-xl md:text-2xl font-bold text-slate-500 uppercase tracking-wider">
-                  KHÔNG CÓ BIỂN
-                </div>
-              )}
-            </div>
-
-            {/* Separator line */}
-            <div className="w-full h-px bg-gradient-to-r from-cyan-500/0 via-cyan-500/50 to-cyan-500/0 mb-6"></div>
-
-            {/* Bottom Map */}
-            <div className="flex-1 w-full rounded-xl overflow-hidden relative border border-cyan-500/20">
-              <HudMiniMap coords={coords} heading={heading} prediction={prediction} />
-            </div>
+          {/* ── FULL SCREEN MAP ── */}
+          <div className="absolute inset-0 z-0">
+            <HudMiniMap coords={coords} heading={heading} prediction={prediction} />
           </div>
 
-          {/* ── RIGHT PANEL: Current Speed / Limit ── */}
-          <div className="flex-1 bg-[#0f172a]/80 backdrop-blur-md rounded-2xl relative flex flex-col items-center justify-center border-2 border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
-
-            {/* Top-Center Max Speed Sign */}
-            <button onClick={() => setShowQuickMenu(!showQuickMenu)} 
-              className="absolute top-8 left-1/2 -translate-x-1/2 bg-transparent rounded-xl p-2 flex flex-col items-center justify-center hover:scale-105 transition-transform group z-10"
-            >
-              <div className="w-16 h-16 rounded-full bg-white border-[6px] border-red-600 flex items-center justify-center font-bold text-black text-2xl tabular-nums shadow-[0_0_15px_rgba(220,38,38,0.5)]">
-                {currentMaxSpeed}
+          {/* ── OVERLAY UI ── */}
+          <div className="absolute inset-0 z-10 pointer-events-none">
+            
+            {/* Speech Feedback */}
+            {speechFeedback && (
+              <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-slate-900/90 text-cyan-300 px-4 py-2 rounded-full shadow-lg z-40 border border-cyan-500/30 text-sm font-bold pointer-events-auto backdrop-blur-md">
+                {speechFeedback}
               </div>
-              <div className="text-sm font-bold text-white mt-2 tracking-widest group-hover:text-cyan-300 transition-colors">MAX KM/H</div>
+            )}
+
+            {/* ─── TOP-LEFT: Next Sign Info ─── */}
+            <div className="absolute top-2 left-2 landscape:top-2 landscape:left-2 z-20 pointer-events-auto">
+              <div className="flex items-center gap-2">
+                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Next Sign</div>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="w-12 h-12 rounded-full bg-white/90 border-[3px] border-red-600 flex items-center justify-center font-bold text-black text-base tabular-nums shrink-0 shadow-lg backdrop-blur-sm">
+                  {prediction ? prediction.nextMaxSpeed : "--"}
+                </div>
+              </div>
+            </div>
+
+            {/* ─── TOP-RIGHT: Speed Limit Sign ─── */}
+            <button 
+              onClick={() => setShowQuickMenu(!showQuickMenu)} 
+              className="absolute top-2 right-2 landscape:top-2 landscape:right-2 z-20 pointer-events-auto flex flex-col items-center hover:scale-105 transition-transform group"
+            >
+              <div className="bg-black/60 backdrop-blur-md rounded-2xl p-3 flex flex-col items-center border border-slate-700/30">
+                <div className="w-[72px] h-[72px] landscape:w-20 landscape:h-20 rounded-full bg-black border-[6px] border-orange-500 flex items-center justify-center font-bold text-white text-3xl landscape:text-4xl tabular-nums shadow-[0_0_25px_rgba(249,115,22,0.5)]">
+                  {currentMaxSpeed}
+                </div>
+                <div className="text-[10px] font-bold text-slate-300 mt-1.5 tracking-[0.2em] uppercase">Limit</div>
+              </div>
             </button>
 
-            {/* Current Speed */}
-            <div className="flex flex-col items-center justify-center mt-16">
-              <div className={`font-digital text-[28vh] font-black leading-none tabular-nums tracking-tighter transition-all ${isOverSpeed ? "text-red-500 animate-pulse" : "text-[#22c55e]"}`} style={{ textShadow: isOverSpeed ? "0 0 30px rgba(239,68,68,0.8)" : "0 0 30px rgba(34,197,94,0.6)" }}>
-                {finalSpeed}
+            {/* ─── LEFT-BOTTOM on map: Distance badge ─── */}
+            {prediction && (
+              <div className="absolute bottom-16 left-2 landscape:bottom-16 landscape:left-2 z-20 flex items-center gap-1.5">
+                <div className="bg-slate-900/80 text-white text-[10px] font-bold px-1.5 py-1 rounded backdrop-blur-md border border-slate-600/40 uppercase">N</div>
+                <div className="bg-cyan-900/80 text-cyan-300 text-xs font-bold px-2.5 py-1 rounded backdrop-blur-md border border-cyan-500/30 shadow-lg">
+                  {prediction.distanceMeters}M
+                </div>
               </div>
-              <div className={`text-3xl font-bold mt-2 tracking-widest ${isOverSpeed ? "text-red-400" : "text-[#22c55e]"}`} style={{ textShadow: "0 0 10px currentColor" }}>
-                KM/H
+            )}
+
+            {/* ─── BOTTOM-RIGHT: Speed Display ─── */}
+            <div className="absolute bottom-14 right-2 landscape:bottom-14 landscape:right-4 z-20 flex flex-col items-center pointer-events-auto">
+              <div className="bg-black/60 backdrop-blur-md rounded-2xl px-6 py-3 flex flex-col items-center border border-slate-700/30">
+                <div className={`font-digital text-[28vw] landscape:text-[24vh] font-black leading-none tabular-nums tracking-tighter transition-all ${isOverSpeed ? "text-red-500 animate-pulse" : "text-[#22c55e]"}`} style={{ textShadow: isOverSpeed ? "0 0 40px rgba(239,68,68,0.8), 0 0 80px rgba(239,68,68,0.4)" : "0 0 40px rgba(34,197,94,0.6), 0 0 80px rgba(34,197,94,0.3)" }}>
+                  {finalSpeed}
+                </div>
+                <div className={`text-2xl landscape:text-3xl font-bold tracking-[0.3em] -mt-1 ${isOverSpeed ? "text-red-400" : "text-[#22c55e]"}`} style={{ textShadow: "0 0 15px currentColor" }}>
+                  KM/H
+                </div>
               </div>
             </div>
 
-            {/* Hidden Offset controls / Mic for clickability */}
-            <div className="absolute bottom-6 left-6 flex gap-2 z-10">
-               <button onClick={() => hudStore.updateState({ offset: offset - 1 })} className="w-10 h-10 rounded-full bg-slate-800/50 text-slate-400 flex items-center justify-center active:scale-90"><Minus size={16}/></button>
-               <button onClick={() => hudStore.updateState({ offset: offset + 1 })} className="w-10 h-10 rounded-full bg-slate-800/50 text-slate-400 flex items-center justify-center active:scale-90"><Plus size={16}/></button>
-               {offset !== 0 && <div className="flex items-center text-cyan-400 text-xs font-bold px-2">{offset > 0 ? `+${offset}` : offset}</div>}
-               
-               {!isHosting && (
-                 <button onClick={toggleListening} className={`w-10 h-10 rounded-full flex items-center justify-center ml-2 transition-all active:scale-90 ${isListening ? "bg-red-600" : "bg-slate-800/50 text-slate-400"}`}>
-                   {isListening ? <Mic size={16} className="text-white" /> : <MicOff size={16} />}
-                 </button>
-               )}
+            {/* ─── BOTTOM BAR: Controls ─── */}
+            <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-auto">
+              <div className="flex items-center justify-between px-3 py-2 bg-black/70 backdrop-blur-md border-t border-slate-800/60">
+                {/* Left: Navigation arrow + offset controls */}
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-full bg-slate-800/80 border border-cyan-500/30 flex items-center justify-center">
+                    <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[12px] border-b-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]"></div>
+                  </div>
+                  <button onClick={() => hudStore.updateState({ offset: offset - 1 })} className="w-9 h-9 rounded-full bg-slate-800/80 text-slate-400 flex items-center justify-center active:scale-90 border border-slate-700/50 transition"><Minus size={14}/></button>
+                  <button onClick={() => hudStore.updateState({ offset: offset + 1 })} className="w-9 h-9 rounded-full bg-slate-800/80 text-slate-400 flex items-center justify-center active:scale-90 border border-slate-700/50 transition"><Plus size={14}/></button>
+                  {offset !== 0 && <div className="flex items-center text-cyan-400 text-[10px] font-bold">{offset > 0 ? `+${offset}` : offset}</div>}
+                  
+                  {!isHosting && (
+                    <button onClick={toggleListening} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 border ${isListening ? "bg-red-600 border-red-500" : "bg-slate-800/80 text-slate-400 border-slate-700/50"}`}>
+                      {isListening ? <Mic size={14} className="text-white" /> : <MicOff size={14} />}
+                    </button>
+                  )}
+                </div>
+
+                {/* Right: Save Zone button */}
+                <div className="flex items-center gap-2">
+                  {!isHosting && coords && (
+                    <button onClick={handleSaveZone} className="w-9 h-9 rounded-full bg-slate-800/80 text-slate-400 flex items-center justify-center active:scale-90 transition-all hover:text-cyan-400 border border-slate-700/50" title="Ghi nhận toạ độ">
+                      <MapPin size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Save Zone button */}
-            {!isHosting && coords && (
-              <button onClick={handleSaveZone} className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-slate-800/50 text-slate-400 flex items-center justify-center active:scale-90 transition-all hover:text-cyan-400 z-10" title="Ghi nhận toạ độ">
-                <MapPin size={20} />
-              </button>
-            )}
-
-            {/* Side Speed Presets (Quick Menu) */}
-            {!isHosting && showQuickMenu && (
-              <div className="absolute right-24 top-8 flex gap-2 z-20 bg-black/80 p-2 rounded-xl backdrop-blur">
-                {[50, 60, 80, 100].map(s => (
-                  <button key={s} onClick={() => handleQuickSelect("manual", s)}
-                    className={`w-10 h-10 rounded-full border-2 flex items-center justify-center font-bold text-xs transition-all ${currentMaxSpeed === s ? "border-red-500 bg-white text-black scale-110 shadow-[0_0_15px_rgba(239,68,68,0.7)]" : "border-[#2C2C2E] bg-[#1c1c1e] text-slate-400 hover:border-slate-500"}`}
-                  >{s}</button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 

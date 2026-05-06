@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -20,12 +20,18 @@ interface HudMiniMapProps {
   prediction: SpeedZonePrediction | null;
 }
 
-function MapUpdater({ coords }: { coords: { lat: number; lng: number } | null }) {
+function MapUpdater({ coords, heading }: { coords: { lat: number; lng: number } | null; heading: number }) {
   const map = useMap();
+  const initializedRef = useRef(false);
   
   useEffect(() => {
     if (coords) {
-      map.setView([coords.lat, coords.lng], 16);
+      if (!initializedRef.current) {
+        map.setView([coords.lat, coords.lng], 17);
+        initializedRef.current = true;
+      } else {
+        map.panTo([coords.lat, coords.lng], { animate: true, duration: 0.5 });
+      }
     }
   }, [coords, map]);
 
@@ -34,8 +40,11 @@ function MapUpdater({ coords }: { coords: { lat: number; lng: number } | null })
 
 export default function HudMiniMap({ coords, heading, prediction }: HudMiniMapProps) {
   if (!coords) return (
-    <div className="w-full h-full flex items-center justify-center bg-[#1c1c1e] text-slate-500 text-xs">
-      Đang đợi GPS...
+    <div className="w-full h-full flex items-center justify-center bg-[#1a1a2e] text-slate-500 text-xs">
+      <div className="flex flex-col items-center gap-2">
+        <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+        <span className="uppercase tracking-widest text-[10px]">Đang đợi GPS...</span>
+      </div>
     </div>
   );
 
@@ -44,39 +53,45 @@ export default function HudMiniMap({ coords, heading, prediction }: HudMiniMapPr
       html: `
         <div style="
           background-color: white;
-          width: 30px; height: 30px;
+          width: 36px; height: 36px;
           border-radius: 50%;
-          border: 3px solid red;
+          border: 4px solid #dc2626;
           display: flex; align-items: center; justify-content: center;
-          color: black; font-family: sans-serif; font-weight: bold; font-size: 14px;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+          color: black; font-family: sans-serif; font-weight: 900; font-size: 14px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         ">
           ${speed}
         </div>
       `,
       className: "",
-      iconSize: [30, 30],
-      iconAnchor: [15, 15],
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
     });
   };
 
-  const createCarIcon = (heading: number) => {
+  const createCarIcon = (h: number) => {
     return L.divIcon({
       html: `
         <div style="
-          width: 0; 
-          height: 0; 
-          border-left: 10px solid transparent;
-          border-right: 10px solid transparent;
-          border-bottom: 20px solid #B5FF00;
-          transform: rotate(${heading}deg);
-          transform-origin: center;
-          filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));
-        "></div>
+          position: relative;
+          width: 24px; height: 24px;
+          display: flex; align-items: center; justify-content: center;
+        ">
+          <div style="
+            width: 0; 
+            height: 0; 
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 22px solid #22d3ee;
+            transform: rotate(${h}deg);
+            transform-origin: center;
+            filter: drop-shadow(0px 0px 6px rgba(34,211,238,0.8));
+          "></div>
+        </div>
       `,
       className: "",
-      iconSize: [20, 20],
-      iconAnchor: [10, 10],
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
     });
   };
 
@@ -84,22 +99,26 @@ export default function HudMiniMap({ coords, heading, prediction }: HudMiniMapPr
     <div className="w-full h-full relative z-0">
       <MapContainer 
         center={[coords.lat, coords.lng]} 
-        zoom={16} 
-        className="w-full h-full rounded-2xl"
+        zoom={17} 
+        className="w-full h-full"
         zoomControl={false}
-        attributionControl={false}
+        attributionControl={true}
+        style={{ background: "#e8e4d8" }}
       >
+        {/* Google Maps Standard style (light) */}
         <TileLayer
-          url="http://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}"
+          url="https://mt0.google.com/vt/lyrs=m&hl=vi&x={x}&y={y}&z={z}"
         />
-        <MapUpdater coords={coords} />
+        <MapUpdater coords={coords} heading={heading} />
         
+        {/* Car Marker */}
         <Marker 
           position={[coords.lat, coords.lng]} 
           icon={createCarIcon(heading)} 
           zIndexOffset={100}
         />
 
+        {/* Predicted zone marker */}
         {prediction && prediction.lat && prediction.lng && (
           <Marker 
             position={[prediction.lat, prediction.lng]} 
