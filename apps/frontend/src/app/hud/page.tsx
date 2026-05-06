@@ -241,6 +241,7 @@ export default function HUDPage() {
 
   const autoSaveZone = async (newMaxSpeed: number, newZone: "residential" | "outside") => {
     if (!coords) return;
+    setSpeechFeedback("⏳ Đang lưu biển báo...");
     const record: SpeedZoneRecord = {
       lat: coords.lat, lng: coords.lng, heading,
       zone: newZone, roadType, maxSpeed: newMaxSpeed,
@@ -250,9 +251,11 @@ export default function HUDPage() {
     const ok = await speedZoneStore.recordZone(record);
     if (ok) {
       lastSavedZoneRef.current = { lat: coords.lat, lng: coords.lng, heading, maxSpeed: newMaxSpeed, zone: newZone };
-      setSpeechFeedback("Đã cập nhật biển báo mới!");
-      setTimeout(() => setSpeechFeedback(""), 3000);
+      setSpeechFeedback(`✅ Đã lưu: ${newMaxSpeed} km/h • ${newZone === "residential" ? "KDC" : "Ngoài KDC"}`);
+    } else {
+      setSpeechFeedback("❌ Lưu thất bại! Kiểm tra kết nối.");
     }
+    setTimeout(() => setSpeechFeedback(""), 3000);
   };
 
   const handleQuickSelect = (type: string, val?: number | string) => {
