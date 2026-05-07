@@ -313,6 +313,7 @@ export interface SpeedZoneRecord {
   zone: HudZone;
   roadType: HudRoadType;
   maxSpeed: number;
+  laneCount?: 1 | 2;      // 1 làn hoặc 2 làn
   label?: string;          // e.g. "QL1A", "Đầu cầu X"
   createdAt: string;
   status?: "active" | "inactive";

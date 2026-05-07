@@ -20,6 +20,10 @@ interface SpeedZoneMapProps {
   onToggleStatus: (id: string, newStatus: "active" | "inactive") => void;
   onDelete: (id: string) => void;
   onUpdatePosition: (id: string, lat: number, lng: number) => void;
+  /** Optional: current user heading for showing movement direction */
+  currentHeading?: number;
+  /** Optional: current user position */
+  currentPosition?: { lat: number; lng: number } | null;
 }
 
 // Component to dynamically change map view
@@ -31,40 +35,90 @@ function ChangeView({ center }: { center: [number, number] }) {
   return null;
 }
 
-export default function SpeedZoneMap({ zones, onToggleStatus, onDelete, onUpdatePosition }: SpeedZoneMapProps) {
-  // Find map center based on the most recently added zone, fallback to HCM center
+export default function SpeedZoneMap({ zones, onToggleStatus, onDelete, onUpdatePosition, currentHeading, currentPosition }: SpeedZoneMapProps) {
+  // Find map center based on current position, most recently added zone, or HCM center
   let defaultCenter: [number, number] = [10.762622, 106.660172];
-  if (zones.length > 0) {
+  if (currentPosition) {
+    defaultCenter = [currentPosition.lat, currentPosition.lng];
+  } else if (zones.length > 0) {
     const lastZone = zones[zones.length - 1];
     defaultCenter = [lastZone.lat, lastZone.lng];
   }
 
-  // Create a custom icon with speed limit number inside
+  // Create a custom icon with speed limit number + heading arrow
   const createCustomIcon = (zone: SpeedZoneRecord) => {
     const isInactive = zone.status === "inactive";
     const bgColor = isInactive ? "#475569" : (zone.zone === "residential" ? "#f97316" : "#22c55e");
+    const headingDeg = zone.heading || 0;
+    const laneText = zone.laneCount ? `${zone.laneCount}L` : "";
     
     const html = `
       <div style="
-        background-color: ${bgColor};
-        width: 32px; height: 32px;
-        border-radius: 50%;
-        border: 2px solid white;
-        display: flex; align-items: center; justify-content: center;
-        color: white; font-family: sans-serif; font-weight: bold; font-size: 13px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.4);
-        opacity: ${isInactive ? 0.5 : 1};
+        position: relative;
+        display: flex; flex-direction: column; align-items: center;
       ">
-        ${zone.maxSpeed}
+        <!-- Heading arrow -->
+        <div style="
+          width: 0; height: 0;
+          border-left: 6px solid transparent;
+          border-right: 6px solid transparent;
+          border-bottom: 12px solid ${bgColor};
+          transform: rotate(${headingDeg}deg);
+          transform-origin: center bottom;
+          margin-bottom: -3px;
+          opacity: ${isInactive ? 0.4 : 0.9};
+          filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+        "></div>
+        <!-- Speed circle -->
+        <div style="
+          background-color: ${bgColor};
+          width: 32px; height: 32px;
+          border-radius: 50%;
+          border: 2px solid white;
+          display: flex; align-items: center; justify-content: center;
+          color: white; font-family: sans-serif; font-weight: bold; font-size: 13px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+          opacity: ${isInactive ? 0.5 : 1};
+          position: relative;
+        ">
+          ${zone.maxSpeed}
+          ${laneText ? `<span style="position:absolute;bottom:-8px;font-size:8px;background:${bgColor};color:white;padding:0 3px;border-radius:3px;border:1px solid white;">${laneText}</span>` : ""}
+        </div>
       </div>
     `;
 
     return L.divIcon({
       html,
       className: "",
-      iconSize: [32, 32],
-      iconAnchor: [16, 16],
-      popupAnchor: [0, -16],
+      iconSize: [32, 46],
+      iconAnchor: [16, 46],
+      popupAnchor: [0, -46],
+    });
+  };
+
+  // Current position marker with heading arrow
+  const createCurrentPosIcon = (h: number) => {
+    return L.divIcon({
+      html: `
+        <div style="
+          position: relative;
+          width: 28px; height: 28px;
+          display: flex; align-items: center; justify-content: center;
+        ">
+          <div style="
+            width: 0; height: 0;
+            border-left: 12px solid transparent;
+            border-right: 12px solid transparent;
+            border-bottom: 26px solid #22d3ee;
+            transform: rotate(${h}deg);
+            transform-origin: center;
+            filter: drop-shadow(0px 0px 8px rgba(34,211,238,0.8));
+          "></div>
+        </div>
+      `,
+      className: "",
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
     });
   };
 
@@ -77,6 +131,15 @@ export default function SpeedZoneMap({ zones, onToggleStatus, onDelete, onUpdate
         />
         <ChangeView center={defaultCenter} />
 
+        {/* Current position marker */}
+        {currentPosition && (
+          <Marker 
+            position={[currentPosition.lat, currentPosition.lng]}
+            icon={createCurrentPosIcon(currentHeading || 0)}
+            zIndexOffset={200}
+          />
+        )}
+
         {zones.map((z) => (
           <Marker 
             key={z.id} 
@@ -84,7 +147,7 @@ export default function SpeedZoneMap({ zones, onToggleStatus, onDelete, onUpdate
             icon={createCustomIcon(z)}
             draggable={true}
             eventHandlers={{
-              dragend: (e) => {
+              dragend: (e: any) => {
                 const marker = e.target;
                 const position = marker.getLatLng();
                 if (z.id) {
@@ -111,6 +174,12 @@ export default function SpeedZoneMap({ zones, onToggleStatus, onDelete, onUpdate
                     <span className="text-slate-400">Hướng:</span> 
                     <b>{Math.round(z.heading)}°</b>
                   </div>
+                  {z.laneCount && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Số làn:</span> 
+                      <b>{z.laneCount} làn</b>
+                    </div>
+                  )}
                   {z.label && (
                     <div className="flex justify-between">
                       <span className="text-slate-400">Ghi chú:</span> 

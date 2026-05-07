@@ -4,10 +4,10 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Car, Bike, Plus, Minus, Wifi, WifiOff, Loader2, MapPin, Trash2, RefreshCw, Eye, EyeOff, Map as MapIcon, List } from "lucide-react";
+import { ArrowLeft, Car, Bike, Plus, Minus, Wifi, WifiOff, Loader2, MapPin, Trash2, RefreshCw, Eye, EyeOff, Map as MapIcon, List, Save } from "lucide-react";
 import { useHudStore } from "../../../store/hud-store";
 import { useSpeedZoneStore } from "../../../store/speed-zone-store";
-import type { HudState } from "@karaoke/shared";
+import type { HudState, SpeedZoneRecord } from "@karaoke/shared";
 
 const SpeedZoneMap = dynamic(() => import("./SpeedZoneMap"), {
   ssr: false,
@@ -36,6 +36,8 @@ function HudRemoteContent() {
   const [adminOnly, setAdminOnly] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
+  const [laneCount, setLaneCount] = useState<1 | 2>(1);
+  const [saveFeedback, setSaveFeedback] = useState("");
 
   const searchParams = useSearchParams();
 
@@ -57,6 +59,30 @@ function HudRemoteContent() {
   };
 
   const patch = (p: Partial<HudState>) => updateState(p);
+
+  // Lưu biển báo xuống Google Sheet khi chọn tốc độ
+  const saveSignToSheet = async (speed: number) => {
+    const currentZone = state?.zone || "residential";
+    setSaveFeedback("⏳ Đang lưu...");
+    const record: SpeedZoneRecord = {
+      lat: 0, lng: 0, // Will be filled by HUD device GPS if synced
+      heading: 0,
+      zone: currentZone,
+      roadType: "manual",
+      maxSpeed: speed,
+      laneCount: laneCount,
+      createdAt: new Date().toISOString(),
+      status: "active",
+      label: `${laneCount} làn • ${currentZone === "residential" ? "KDC" : "Ngoài KDC"}`,
+    };
+    const ok = await speedZoneStore.recordZone(record);
+    if (ok) {
+      setSaveFeedback(`✅ Đã lưu: ${speed} km/h • ${laneCount} làn • ${currentZone === "residential" ? "KDC" : "Ngoài KDC"}`);
+    } else {
+      setSaveFeedback("❌ Lưu thất bại!");
+    }
+    setTimeout(() => setSaveFeedback(""), 3000);
+  };
 
   const currentMaxSpeed = state?.manualMax || 60;
 
@@ -216,25 +242,62 @@ function HudRemoteContent() {
             </div>
 
             {/* Chuyển Khu dân cư */}
-            <button
-              onClick={() => patch({ zone: state.zone === "residential" ? "outside" : "residential" })}
-              className={`w-full py-5 rounded-2xl border-2 text-2xl font-bold transition-all ${
-                state.zone === "residential"
-                  ? "bg-orange-950/60 border-orange-500 text-orange-300"
-                  : "bg-green-950/60 border-green-500 text-green-300"
-              }`}
-            >
-              {state.zone === "residential" ? "🏘 Khu dân cư → Ngoài KDC" : "🌿 Ngoài KDC → Khu dân cư"}
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => patch({ zone: "residential" })}
+                className={`py-4 rounded-2xl border-2 text-lg font-bold transition-all flex items-center justify-center gap-2 ${
+                  state.zone === "residential"
+                    ? "bg-orange-950/60 border-orange-500 text-orange-300"
+                    : "bg-slate-800/60 border-slate-700 text-slate-400"
+                }`}
+              >
+                🏘 KDC
+              </button>
+              <button
+                onClick={() => patch({ zone: "outside" })}
+                className={`py-4 rounded-2xl border-2 text-lg font-bold transition-all flex items-center justify-center gap-2 ${
+                  state.zone === "outside"
+                    ? "bg-green-950/60 border-green-500 text-green-300"
+                    : "bg-slate-800/60 border-slate-700 text-slate-400"
+                }`}
+              >
+                🌿 Ngoài KDC
+              </button>
+            </div>
 
-            {/* Biển báo tốc độ */}
+            {/* Số làn đường */}
             <div>
-              <div className="text-sm text-slate-400 mb-3 font-semibold uppercase tracking-wide">Biển báo thủ công</div>
+              <div className="text-sm text-slate-400 mb-3 font-semibold uppercase tracking-wide">Số làn đường</div>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setLaneCount(1)}
+                  className={`py-4 rounded-xl border-2 text-lg font-bold flex items-center justify-center gap-2 transition-all ${
+                    laneCount === 1 ? "bg-cyan-900/60 border-cyan-400 text-cyan-200" : "bg-slate-800/60 border-slate-700 text-slate-400"
+                  }`}
+                >
+                  🛣 1 Làn
+                </button>
+                <button
+                  onClick={() => setLaneCount(2)}
+                  className={`py-4 rounded-xl border-2 text-lg font-bold flex items-center justify-center gap-2 transition-all ${
+                    laneCount === 2 ? "bg-cyan-900/60 border-cyan-400 text-cyan-200" : "bg-slate-800/60 border-slate-700 text-slate-400"
+                  }`}
+                >
+                  🛣 2 Làn
+                </button>
+              </div>
+            </div>
+
+            {/* Biển báo tốc độ — chọn sẽ lưu xuống Google Sheet */}
+            <div>
+              <div className="text-sm text-slate-400 mb-3 font-semibold uppercase tracking-wide flex items-center gap-2">
+                <Save size={14} /> Biển báo tốc độ <span className="text-[10px] text-slate-500 normal-case">(Chọn = Lưu xuống Sheet)</span>
+              </div>
               <div className="grid grid-cols-4 gap-3">
-                {[40, 50, 60, 80, 90, 100, 120].map(s => (
+                {[40, 50, 60, 70, 80, 90, 100, 120].map(s => (
                   <button
                     key={s}
-                    onClick={() => patch({ manualMax: s })}
+                    onClick={() => { patch({ manualMax: s }); saveSignToSheet(s); }}
                     className={`py-4 rounded-full border-[3px] text-2xl font-bold flex items-center justify-center transition-all ${
                       state.manualMax === s
                         ? "border-red-500 bg-white text-black scale-110 shadow-[0_0_15px_rgba(239,68,68,0.5)]"
@@ -245,6 +308,15 @@ function HudRemoteContent() {
                   </button>
                 ))}
               </div>
+              {saveFeedback && (
+                <div className={`mt-3 text-center text-sm font-bold py-2 rounded-xl border ${
+                  saveFeedback.includes("✅") ? "bg-green-900/40 border-green-500/40 text-green-300" 
+                  : saveFeedback.includes("❌") ? "bg-red-900/40 border-red-500/40 text-red-300"
+                  : "bg-slate-800/60 border-slate-700 text-cyan-300"
+                }`}>
+                  {saveFeedback}
+                </div>
+              )}
             </div>
 
         {/* Sai số GPS */}

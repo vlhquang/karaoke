@@ -3,6 +3,17 @@
 import { create } from "zustand";
 import type { SpeedZoneRecord, SpeedZonePrediction, HudZone, HudRoadType } from "@karaoke/shared";
 
+// ── Configurable thresholds (env vars, đơn vị mét) ──
+
+/** Bán kính scan biển báo phía trước (mét). Mặc định 2000m. */
+const SCAN_RADIUS_M = Number(process.env.NEXT_PUBLIC_HUD_SCAN_RADIUS_M) || 2000;
+
+/** Ngưỡng "đã tới" biển báo để auto-update tốc độ (mét). Mặc định 30m. */
+const ARRIVE_THRESHOLD_M = Number(process.env.NEXT_PUBLIC_HUD_ARRIVE_THRESHOLD_M) || 30;
+
+/** Số biển báo tiếp theo tối đa hiển thị */
+const MAX_PREDICTIONS = 3;
+
 // ── Geo utilities ──
 
 /** Haversine distance in meters */
@@ -46,6 +57,9 @@ function isAhead(currentHeading: number, bearingToTarget: number): boolean {
 
 interface SpeedZoneState {
   zones: SpeedZoneRecord[];
+  /** Tối đa 3 biển báo phía trước, sorted by distance asc */
+  predictions: SpeedZonePrediction[];
+  /** Backward-compat alias: biển báo gần nhất (predictions[0] or null) */
   prediction: SpeedZonePrediction | null;
   loading: boolean;
   error: string;
@@ -54,24 +68,34 @@ interface SpeedZoneState {
   // Pending zone (chờ xác nhận trước khi lưu)
   pendingZone: SpeedZoneRecord | null;
 
+  // Track zones đã đi qua để tránh re-trigger auto-update
+  passedZoneIds: Set<string>;
+
   loadZones: () => Promise<void>;
   recordZone: (record: SpeedZoneRecord) => Promise<boolean>;
   deleteZone: (id: string) => Promise<boolean>;
-  updatePrediction: (lat: number, lng: number, heading: number, currentMaxSpeed: number) => void;
+  /**
+   * Cập nhật predictions (tối đa 3 biển phía trước).
+   * Returns zone id nếu vừa arrive (≤ threshold), null otherwise.
+   */
+  updatePrediction: (lat: number, lng: number, heading: number, currentMaxSpeed: number) => { arrivedZone: SpeedZoneRecord | null };
   setPendingZone: (zone: SpeedZoneRecord | null) => void;
   confirmPendingZone: () => Promise<boolean>;
   toggleZoneStatus: (id: string, newStatus: "active" | "inactive") => Promise<boolean>;
   updateZonePosition: (id: string, lat: number, lng: number) => Promise<boolean>;
   clearError: () => void;
+  resetPassedZones: () => void;
 }
 
 export const useSpeedZoneStore = create<SpeedZoneState>((set, get) => ({
   zones: [],
+  predictions: [],
   prediction: null,
   loading: false,
   error: "",
   lastSyncTime: null,
   pendingZone: null,
+  passedZoneIds: new Set(),
 
   loadZones: async () => {
     set({ loading: true, error: "" });
@@ -137,56 +161,69 @@ export const useSpeedZoneStore = create<SpeedZoneState>((set, get) => ({
     }
   },
 
-  updatePrediction: (lat: number, lng: number, heading: number, currentMaxSpeed: number) => {
-    const { zones } = get();
+  updatePrediction: (lat: number, lng: number, heading: number, _currentMaxSpeed: number) => {
+    const { zones, passedZoneIds } = get();
+
     if (zones.length === 0) {
-      set({ prediction: null });
-      return;
+      set({ predictions: [], prediction: null });
+      return { arrivedZone: null };
     }
 
-    // Tìm zone phía trước gần nhất có maxSpeed khác currentMaxSpeed
-    let bestZone: SpeedZoneRecord | null = null;
-    let bestDist = Infinity;
+    // Collect all candidate zones ahead
+    const candidates: { zone: SpeedZoneRecord; dist: number }[] = [];
 
     for (const zone of zones) {
       if (zone.status === "inactive") continue;
-      
+      if (!zone.id) continue;
+
       const dist = haversineDistance(lat, lng, zone.lat, zone.lng);
-      // Chỉ quan tâm zones trong bán kính 500m
-      if (dist > 500) continue;
+      // Chỉ quan tâm zones trong bán kính scan
+      if (dist > SCAN_RADIUS_M) continue;
       // Chỉ lấy zone phía trước
       const bearingToZone = bearing(lat, lng, zone.lat, zone.lng);
       if (!isAhead(heading, bearingToZone)) continue;
-      
+
       // Chỉ lấy zone cùng chiều di chuyển (lệch tối đa 60 độ)
       const angleDiff = Math.abs(heading - zone.heading);
       const normalizedAngleDiff = Math.min(angleDiff, 360 - angleDiff);
       if (normalizedAngleDiff > 60) continue;
 
-      // Chỉ cảnh báo khi tốc độ tối đa sắp thay đổi
-      if (zone.maxSpeed === currentMaxSpeed) continue;
-      // Gần nhất
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestZone = zone;
+      candidates.push({ zone, dist });
+    }
+
+    // Sort by distance ascending, take top MAX_PREDICTIONS
+    candidates.sort((a, b) => a.dist - b.dist);
+    const topCandidates = candidates.slice(0, MAX_PREDICTIONS);
+
+    const predictions: SpeedZonePrediction[] = topCandidates.map(({ zone, dist }) => ({
+      nextMaxSpeed: zone.maxSpeed,
+      distanceMeters: Math.round(dist),
+      zone: zone.zone,
+      roadType: zone.roadType,
+      label: zone.label,
+      lat: zone.lat,
+      lng: zone.lng,
+    }));
+
+    // Check arrival: biển báo gần nhất ≤ threshold & chưa passed
+    let arrivedZone: SpeedZoneRecord | null = null;
+    if (topCandidates.length > 0) {
+      const nearest = topCandidates[0];
+      if (nearest.dist <= ARRIVE_THRESHOLD_M && nearest.zone.id && !passedZoneIds.has(nearest.zone.id)) {
+        arrivedZone = nearest.zone;
+        // Mark as passed
+        const newPassed = new Set(passedZoneIds);
+        newPassed.add(nearest.zone.id);
+        set({ passedZoneIds: newPassed });
       }
     }
 
-    if (bestZone) {
-      set({
-        prediction: {
-          nextMaxSpeed: bestZone.maxSpeed,
-          distanceMeters: Math.round(bestDist),
-          zone: bestZone.zone,
-          roadType: bestZone.roadType,
-          label: bestZone.label,
-          lat: bestZone.lat,
-          lng: bestZone.lng,
-        },
-      });
-    } else {
-      set({ prediction: null });
-    }
+    set({
+      predictions,
+      prediction: predictions.length > 0 ? predictions[0] : null,
+    });
+
+    return { arrivedZone };
   },
 
   setPendingZone: (zone: SpeedZoneRecord | null) => {
@@ -248,4 +285,6 @@ export const useSpeedZoneStore = create<SpeedZoneState>((set, get) => ({
   },
 
   clearError: () => set({ error: "" }),
+
+  resetPassedZones: () => set({ passedZoneIds: new Set() }),
 }));

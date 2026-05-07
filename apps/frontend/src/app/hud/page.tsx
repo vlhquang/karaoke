@@ -37,7 +37,8 @@ export default function HUDPage() {
   const hudStore = useHudStore();
   const { mode, roadType, zone, manualMax, offset } = hudStore.state;
   const speedZoneStore = useSpeedZoneStore();
-  const { prediction, pendingZone } = speedZoneStore;
+  const { predictions, pendingZone } = speedZoneStore;
+  const prediction = predictions.length > 0 ? predictions[0] : null;
 
   const [isListening, setIsListening] = useState<boolean>(false);
   const [speechFeedback, setSpeechFeedback] = useState<string>("");
@@ -128,8 +129,14 @@ export default function HUDPage() {
               const freshZone = freshState.zone as "residential" | "outside";
               const freshRoadType = freshState.roadType;
 
-              // Update prediction
-              speedZoneStore.updatePrediction(newCoords.lat, newCoords.lng, h, freshMaxSpeed);
+              // Update prediction & check arrival
+              const { arrivedZone } = speedZoneStore.updatePrediction(newCoords.lat, newCoords.lng, h, freshMaxSpeed);
+              if (arrivedZone) {
+                // Auto-update max speed to arrived zone's speed
+                useHudStore.getState().updateState({ manualMax: arrivedZone.maxSpeed, zone: arrivedZone.zone });
+                setSpeechFeedback(`🚦 Cập nhật: ${arrivedZone.maxSpeed} km/h • ${arrivedZone.zone === "residential" ? "KDC" : "Ngoài KDC"}`);
+                setTimeout(() => setSpeechFeedback(""), 3000);
+              }
 
               // Tự động lưu khi bẻ lái chuyển đường (heading thay đổi > 45 độ, khoảng cách > 50m)
               if (!lastSavedZoneRef.current) {
@@ -395,7 +402,7 @@ export default function HUDPage() {
           
           {/* ── FULL SCREEN MAP ── */}
           <div className="absolute inset-0 z-0">
-            <HudMiniMap coords={coords} heading={heading} prediction={prediction} />
+            <HudMiniMap coords={coords} heading={heading} predictions={predictions} />
           </div>
 
           {/* ── OVERLAY UI ── */}
@@ -414,10 +421,33 @@ export default function HUDPage() {
                 <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Next Sign</div>
               </div>
               <div className="flex items-center gap-2 mt-1">
-                <div className="w-12 h-12 rounded-full bg-white/90 border-[3px] border-red-600 flex items-center justify-center font-bold text-black text-base tabular-nums shrink-0 shadow-lg backdrop-blur-sm">
+                <div className="w-14 h-14 rounded-full bg-white/90 border-[4px] border-red-600 flex items-center justify-center font-bold text-black text-lg tabular-nums shrink-0 shadow-lg backdrop-blur-sm">
                   {prediction ? prediction.nextMaxSpeed : "--"}
                 </div>
+                {prediction && (
+                  <div className="flex flex-col gap-0.5">
+                    <div className="bg-cyan-900/80 text-cyan-300 text-sm font-bold px-2.5 py-1 rounded backdrop-blur-md border border-cyan-500/30 shadow-lg tabular-nums">
+                      {prediction.distanceMeters}m
+                    </div>
+                    <div className="text-[9px] text-slate-400 font-medium">
+                      {prediction.zone === "residential" ? "KDC" : "Ngoài KDC"}
+                    </div>
+                  </div>
+                )}
               </div>
+              {/* Additional upcoming signs */}
+              {predictions.length > 1 && (
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  {predictions.slice(1).map((p, idx) => (
+                    <div key={idx} className="flex items-center gap-1 bg-black/50 backdrop-blur-sm rounded-lg px-1.5 py-0.5">
+                      <div className="w-7 h-7 rounded-full bg-white/80 border-[2px] border-red-500 flex items-center justify-center font-bold text-black text-[10px] tabular-nums shrink-0">
+                        {p.nextMaxSpeed}
+                      </div>
+                      <span className="text-[10px] text-slate-300 font-medium tabular-nums">{p.distanceMeters}m</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* ─── TOP-RIGHT: Speed Limit Sign ─── */}
@@ -437,8 +467,14 @@ export default function HUDPage() {
             {prediction && (
               <div className="absolute bottom-16 left-2 landscape:bottom-16 landscape:left-2 z-20 flex items-center gap-1.5">
                 <div className="bg-slate-900/80 text-white text-[10px] font-bold px-1.5 py-1 rounded backdrop-blur-md border border-slate-600/40 uppercase">N</div>
-                <div className="bg-cyan-900/80 text-cyan-300 text-xs font-bold px-2.5 py-1 rounded backdrop-blur-md border border-cyan-500/30 shadow-lg">
-                  {prediction.distanceMeters}M
+                <div className={`text-xs font-bold px-2.5 py-1 rounded backdrop-blur-md border shadow-lg tabular-nums ${
+                  prediction.distanceMeters <= 100 
+                    ? "bg-red-900/80 text-red-300 border-red-500/40 animate-pulse" 
+                    : prediction.distanceMeters <= 200 
+                      ? "bg-yellow-900/80 text-yellow-300 border-yellow-500/30" 
+                      : "bg-cyan-900/80 text-cyan-300 border-cyan-500/30"
+                }`}>
+                  {prediction.distanceMeters}m
                 </div>
               </div>
             )}
