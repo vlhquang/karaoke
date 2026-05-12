@@ -76,8 +76,13 @@ function SolarSystem({ simState, viewMode, dayOfYear }: SpaceSimulationProps) {
 
     if (earthGroupRef.current) {
       if (simState.seasons) {
+        // Offset 171 ngày: Để ngày 0 (01/01) nằm ở đúng vị trí trên quỹ đạo thực tế
+        // (Vừa qua khỏi Đông Chí - góc PI).
+        const offsetDays = 171;
+        const currentDay = dayOfYear - offsetDays;
+        
         // Quỹ đạo của Trái đất: 365.25 ngày = 1 vòng quỹ đạo (2 * PI)
-        orbitAngle.current = (dayOfYear / 365.25) * 2 * Math.PI;
+        orbitAngle.current = (currentDay / 365.25) * 2 * Math.PI;
       }
       
       const ex = ORBIT_A * Math.cos(orbitAngle.current) + ORBIT_C;
