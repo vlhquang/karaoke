@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Sun, CalendarDays, Snowflake, Droplets, Play, Pause } from "lucide-react";
 import Link from "next/link";
@@ -75,7 +75,7 @@ export default function SpaceLabPage() {
   const [isPlaying, setIsPlaying] = useState(false);
 
   // Play loop
-  React.useEffect(() => {
+  useEffect(() => {
     let animationFrameId: number;
     let lastTime = performance.now();
 
