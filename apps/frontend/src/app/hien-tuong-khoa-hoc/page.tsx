@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Sun, CalendarDays, Snowflake, Droplets, Play, Pause } from "lucide-react";
+import { ArrowLeft, Sun, CalendarDays, Snowflake, Droplets, Play, Pause, Settings2 } from "lucide-react";
 import Link from "next/link";
 
 // Dynamically import the 3D simulation to avoid SSR issues
@@ -73,6 +73,9 @@ export default function SpaceLabPage() {
   const [viewMode, setViewMode] = useState<'space' | 'surface'>('space');
   const [dayOfYear, setDayOfYear] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [timeSpan, setTimeSpan] = useState(365.25);
+  const [playSpeed, setPlaySpeed] = useState(1);
+  const [showTimeConfig, setShowTimeConfig] = useState(false);
 
   // Play loop
   useEffect(() => {
@@ -85,8 +88,10 @@ export default function SpaceLabPage() {
 
       if (isPlaying) {
         setDayOfYear(prev => {
-          let next = prev + (deltaMs / 1000) * 1.5; // 1.5 ngày mỗi giây (nhanh vừa phải để xem tự quay)
-          if (next > 365.25) next = 0;
+          // Tính toán sao cho thời gian chạy hết thanh trượt (timeSpan) luôn mất khoảng 30 giây ở tốc độ 1x
+          const daysPerSecond = (timeSpan / 30) * playSpeed;
+          let next = prev + (deltaMs / 1000) * daysPerSecond;
+          if (next > timeSpan) next = 0;
           return next;
         });
       }
@@ -100,7 +105,7 @@ export default function SpaceLabPage() {
     return () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
     };
-  }, [isPlaying]);
+  }, [isPlaying, timeSpan, playSpeed]);
 
   const formatDate = (days: number) => {
     const baseDate = new Date(2025, 0, 1, 0, 0, 0);
@@ -235,7 +240,6 @@ export default function SpaceLabPage() {
               </div>
             );
           })}
-
         </div>
       </div>
 
@@ -247,25 +251,69 @@ export default function SpaceLabPage() {
 
       {/* Bottom Timeline Scrubber */}
       <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 w-[90%] md:w-[600px] z-20 bg-slate-900/60 backdrop-blur-md border border-white/20 p-3 md:p-4 rounded-2xl md:rounded-3xl shadow-2xl flex flex-col gap-2 transition-all">
+        {showTimeConfig && (
+          <div className="absolute bottom-[110%] left-0 w-64 bg-slate-900/90 backdrop-blur-xl border border-white/20 p-4 rounded-2xl shadow-2xl flex flex-col gap-4">
+            <div>
+              <label className="text-xs text-slate-300 mb-1.5 block font-semibold">Phạm vi thời gian (Timeline)</label>
+              <select 
+                value={timeSpan} 
+                onChange={(e) => {
+                  const newSpan = parseFloat(e.target.value);
+                  setTimeSpan(newSpan);
+                  if (dayOfYear > newSpan) setDayOfYear(newSpan);
+                }}
+                className="w-full bg-black/50 text-cyan-300 text-sm rounded-lg border border-cyan-500/30 px-3 py-2 outline-none focus:border-cyan-400"
+              >
+                <option value={1}>1 Ngày (Chi tiết ngày đêm)</option>
+                <option value={7}>1 Tuần</option>
+                <option value={30}>1 Tháng (Xem thủy triều)</option>
+                <option value={365.25}>1 Năm (Xem các mùa)</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="text-xs text-slate-300 mb-1.5 flex justify-between font-semibold">
+                <span>Tốc độ tự động</span>
+                <span className="text-purple-400">{playSpeed}x</span>
+              </label>
+              <input 
+                type="range" 
+                min="0.1" max="5" step="0.1" 
+                value={playSpeed}
+                onChange={(e) => setPlaySpeed(parseFloat(e.target.value))}
+                className="w-full accent-purple-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-between items-center px-1">
-          <button 
-            onClick={() => setIsPlaying(!isPlaying)}
-            className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-cyan-500 hover:bg-cyan-400 text-black flex items-center justify-center transition-colors shadow-lg shrink-0"
-          >
-            {isPlaying ? <Pause className="w-4 h-4 md:w-5 md:h-5 fill-current" /> : <Play className="w-4 h-4 md:w-5 md:h-5 fill-current translate-x-[1px]" />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setIsPlaying(!isPlaying)}
+              className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-cyan-500 hover:bg-cyan-400 text-black flex items-center justify-center transition-colors shadow-lg shrink-0"
+            >
+              {isPlaying ? <Pause className="w-4 h-4 md:w-5 md:h-5 fill-current" /> : <Play className="w-4 h-4 md:w-5 md:h-5 fill-current translate-x-[1px]" />}
+            </button>
+            <button 
+              onClick={() => setShowTimeConfig(!showTimeConfig)}
+              className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-colors shadow-lg shrink-0 ${showTimeConfig ? "bg-purple-500 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
+            >
+              <Settings2 className="w-4 h-4 md:w-5 md:h-5" />
+            </button>
+          </div>
           
           <div className="text-center font-mono text-cyan-300 font-bold text-sm md:text-base bg-black/40 px-4 py-1.5 rounded-full border border-cyan-500/30">
             {formatDate(dayOfYear)}
           </div>
           
-          <div className="w-8 md:w-10 opacity-0 shrink-0">{/* spacer */}</div>
+          <div className="w-[72px] md:w-[88px] opacity-0 shrink-0">{/* spacer */}</div>
         </div>
         
         <div className="px-2 pb-1">
           <input 
             type="range" 
-            min="0" max="365.25" step={1/24} 
+            min="0" max={timeSpan} step={1/24} 
             value={dayOfYear}
             onChange={(e) => {
               setIsPlaying(false);
@@ -277,4 +325,3 @@ export default function SpaceLabPage() {
       </div>
     </div>
   );
-}
