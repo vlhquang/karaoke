@@ -26,9 +26,10 @@ const ORBIT_C = Math.sqrt(ORBIT_A * ORBIT_A - ORBIT_B * ORBIT_B); // approx 15.1
 interface SpaceSimulationProps {
   simState: SimulationState;
   viewMode: 'space' | 'surface';
+  orbitSpeed: number;
 }
 
-function SolarSystem({ simState, viewMode }: SpaceSimulationProps) {
+function SolarSystem({ simState, viewMode, orbitSpeed }: SpaceSimulationProps) {
   const earthGroupRef = useRef<THREE.Group>(null);
   const earthMeshRef = useRef<THREE.Mesh>(null);
   const moonGroupRef = useRef<THREE.Group>(null);
@@ -65,15 +66,19 @@ function SolarSystem({ simState, viewMode }: SpaceSimulationProps) {
   const controlsRef = useRef<any>(null);
 
   useFrame((state, delta) => {
+    // Tỉ lệ thực tế:
+    // 1 năm = 365.25 ngày (Trái đất tự quay 365.25 vòng/năm)
+    // 1 năm = 13.38 tháng Mặt Trăng (Mặt trăng quay quanh Trái đất 13.38 vòng/năm)
+    const BASE_SPEED = 0.2; // 1 vòng Trái đất quanh mặt trời mất ~31.4s ở tốc độ 1x
+    const EARTH_ROT_SPEED = BASE_SPEED * 365.25; 
+    const MOON_ORB_SPEED = BASE_SPEED * 13.38;
+
     if (simState.dayNight && earthMeshRef.current) {
       let speedMult = 1.0;
-      if (viewMode === 'space' && earthGroupRef.current) {
-        const distance = state.camera.position.distanceTo(earthGroupRef.current.position);
-        speedMult = Math.max(0.1, Math.min(1.0, (distance - 3) / 17));
-      } else if (viewMode === 'surface') {
-        speedMult = 0.05; // Very slow to observe sunrise/sunset
+      if (viewMode === 'surface') {
+        speedMult = 0.01; // Cực chậm ở mặt đất để có thể ngắm mặt trời lặn/mọc
       }
-      earthMeshRef.current.rotation.y += delta * 0.5 * speedMult;
+      earthMeshRef.current.rotation.y += delta * EARTH_ROT_SPEED * speedMult * orbitSpeed;
     }
 
     if (earthGroupRef.current) {
@@ -82,8 +87,8 @@ function SolarSystem({ simState, viewMode }: SpaceSimulationProps) {
           Math.pow(ORBIT_A * Math.cos(orbitAngle.current) + ORBIT_C, 2) + 
           Math.pow(ORBIT_B * Math.sin(orbitAngle.current), 2)
         );
-        // Tăng tốc độ góc lên để dễ quan sát bằng mắt thường (1 vòng quỹ đạo khoảng 20-30s)
-        const angularVelocity = 150.0 / (distanceToSun * distanceToSun);
+        // k = BASE_SPEED * 361 (bình phương khoảng cách trung bình ~19) để tốc độ trung bình = BASE_SPEED
+        const angularVelocity = (72.2 / (distanceToSun * distanceToSun)) * orbitSpeed;
         orbitAngle.current += delta * angularVelocity;
       }
       
@@ -91,14 +96,16 @@ function SolarSystem({ simState, viewMode }: SpaceSimulationProps) {
       const ez = ORBIT_B * Math.sin(orbitAngle.current);
       
       const newPos = new THREE.Vector3(ex, 0, ez);
-      const diff = newPos.clone().sub(earthGroupRef.current.position);
       
       earthGroupRef.current.position.copy(newPos);
       
       // Move camera to follow Earth
-      if (controlsRef.current) {
+      if (viewMode === 'space' && controlsRef.current) {
+        // Chỉ cập nhật mục tiêu của camera (target) để bám theo Trái Đất, 
+        // nhưng KHÔNG di chuyển vị trí camera. 
+        // Điều này tạo ra góc nhìn thị sai (parallax), giúp người xem thấy rõ 
+        // sự thay đổi tương đối của trục nghiêng so với Mặt Trời qua các mùa.
         controlsRef.current.target.copy(newPos);
-        state.camera.position.add(diff);
       }
       
       if (simState.seasons || simState.polar) {
@@ -131,7 +138,7 @@ function SolarSystem({ simState, viewMode }: SpaceSimulationProps) {
     }
 
     if (simState.tides && moonGroupRef.current) {
-      moonOrbitAngle.current += delta * 1.2;
+      moonOrbitAngle.current += delta * MOON_ORB_SPEED * orbitSpeed;
       
       // Quỹ đạo Elip của Mặt Trăng để tạo ra sự chênh lệch khoảng cách
       const mx = 6.0 * Math.cos(moonOrbitAngle.current) + 1.5; // Lệch tâm để có lúc gần, lúc xa
@@ -309,9 +316,9 @@ function PointLight({ color, intensity, distance, decay }: any) {
   return <pointLight color={color} intensity={intensity} distance={distance} decay={decay} castShadow shadow-mapSize={[2048, 2048]} />;
 }
 
-export default function SpaceSimulation({ simState, viewMode }: SpaceSimulationProps) {
+export default function SpaceSimulation({ simState, viewMode, orbitSpeed }: SpaceSimulationProps) {
   return (
-    <Canvas shadows camera={{ position: [ORBIT_A + ORBIT_C, 5, 10], fov: 45 }}>
+    <Canvas shadows camera={{ position: [ORBIT_A + ORBIT_C, 5, 20], fov: 45 }}>
       <color attach="background" args={["#020205"]} />
       
       {/* 0 ambient light to make the dark side pitch black */}
@@ -319,7 +326,7 @@ export default function SpaceSimulation({ simState, viewMode }: SpaceSimulationP
       
       <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
       
-      <SolarSystem simState={simState} viewMode={viewMode} />
+      <SolarSystem simState={simState} viewMode={viewMode} orbitSpeed={orbitSpeed} />
     </Canvas>
   );
 }
