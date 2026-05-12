@@ -10,11 +10,18 @@ import type { SimulationState } from "../page";
 const EARTH_TEX = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg";
 const MOON_TEX = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg";
 
-const ORBIT_RADIUS = 15;
 const EARTH_RADIUS = 2;
 const MOON_RADIUS = 0.5;
 const MOON_ORBIT_RADIUS = 4;
 const TILT_ANGLE = (23.5 * Math.PI) / 180;
+
+// Elliptical orbit parameters
+const ORBIT_A = 22; // Semi-major axis
+const ORBIT_B = 16; // Semi-minor axis
+// Focus distance c = sqrt(a^2 - b^2)
+const ORBIT_C = Math.sqrt(ORBIT_A * ORBIT_A - ORBIT_B * ORBIT_B); // approx 15.1
+// We place the Sun at (0,0,0) which is one focus.
+// The center of the ellipse will be at (ORBIT_C, 0, 0).
 
 interface SpaceSimulationProps {
   simState: SimulationState;
@@ -26,7 +33,6 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
   const moonGroupRef = useRef<THREE.Group>(null);
   const waterMeshRef = useRef<THREE.Mesh>(null);
 
-  // Load textures
   const [earthMap, moonMap] = useLoader(THREE.TextureLoader, [EARTH_TEX, MOON_TEX]);
 
   // Orbit path points for Seasons module
@@ -34,53 +40,56 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
     const points = [];
     for (let i = 0; i <= 64; i++) {
       const angle = (i / 64) * Math.PI * 2;
-      points.push(new THREE.Vector3(Math.cos(angle) * ORBIT_RADIUS, 0, Math.sin(angle) * ORBIT_RADIUS));
+      points.push(new THREE.Vector3(ORBIT_A * Math.cos(angle) + ORBIT_C, 0, ORBIT_B * Math.sin(angle)));
     }
     return points;
   }, []);
 
-  // Animation variables
   const orbitAngle = useRef(0);
   const moonOrbitAngle = useRef(0);
 
   useFrame((state, delta) => {
-    // 1. Day and Night: Earth rotates on its own axis
     if (simState.dayNight && earthMeshRef.current) {
       earthMeshRef.current.rotation.y += delta * 0.5;
     }
 
-    // 2. Seasons: Earth orbits the Sun
     if (earthGroupRef.current) {
       if (simState.seasons) {
-        orbitAngle.current += delta * 0.2;
+        // Variable speed based on Kepler's second law (faster near perihelion)
+        // Perihelion is when angle is PI (since center is at +C, and we use cos, x = -A + C is closest to 0)
+        // A simple approximation:
+        const distanceToSun = Math.sqrt(
+          Math.pow(ORBIT_A * Math.cos(orbitAngle.current) + ORBIT_C, 2) + 
+          Math.pow(ORBIT_B * Math.sin(orbitAngle.current), 2)
+        );
+        const angularVelocity = 5.0 / (distanceToSun * distanceToSun); // Inverse square approximation
+        
+        orbitAngle.current += delta * angularVelocity;
       }
-      earthGroupRef.current.position.x = Math.cos(orbitAngle.current) * ORBIT_RADIUS;
-      earthGroupRef.current.position.z = Math.sin(orbitAngle.current) * ORBIT_RADIUS;
       
-      // Tilt axis
+      const ex = ORBIT_A * Math.cos(orbitAngle.current) + ORBIT_C;
+      const ez = ORBIT_B * Math.sin(orbitAngle.current);
+      
+      earthGroupRef.current.position.x = ex;
+      earthGroupRef.current.position.z = ez;
+      
       if (simState.seasons || simState.polar) {
-        // Apply tilt. We tilt the earth mesh group
+        // To maintain the 23.5 deg tilt always pointing in the same direction in space
+        // we apply it relative to the world, but since the group revolves, we just set it.
         earthGroupRef.current.rotation.z = TILT_ANGLE;
       } else {
         earthGroupRef.current.rotation.z = 0;
       }
     }
 
-    // 4. Tides: Moon orbits Earth
     if (simState.tides && moonGroupRef.current) {
       moonOrbitAngle.current += delta * 0.8;
       moonGroupRef.current.position.x = Math.cos(moonOrbitAngle.current) * MOON_ORBIT_RADIUS;
       moonGroupRef.current.position.z = Math.sin(moonOrbitAngle.current) * MOON_ORBIT_RADIUS;
 
-      // Water layer bulges towards the moon
       if (waterMeshRef.current) {
-        // The bulge needs to align with the moon's direction
-        // Reset scale first
         waterMeshRef.current.scale.set(1, 1, 1);
-        // We scale along the X axis (since moon is moving in X-Z relative to earth)
-        // Rotate the water mesh to face the moon
         waterMeshRef.current.rotation.y = -moonOrbitAngle.current;
-        // Stretch along local X axis
         waterMeshRef.current.scale.set(1.15, 1.02, 1.02);
       }
     }
@@ -88,23 +97,35 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
 
   return (
     <>
-      {/* The Sun */}
       <mesh position={[0, 0, 0]}>
         <sphereGeometry args={[3, 32, 32]} />
         <meshBasicMaterial color="#ffdd44" />
-        <PointLight color="#ffffff" intensity={200} distance={100} decay={2} />
+        <PointLight color="#ffffff" intensity={300} distance={150} decay={2} />
       </mesh>
       <Text position={[0, 4, 0]} fontSize={1} color="#ffaa00" anchorX="center" anchorY="middle">
         Mặt Trời
       </Text>
 
-      {/* Earth Orbit Path (Seasons) */}
+      {/* Earth Orbit Path & Season Labels */}
       {simState.seasons && (
-        <Line points={orbitPoints} color="rgba(255, 255, 255, 0.2)" lineWidth={1} />
+        <group>
+          <Line points={orbitPoints} color="rgba(255, 255, 255, 0.3)" lineWidth={1.5} />
+          {/* Labels at key points. 
+              Angle 0: Aphelion (Far) -> x = A+C, z = 0.
+              Angle PI: Perihelion (Near) -> x = -A+C, z = 0.
+              Angle PI/2: -> x = C, z = B.
+              Angle 3PI/2: -> x = C, z = -B.
+          */}
+          <Text position={[-ORBIT_A + ORBIT_C - 3, 0, 0]} fontSize={0.8} color="#00ffff" rotation={[-Math.PI/2, 0, 0]}>Hạ Chí</Text>
+          <Text position={[ORBIT_A + ORBIT_C + 3, 0, 0]} fontSize={0.8} color="#00ffff" rotation={[-Math.PI/2, 0, 0]}>Đông Chí</Text>
+          <Text position={[ORBIT_C, 0, ORBIT_B + 2]} fontSize={0.8} color="#00ffff" rotation={[-Math.PI/2, 0, 0]}>Xuân Phân</Text>
+          <Text position={[ORBIT_C, 0, -ORBIT_B - 2]} fontSize={0.8} color="#00ffff" rotation={[-Math.PI/2, 0, 0]}>Thu Phân</Text>
+        </group>
       )}
 
       {/* Earth System */}
-      <group ref={earthGroupRef} position={[ORBIT_RADIUS, 0, 0]}>
+      <group ref={earthGroupRef} position={[ORBIT_A + ORBIT_C, 0, 0]}>
+
         
         {/* Earth Mesh */}
         <mesh ref={earthMeshRef} castShadow receiveShadow>
