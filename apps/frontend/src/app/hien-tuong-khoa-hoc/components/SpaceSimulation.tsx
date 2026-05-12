@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useState, useEffect } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { OrbitControls, Stars, Line, Sphere, Text } from "@react-three/drei";
 import * as THREE from "three";
@@ -32,10 +32,23 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
   const earthMeshRef = useRef<THREE.Mesh>(null);
   const moonGroupRef = useRef<THREE.Group>(null);
   const waterMeshRef = useRef<THREE.Mesh>(null);
+  const seasonTextRef = useRef<any>(null);
 
   const [earthMap, moonMap] = useLoader(THREE.TextureLoader, [EARTH_TEX, MOON_TEX]);
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
 
-  // Orbit path points for Seasons module
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      }, () => {
+        setUserLocation({ lat: 14, lng: 108 });
+      });
+    } else {
+      setUserLocation({ lat: 14, lng: 108 });
+    }
+  }, []);
+
   const orbitPoints = useMemo(() => {
     const points = [];
     for (let i = 0; i <= 64; i++) {
@@ -47,6 +60,7 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
 
   const orbitAngle = useRef(0);
   const moonOrbitAngle = useRef(0);
+  const controlsRef = useRef<any>(null);
 
   useFrame((state, delta) => {
     if (simState.dayNight && earthMeshRef.current) {
@@ -55,30 +69,54 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
 
     if (earthGroupRef.current) {
       if (simState.seasons) {
-        // Variable speed based on Kepler's second law (faster near perihelion)
-        // Perihelion is when angle is PI (since center is at +C, and we use cos, x = -A + C is closest to 0)
-        // A simple approximation:
         const distanceToSun = Math.sqrt(
           Math.pow(ORBIT_A * Math.cos(orbitAngle.current) + ORBIT_C, 2) + 
           Math.pow(ORBIT_B * Math.sin(orbitAngle.current), 2)
         );
-        const angularVelocity = 5.0 / (distanceToSun * distanceToSun); // Inverse square approximation
-        
+        const angularVelocity = 5.0 / (distanceToSun * distanceToSun);
         orbitAngle.current += delta * angularVelocity;
       }
       
       const ex = ORBIT_A * Math.cos(orbitAngle.current) + ORBIT_C;
       const ez = ORBIT_B * Math.sin(orbitAngle.current);
       
-      earthGroupRef.current.position.x = ex;
-      earthGroupRef.current.position.z = ez;
+      const newPos = new THREE.Vector3(ex, 0, ez);
+      const diff = newPos.clone().sub(earthGroupRef.current.position);
+      
+      earthGroupRef.current.position.copy(newPos);
+      
+      // Move camera to follow Earth
+      if (controlsRef.current) {
+        controlsRef.current.target.copy(newPos);
+        state.camera.position.add(diff);
+      }
       
       if (simState.seasons || simState.polar) {
-        // To maintain the 23.5 deg tilt always pointing in the same direction in space
-        // we apply it relative to the world, but since the group revolves, we just set it.
         earthGroupRef.current.rotation.z = TILT_ANGLE;
       } else {
         earthGroupRef.current.rotation.z = 0;
+      }
+
+      // Update local season text
+      if (simState.seasons && userLocation && seasonTextRef.current) {
+        let normAngle = orbitAngle.current % (Math.PI * 2);
+        if (normAngle < 0) normAngle += Math.PI * 2;
+        const isNorth = userLocation.lat >= 0;
+        let seasonStr = "";
+        
+        if (normAngle > 7*Math.PI/4 || normAngle <= Math.PI/4) {
+           seasonStr = isNorth ? "Mùa Hè" : "Mùa Đông";
+        } else if (normAngle > Math.PI/4 && normAngle <= 3*Math.PI/4) {
+           seasonStr = isNorth ? "Mùa Thu" : "Mùa Xuân";
+        } else if (normAngle > 3*Math.PI/4 && normAngle <= 5*Math.PI/4) {
+           seasonStr = isNorth ? "Mùa Đông" : "Mùa Hè";
+        } else {
+           seasonStr = isNorth ? "Mùa Xuân" : "Mùa Thu";
+        }
+        
+        if (seasonTextRef.current.text !== seasonStr) {
+          seasonTextRef.current.text = seasonStr;
+        }
       }
     }
 
@@ -100,7 +138,7 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
       <mesh position={[0, 0, 0]}>
         <sphereGeometry args={[3, 32, 32]} />
         <meshBasicMaterial color="#ffdd44" />
-        <PointLight color="#ffffff" intensity={300} distance={150} decay={2} />
+        <PointLight color="#ffffff" intensity={500} distance={200} decay={1.5} />
       </mesh>
       <Text position={[0, 4, 0]} fontSize={1} color="#ffaa00" anchorX="center" anchorY="middle">
         Mặt Trời
@@ -110,32 +148,35 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
       {simState.seasons && (
         <group>
           <Line points={orbitPoints} color="rgba(255, 255, 255, 0.3)" lineWidth={1.5} />
-          {/* Labels at key points. 
-              Angle 0: Aphelion (Far) -> x = A+C, z = 0.
-              Angle PI: Perihelion (Near) -> x = -A+C, z = 0.
-              Angle PI/2: -> x = C, z = B.
-              Angle 3PI/2: -> x = C, z = -B.
-          */}
-          <Text position={[-ORBIT_A + ORBIT_C - 3, 0, 0]} fontSize={0.8} color="#00ffff" rotation={[-Math.PI/2, 0, 0]}>Hạ Chí</Text>
-          <Text position={[ORBIT_A + ORBIT_C + 3, 0, 0]} fontSize={0.8} color="#00ffff" rotation={[-Math.PI/2, 0, 0]}>Đông Chí</Text>
-          <Text position={[ORBIT_C, 0, ORBIT_B + 2]} fontSize={0.8} color="#00ffff" rotation={[-Math.PI/2, 0, 0]}>Xuân Phân</Text>
-          <Text position={[ORBIT_C, 0, -ORBIT_B - 2]} fontSize={0.8} color="#00ffff" rotation={[-Math.PI/2, 0, 0]}>Thu Phân</Text>
+          {/* North pole points towards Sun at +X. So +X is Northern Summer (Hạ Chí) */}
+          <Text position={[ORBIT_A + ORBIT_C + 3, 0, 0]} fontSize={0.8} color="#00ffff" rotation={[-Math.PI/2, 0, 0]}>Hạ Chí</Text>
+          <Text position={[-ORBIT_A + ORBIT_C - 3, 0, 0]} fontSize={0.8} color="#00ffff" rotation={[-Math.PI/2, 0, 0]}>Đông Chí</Text>
+          <Text position={[ORBIT_C, 0, ORBIT_B + 2]} fontSize={0.8} color="#00ffff" rotation={[-Math.PI/2, 0, 0]}>Thu Phân</Text>
+          <Text position={[ORBIT_C, 0, -ORBIT_B - 2]} fontSize={0.8} color="#00ffff" rotation={[-Math.PI/2, 0, 0]}>Xuân Phân</Text>
         </group>
       )}
 
       {/* Earth System */}
       <group ref={earthGroupRef} position={[ORBIT_A + ORBIT_C, 0, 0]}>
-
         
+        {/* Earth Axis Line */}
+        {(simState.seasons || simState.polar) && (
+          <Line 
+            points={[new THREE.Vector3(0, -EARTH_RADIUS - 1.5, 0), new THREE.Vector3(0, EARTH_RADIUS + 1.5, 0)]} 
+            color="#ff0055" 
+            lineWidth={3} 
+          />
+        )}
+
         {/* Earth Mesh */}
         <mesh ref={earthMeshRef} castShadow receiveShadow>
           <sphereGeometry args={[EARTH_RADIUS, 64, 64]} />
-          <meshStandardMaterial map={earthMap} roughness={0.6} metalness={0.1} />
+          <meshStandardMaterial map={earthMap} roughness={1} metalness={0} />
           
-          {/* Home Marker (Vietnam approx: Lat 14°N, Lng 108°E) */}
-          {simState.dayNight && (
-            <group rotation={[0, (108 * Math.PI) / 180, 0]}>
-              <group rotation={[(90 - 14) * Math.PI / 180, 0, 0]}>
+          {/* Home Marker */}
+          {simState.dayNight && userLocation && (
+            <group rotation={[0, (userLocation.lng * Math.PI) / 180, 0]}>
+              <group rotation={[(90 - userLocation.lat) * Math.PI / 180, 0, 0]}>
                 <mesh position={[0, EARTH_RADIUS + 0.1, 0]}>
                   <coneGeometry args={[0.1, 0.3, 16]} />
                   <meshBasicMaterial color="#ff0000" />
@@ -143,6 +184,12 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
                 <Text position={[0, EARTH_RADIUS + 0.5, 0]} fontSize={0.4} color="#ff0000" rotation={[-Math.PI/2, 0, 0]}>
                   Nhà của bé
                 </Text>
+                {/* Local Season Text */}
+                {simState.seasons && (
+                  <Text ref={seasonTextRef} position={[0, EARTH_RADIUS + 1.0, 0]} fontSize={0.5} color="#00ff00" rotation={[-Math.PI/2, 0, 0]}>
+                    Mùa
+                  </Text>
+                )}
               </group>
             </group>
           )}
@@ -193,7 +240,24 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
         )}
 
       </group>
+      
+      {/* OrbitControls injected from parent */}
+      <OrbitControlsHelper controlsRef={controlsRef} />
     </>
+  );
+}
+
+// Helper to get ref to OrbitControls from within Canvas
+function OrbitControlsHelper({ controlsRef }: { controlsRef: React.MutableRefObject<any> }) {
+  return (
+    <OrbitControls 
+      ref={controlsRef}
+      enablePan={true} 
+      enableZoom={true} 
+      enableRotate={true}
+      minDistance={3}
+      maxDistance={80}
+    />
   );
 }
 
@@ -204,23 +268,15 @@ function PointLight({ color, intensity, distance, decay }: any) {
 
 export default function SpaceSimulation({ simState }: SpaceSimulationProps) {
   return (
-    <Canvas shadows camera={{ position: [0, 15, 25], fov: 45 }}>
-      <color attach="background" args={["#050510"]} />
+    <Canvas shadows camera={{ position: [ORBIT_A + ORBIT_C, 5, 10], fov: 45 }}>
+      <color attach="background" args={["#020205"]} />
       
-      {/* Ambient light so we can see the dark side slightly */}
-      <ambientLight intensity={0.05} />
+      {/* 0 ambient light to make the dark side pitch black */}
+      <ambientLight intensity={0} />
       
       <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
       
       <SolarSystem simState={simState} />
-      
-      <OrbitControls 
-        enablePan={true} 
-        enableZoom={true} 
-        enableRotate={true}
-        minDistance={5}
-        maxDistance={50}
-      />
     </Canvas>
   );
 }
