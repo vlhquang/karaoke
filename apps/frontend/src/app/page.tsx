@@ -58,6 +58,12 @@ export default function HomePage() {
       title: "HUD Tốc độ",
       description: "Đồng hồ đo tốc độ GPS cảnh báo giới hạn, hỗ trợ hắt kính lái ô tô.",
       badge: "New"
+    },
+    {
+      href: "/hien-tuong-khoa-hoc",
+      title: "Hiện tượng khoa học",
+      description: "Phòng Thí Nghiệm Vũ Trụ Của Bé - Mô phỏng 3D hiện tượng thiên văn (Ngày/đêm, Các mùa, Thủy triều).",
+      badge: "New"
     }
   ];
 
