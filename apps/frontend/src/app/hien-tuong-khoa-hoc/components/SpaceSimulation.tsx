@@ -26,10 +26,10 @@ const ORBIT_C = Math.sqrt(ORBIT_A * ORBIT_A - ORBIT_B * ORBIT_B); // approx 15.1
 interface SpaceSimulationProps {
   simState: SimulationState;
   viewMode: 'space' | 'surface';
-  orbitSpeed: number;
+  dayOfYear: number;
 }
 
-function SolarSystem({ simState, viewMode, orbitSpeed }: SpaceSimulationProps) {
+function SolarSystem({ simState, viewMode, dayOfYear }: SpaceSimulationProps) {
   const earthGroupRef = useRef<THREE.Group>(null);
   const earthMeshRef = useRef<THREE.Mesh>(null);
   const moonGroupRef = useRef<THREE.Group>(null);
@@ -301,7 +301,7 @@ function PointLight({ color, intensity, distance, decay }: any) {
   return <pointLight color={color} intensity={intensity} distance={distance} decay={decay} castShadow shadow-mapSize={[2048, 2048]} />;
 }
 
-export default function SpaceSimulation({ simState, viewMode, orbitSpeed }: SpaceSimulationProps) {
+export default function SpaceSimulation({ simState, viewMode, dayOfYear }: SpaceSimulationProps) {
   return (
     <Canvas shadows camera={{ position: [ORBIT_A + ORBIT_C, 5, 20], fov: 45 }}>
       <color attach="background" args={["#020205"]} />
@@ -311,7 +311,7 @@ export default function SpaceSimulation({ simState, viewMode, orbitSpeed }: Spac
       
       <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
       
-      <SolarSystem simState={simState} viewMode={viewMode} orbitSpeed={orbitSpeed} />
+      <SolarSystem simState={simState} viewMode={viewMode} dayOfYear={dayOfYear} />
     </Canvas>
   );
 }
