@@ -69,6 +69,8 @@ export default function SpaceLabPage() {
   ];
 
   const [activeHint, setActiveHint] = useState<keyof SimulationState | null>(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const [viewMode, setViewMode] = useState<'space' | 'surface'>('space');
 
   const toggleHint = (e: React.MouseEvent, id: keyof SimulationState) => {
     e.stopPropagation();
@@ -80,21 +82,57 @@ export default function SpaceLabPage() {
       
       {/* 3D Simulation Canvas - Full Screen */}
       <div className="absolute inset-0 z-0">
-        <SpaceSimulation simState={simState} />
+        <SpaceSimulation simState={simState} viewMode={viewMode} />
       </div>
 
-      {/* Floating Control Panel - Responsive for Mobile Landscape */}
-      <div className="absolute top-2 left-2 landscape:top-2 landscape:left-2 md:top-4 md:left-4 z-10 w-64 landscape:w-56 md:w-72 max-h-[calc(100vh-1rem)] md:max-h-[calc(100vh-2rem)] flex flex-col bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-2xl md:rounded-3xl shadow-2xl overflow-y-auto">
+      {/* Floating Buttons Group (Top Left) */}
+      <div className="absolute top-4 left-4 z-20 flex flex-col gap-3">
+        {/* Toggle Panel Button */}
+        <button 
+          onClick={() => setIsPanelOpen(!isPanelOpen)}
+          className="w-12 h-12 bg-slate-900/60 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-cyan-400 hover:text-white hover:bg-slate-800/80 transition-all shadow-lg"
+        >
+          {isPanelOpen ? (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          ) : (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+          )}
+        </button>
+      </div>
+
+      {/* Floating Control Panel */}
+      <div className={`absolute top-20 left-4 z-10 w-64 md:w-72 max-h-[calc(100vh-6rem)] flex flex-col bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-2xl md:rounded-3xl shadow-2xl overflow-y-auto transition-all duration-300 origin-top-left ${
+        isPanelOpen ? "scale-100 opacity-100" : "scale-90 opacity-0 pointer-events-none"
+      }`}>
         <div className="p-3 md:p-4 pb-2 md:pb-3 sticky top-0 bg-slate-900/60 backdrop-blur-lg z-20 border-b border-white/5">
           <Link href="/" className="inline-flex items-center text-cyan-400 hover:text-cyan-300 transition-colors mb-1 md:mb-2 text-xs md:text-sm font-medium bg-black/30 px-2 py-0.5 md:px-3 md:py-1 rounded-full border border-cyan-500/30">
             <ArrowLeft className="w-3 h-3 md:w-4 md:h-4 mr-1" /> Trang chủ
           </Link>
-          <h1 className="text-lg landscape:text-base md:text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-400 leading-tight">
+          <h1 className="text-lg md:text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-400 leading-tight">
             PTN Vũ Trụ Của Bé
           </h1>
         </div>
 
         <div className="p-2 md:p-3 flex flex-col gap-2 md:gap-3">
+          {/* View Mode Toggle */}
+          <div 
+            onClick={() => setViewMode(prev => prev === 'space' ? 'surface' : 'space')}
+            className="relative overflow-hidden rounded-xl md:rounded-2xl cursor-pointer transition-all duration-300 border border-purple-500/50 bg-black/40 hover:bg-black/60 shadow-lg p-2 md:p-3 flex items-center gap-3"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 opacity-30"></div>
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center bg-purple-900/50 text-white shrink-0">
+              {viewMode === 'space' ? "🌌" : "🌍"}
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xs md:text-sm font-bold text-white">Góc nhìn</h2>
+              <p className="text-[10px] text-purple-200">
+                {viewMode === 'space' ? "Từ Không gian" : "Từ Mặt đất (GPS)"}
+              </p>
+            </div>
+          </div>
+
+          <div className="h-px w-full bg-white/10 my-1"></div>
+
           {modules.map((mod) => {
             const isActive = simState[mod.id];
             const isHintOpen = activeHint === mod.id;
@@ -116,7 +154,6 @@ export default function SpaceLabPage() {
                       <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-colors shadow-inner ${
                         isActive ? "bg-slate-900" : "bg-slate-900/50"
                       }`}>
-                        {/* Smaller icon on landscape/mobile */}
                         <div className="scale-75 md:scale-100">{mod.icon}</div>
                       </div>
                     </div>
@@ -146,7 +183,6 @@ export default function SpaceLabPage() {
                     </div>
                   </div>
                   
-                  {/* Hint Dropdown */}
                   {isHintOpen && (
                     <div className="mt-2 p-2 bg-black/40 rounded-lg border border-white/5" onClick={(e) => e.stopPropagation()}>
                       <p className="text-[10px] md:text-xs leading-relaxed text-cyan-100">
@@ -162,8 +198,9 @@ export default function SpaceLabPage() {
       </div>
 
       {/* Instruction overlay */}
-      <div className="absolute bottom-2 landscape:bottom-2 md:bottom-6 left-1/2 transform -translate-x-1/2 pointer-events-none bg-black/40 backdrop-blur-md px-3 py-1.5 md:px-5 md:py-2.5 rounded-full border border-white/10 text-white/90 text-[10px] md:text-sm flex items-center gap-2 shadow-xl whitespace-nowrap">
-        <span className="animate-bounce">👆</span> Vuốt để xoay góc nhìn, cuộn/zoom để phóng to
+      <div className="absolute bottom-4 md:bottom-6 left-1/2 transform -translate-x-1/2 pointer-events-none bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-white/90 text-[10px] md:text-sm flex items-center gap-2 shadow-xl whitespace-nowrap">
+        <span className="animate-bounce">👆</span> 
+        {viewMode === 'space' ? "Vuốt để xoay góc nhìn, cuộn/zoom để phóng to" : "Di chuột/ngón tay để nhìn quanh bầu trời"}
       </div>
     </div>
   );

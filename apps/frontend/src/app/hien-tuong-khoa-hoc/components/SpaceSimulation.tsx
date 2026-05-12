@@ -2,7 +2,7 @@
 
 import { useRef, useMemo, useState, useEffect } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
-import { OrbitControls, Stars, Line, Sphere, Text } from "@react-three/drei";
+import { OrbitControls, Stars, Line, Sphere, Text, PerspectiveCamera } from "@react-three/drei";
 import * as THREE from "three";
 import type { SimulationState } from "../page";
 
@@ -25,14 +25,16 @@ const ORBIT_C = Math.sqrt(ORBIT_A * ORBIT_A - ORBIT_B * ORBIT_B); // approx 15.1
 
 interface SpaceSimulationProps {
   simState: SimulationState;
+  viewMode: 'space' | 'surface';
 }
 
-function SolarSystem({ simState }: SpaceSimulationProps) {
+function SolarSystem({ simState, viewMode }: SpaceSimulationProps) {
   const earthGroupRef = useRef<THREE.Group>(null);
   const earthMeshRef = useRef<THREE.Mesh>(null);
   const moonGroupRef = useRef<THREE.Group>(null);
   const waterMeshRef = useRef<THREE.Mesh>(null);
   const seasonTextRef = useRef<any>(null);
+  const surfaceCamRef = useRef<THREE.PerspectiveCamera>(null);
 
   const [earthMap, moonMap] = useLoader(THREE.TextureLoader, [EARTH_TEX, MOON_TEX]);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
@@ -64,7 +66,14 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
 
   useFrame((state, delta) => {
     if (simState.dayNight && earthMeshRef.current) {
-      earthMeshRef.current.rotation.y += delta * 0.5;
+      let speedMult = 1.0;
+      if (viewMode === 'space' && earthGroupRef.current) {
+        const distance = state.camera.position.distanceTo(earthGroupRef.current.position);
+        speedMult = Math.max(0.1, Math.min(1.0, (distance - 3) / 17));
+      } else if (viewMode === 'surface') {
+        speedMult = 0.05; // Very slow to observe sunrise/sunset
+      }
+      earthMeshRef.current.rotation.y += delta * 0.5 * speedMult;
     }
 
     if (earthGroupRef.current) {
@@ -131,6 +140,11 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
         waterMeshRef.current.scale.set(1.15, 1.02, 1.02);
       }
     }
+
+    if (viewMode === 'surface' && surfaceCamRef.current) {
+      surfaceCamRef.current.rotation.x = THREE.MathUtils.lerp(surfaceCamRef.current.rotation.x, Math.PI/2 - state.pointer.y * 1.5, 0.1);
+      surfaceCamRef.current.rotation.y = THREE.MathUtils.lerp(surfaceCamRef.current.rotation.y, -state.pointer.x * Math.PI, 0.1);
+    }
   });
 
   return (
@@ -140,12 +154,15 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
         <meshBasicMaterial color="#ffdd44" />
         <PointLight color="#ffffff" intensity={500} distance={200} decay={1.5} />
       </mesh>
-      <Text position={[0, 4, 0]} fontSize={1} color="#ffaa00" anchorX="center" anchorY="middle">
-        Mặt Trời
-      </Text>
+      
+      {viewMode === 'space' && (
+        <Text position={[0, 4, 0]} fontSize={1} color="#ffaa00" anchorX="center" anchorY="middle">
+          Mặt Trời
+        </Text>
+      )}
 
       {/* Earth Orbit Path & Season Labels */}
-      {simState.seasons && (
+      {simState.seasons && viewMode === 'space' && (
         <group>
           <Line points={orbitPoints} color="rgba(255, 255, 255, 0.3)" lineWidth={1.5} />
           {/* North pole points towards Sun at +X. So +X is Northern Summer (Hạ Chí) */}
@@ -160,7 +177,7 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
       <group ref={earthGroupRef} position={[ORBIT_A + ORBIT_C, 0, 0]}>
         
         {/* Earth Axis Line */}
-        {(simState.seasons || simState.polar) && (
+        {(simState.seasons || simState.polar) && viewMode === 'space' && (
           <Line 
             points={[new THREE.Vector3(0, -EARTH_RADIUS - 1.5, 0), new THREE.Vector3(0, EARTH_RADIUS + 1.5, 0)]} 
             color="#ff0055" 
@@ -177,25 +194,36 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
           {simState.dayNight && userLocation && (
             <group rotation={[0, (userLocation.lng * Math.PI) / 180, 0]}>
               <group rotation={[(90 - userLocation.lat) * Math.PI / 180, 0, 0]}>
-                <mesh position={[0, EARTH_RADIUS + 0.1, 0]}>
-                  <coneGeometry args={[0.1, 0.3, 16]} />
-                  <meshBasicMaterial color="#ff0000" />
-                </mesh>
-                <Text position={[0, EARTH_RADIUS + 0.5, 0]} fontSize={0.4} color="#ff0000" rotation={[-Math.PI/2, 0, 0]}>
-                  Nhà của bé
-                </Text>
-                {/* Local Season Text */}
-                {simState.seasons && (
-                  <Text ref={seasonTextRef} position={[0, EARTH_RADIUS + 1.0, 0]} fontSize={0.5} color="#00ff00" rotation={[-Math.PI/2, 0, 0]}>
-                    Mùa
-                  </Text>
+                
+                {viewMode === 'space' ? (
+                  <>
+                    <mesh position={[0, EARTH_RADIUS + 0.1, 0]}>
+                      <coneGeometry args={[0.1, 0.3, 16]} />
+                      <meshBasicMaterial color="#ff0000" />
+                    </mesh>
+                    {simState.seasons && (
+                      <Text ref={seasonTextRef} position={[0, EARTH_RADIUS + 1.0, 0]} fontSize={0.5} color="#00ff00" rotation={[-Math.PI/2, 0, 0]}>
+                        Mùa
+                      </Text>
+                    )}
+                  </>
+                ) : (
+                  <PerspectiveCamera 
+                    ref={surfaceCamRef}
+                    makeDefault 
+                    position={[0, EARTH_RADIUS + 0.05, 0]} 
+                    rotation={[Math.PI/2, 0, 0]} 
+                    fov={80} 
+                    near={0.01} 
+                    far={1000} 
+                  />
                 )}
               </group>
             </group>
           )}
 
           {/* Polar Regions Highlight */}
-          {simState.polar && (
+          {simState.polar && viewMode === 'space' && (
             <>
               {/* Arctic Circle (~66.5° N) */}
               <group rotation={[(90 - 66.5) * Math.PI / 180, 0, 0]}>
@@ -233,16 +261,18 @@ function SolarSystem({ simState }: SpaceSimulationProps) {
               <sphereGeometry args={[MOON_RADIUS, 32, 32]} />
               <meshStandardMaterial map={moonMap} roughness={0.9} metalness={0.1} />
             </mesh>
-            <Text position={[0, 1, 0]} fontSize={0.5} color="#cccccc" anchorX="center" anchorY="middle">
-              Mặt Trăng
-            </Text>
+            {viewMode === 'space' && (
+              <Text position={[0, 1, 0]} fontSize={0.5} color="#cccccc" anchorX="center" anchorY="middle">
+                Mặt Trăng
+              </Text>
+            )}
           </group>
         )}
 
       </group>
       
       {/* OrbitControls injected from parent */}
-      <OrbitControlsHelper controlsRef={controlsRef} />
+      {viewMode === 'space' && <OrbitControlsHelper controlsRef={controlsRef} />}
     </>
   );
 }
@@ -266,7 +296,7 @@ function PointLight({ color, intensity, distance, decay }: any) {
   return <pointLight color={color} intensity={intensity} distance={distance} decay={decay} castShadow shadow-mapSize={[2048, 2048]} />;
 }
 
-export default function SpaceSimulation({ simState }: SpaceSimulationProps) {
+export default function SpaceSimulation({ simState, viewMode }: SpaceSimulationProps) {
   return (
     <Canvas shadows camera={{ position: [ORBIT_A + ORBIT_C, 5, 10], fov: 45 }}>
       <color attach="background" args={["#020205"]} />
@@ -276,7 +306,7 @@ export default function SpaceSimulation({ simState }: SpaceSimulationProps) {
       
       <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
       
-      <SolarSystem simState={simState} />
+      <SolarSystem simState={simState} viewMode={viewMode} />
     </Canvas>
   );
 }
