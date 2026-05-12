@@ -71,7 +71,7 @@ export default function SpaceLabPage() {
   const [activeHint, setActiveHint] = useState<keyof SimulationState | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'space' | 'surface'>('space');
-  const [orbitSpeed, setOrbitSpeed] = useState(1);
+  const [dayOfYear, setDayOfYear] = useState(0);
 
   const toggleHint = (e: React.MouseEvent, id: keyof SimulationState) => {
     e.stopPropagation();
@@ -83,7 +83,7 @@ export default function SpaceLabPage() {
       
       {/* 3D Simulation Canvas - Full Screen */}
       <div className="absolute inset-0 z-0">
-        <SpaceSimulation simState={simState} viewMode={viewMode} orbitSpeed={orbitSpeed} />
+        <SpaceSimulation simState={simState} viewMode={viewMode} dayOfYear={dayOfYear} />
       </div>
 
       {/* Floating Buttons Group (Top Left) */}
@@ -196,19 +196,20 @@ export default function SpaceLabPage() {
             );
           })}
 
-          {/* Speed Control Slider */}
+          {/* Time Scrubber Slider */}
           <div className="mt-2 p-3 bg-black/40 rounded-xl md:rounded-2xl border border-white/10">
             <label className="text-xs md:text-sm font-bold text-slate-300 mb-2 flex justify-between items-center">
-              <span>Tốc độ thời gian</span>
-              <span className="text-cyan-400 bg-cyan-900/50 px-2 py-0.5 rounded text-[10px]">{orbitSpeed}x</span>
+              <span>Trôi qua (Ngày)</span>
+              <span className="text-cyan-400 bg-cyan-900/50 px-2 py-0.5 rounded text-[10px]">Ngày {Math.floor(dayOfYear)}</span>
             </label>
             <input 
               type="range" 
-              min="0.1" max="5" step="0.1" 
-              value={orbitSpeed}
-              onChange={(e) => setOrbitSpeed(parseFloat(e.target.value))}
+              min="0" max="365" step="0.1" 
+              value={dayOfYear}
+              onChange={(e) => setDayOfYear(parseFloat(e.target.value))}
               className="w-full accent-purple-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
             />
+            <p className="text-[9px] text-slate-500 mt-2 text-center">Kéo thanh trượt để di chuyển thời gian</p>
           </div>
 
         </div>
