@@ -82,7 +82,8 @@ function SolarSystem({ simState, viewMode }: SpaceSimulationProps) {
           Math.pow(ORBIT_A * Math.cos(orbitAngle.current) + ORBIT_C, 2) + 
           Math.pow(ORBIT_B * Math.sin(orbitAngle.current), 2)
         );
-        const angularVelocity = 5.0 / (distanceToSun * distanceToSun);
+        // Tăng tốc độ góc lên để dễ quan sát bằng mắt thường (1 vòng quỹ đạo khoảng 20-30s)
+        const angularVelocity = 150.0 / (distanceToSun * distanceToSun);
         orbitAngle.current += delta * angularVelocity;
       }
       
@@ -130,14 +131,26 @@ function SolarSystem({ simState, viewMode }: SpaceSimulationProps) {
     }
 
     if (simState.tides && moonGroupRef.current) {
-      moonOrbitAngle.current += delta * 0.8;
-      moonGroupRef.current.position.x = Math.cos(moonOrbitAngle.current) * MOON_ORBIT_RADIUS;
-      moonGroupRef.current.position.z = Math.sin(moonOrbitAngle.current) * MOON_ORBIT_RADIUS;
+      moonOrbitAngle.current += delta * 1.2;
+      
+      // Quỹ đạo Elip của Mặt Trăng để tạo ra sự chênh lệch khoảng cách
+      const mx = 6.0 * Math.cos(moonOrbitAngle.current) + 1.5; // Lệch tâm để có lúc gần, lúc xa
+      const mz = 4.0 * Math.sin(moonOrbitAngle.current);
+      moonGroupRef.current.position.x = mx;
+      moonGroupRef.current.position.z = mz;
+
+      // Tính khoảng cách từ Trái đất đến Mặt trăng
+      const moonDist = Math.sqrt(mx * mx + mz * mz);
+      
+      // Tính độ phình của nước (Thủy triều): Gần thì phình to, xa thì phình ít
+      // Khoảng cách min ~ 4.5, max ~ 7.5. Độ phình dao động từ 1.05 đến 1.35
+      const bulge = 1.05 + ((7.5 - moonDist) / 3.0) * 0.3;
 
       if (waterMeshRef.current) {
         waterMeshRef.current.scale.set(1, 1, 1);
-        waterMeshRef.current.rotation.y = -moonOrbitAngle.current;
-        waterMeshRef.current.scale.set(1.15, 1.02, 1.02);
+        const angleToMoon = Math.atan2(mz, mx);
+        waterMeshRef.current.rotation.y = -angleToMoon;
+        waterMeshRef.current.scale.set(bulge, 1.02, 1.02);
       }
     }
 
