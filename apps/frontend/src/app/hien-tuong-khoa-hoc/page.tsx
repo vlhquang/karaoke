@@ -68,6 +68,13 @@ export default function SpaceLabPage() {
     },
   ];
 
+  const [activeHint, setActiveHint] = useState<keyof SimulationState | null>(null);
+
+  const toggleHint = (e: React.MouseEvent, id: keyof SimulationState) => {
+    e.stopPropagation();
+    setActiveHint(activeHint === id ? null : id);
+  };
+
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans">
       
@@ -76,62 +83,77 @@ export default function SpaceLabPage() {
         <SpaceSimulation simState={simState} />
       </div>
 
-      {/* Floating Control Panel */}
-      <div className="absolute top-4 left-4 z-10 w-72 max-h-[calc(100vh-2rem)] flex flex-col bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-3xl shadow-2xl overflow-y-auto">
-        <div className="p-4 pb-3 sticky top-0 bg-slate-900/60 backdrop-blur-lg z-20 border-b border-white/5">
-          <Link href="/" className="inline-flex items-center text-cyan-400 hover:text-cyan-300 transition-colors mb-2 text-sm font-medium bg-black/30 px-3 py-1 rounded-full border border-cyan-500/30">
-            <ArrowLeft className="w-4 h-4 mr-1" /> Về trang chủ
+      {/* Floating Control Panel - Responsive for Mobile Landscape */}
+      <div className="absolute top-2 left-2 landscape:top-2 landscape:left-2 md:top-4 md:left-4 z-10 w-64 landscape:w-56 md:w-72 max-h-[calc(100vh-1rem)] md:max-h-[calc(100vh-2rem)] flex flex-col bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-2xl md:rounded-3xl shadow-2xl overflow-y-auto">
+        <div className="p-3 md:p-4 pb-2 md:pb-3 sticky top-0 bg-slate-900/60 backdrop-blur-lg z-20 border-b border-white/5">
+          <Link href="/" className="inline-flex items-center text-cyan-400 hover:text-cyan-300 transition-colors mb-1 md:mb-2 text-xs md:text-sm font-medium bg-black/30 px-2 py-0.5 md:px-3 md:py-1 rounded-full border border-cyan-500/30">
+            <ArrowLeft className="w-3 h-3 md:w-4 md:h-4 mr-1" /> Trang chủ
           </Link>
-          <h1 className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-400 leading-tight">
-            Phòng Thí Nghiệm Vũ Trụ
+          <h1 className="text-lg landscape:text-base md:text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-400 leading-tight">
+            PTN Vũ Trụ Của Bé
           </h1>
         </div>
 
-        <div className="p-3 flex flex-col gap-3">
+        <div className="p-2 md:p-3 flex flex-col gap-2 md:gap-3">
           {modules.map((mod) => {
             const isActive = simState[mod.id];
+            const isHintOpen = activeHint === mod.id;
+            
             return (
               <div
                 key={mod.id}
                 onClick={() => toggleModule(mod.id)}
-                className={`relative overflow-hidden rounded-2xl cursor-pointer transition-all duration-300 transform hover:scale-[1.02] border border-white/10 ${
-                  isActive ? "bg-black/40 shadow-lg" : "bg-black/20 hover:bg-black/30"
+                className={`relative overflow-hidden rounded-xl md:rounded-2xl cursor-pointer transition-all duration-300 border border-white/10 ${
+                  isActive ? "bg-black/50 shadow-lg" : "bg-black/20 hover:bg-black/30"
                 }`}
               >
                 {isActive && (
-                  <div className={`absolute inset-0 bg-gradient-to-br ${mod.color} opacity-30 transition-opacity`}></div>
+                  <div className={`absolute inset-0 bg-gradient-to-br ${mod.color} opacity-20 transition-opacity`}></div>
                 )}
-                <div className="relative p-3 flex gap-3 items-center">
-                  <div className="shrink-0">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors shadow-inner ${
-                      isActive ? "bg-slate-900" : "bg-slate-900/50"
-                    }`}>
-                      {mod.icon}
+                <div className="relative p-2 md:p-3 flex flex-col">
+                  <div className="flex gap-2 items-center">
+                    <div className="shrink-0">
+                      <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-colors shadow-inner ${
+                        isActive ? "bg-slate-900" : "bg-slate-900/50"
+                      }`}>
+                        {/* Smaller icon on landscape/mobile */}
+                        <div className="scale-75 md:scale-100">{mod.icon}</div>
+                      </div>
+                    </div>
+                    <div className="flex-1 pr-6">
+                      <h2 className={`text-xs md:text-sm font-bold transition-colors ${
+                        isActive ? "text-white" : "text-slate-300"
+                      } flex items-center gap-1`}>
+                        {mod.title}
+                        <button 
+                          onClick={(e) => toggleHint(e, mod.id)}
+                          className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[9px] text-white hover:bg-white/20"
+                        >
+                          i
+                        </button>
+                      </h2>
+                    </div>
+                    <div className="absolute top-1/2 -translate-y-1/2 right-2 md:right-3">
+                      <div className={`w-4 h-4 md:w-5 md:h-5 rounded-[4px] flex items-center justify-center transition-colors border ${
+                        isActive ? "bg-cyan-500 border-cyan-400" : "border-slate-500 bg-slate-800/50"
+                      }`}>
+                        {isActive && (
+                          <svg className="w-3 h-3 text-black font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex-1 pr-6">
-                    <h2 className={`text-sm font-bold mb-0.5 transition-colors ${
-                      isActive ? "text-white" : "text-slate-300"
-                    }`}>
-                      {mod.title}
-                    </h2>
-                    {isActive && (
-                      <p className="text-[10px] leading-tight text-slate-300 mt-1">
-                        {mod.description}
+                  
+                  {/* Hint Dropdown */}
+                  {isHintOpen && (
+                    <div className="mt-2 p-2 bg-black/40 rounded-lg border border-white/5" onClick={(e) => e.stopPropagation()}>
+                      <p className="text-[10px] md:text-xs leading-relaxed text-cyan-100">
+                        💡 {mod.description}
                       </p>
-                    )}
-                  </div>
-                  <div className="absolute top-1/2 -translate-y-1/2 right-3">
-                    <div className={`w-5 h-5 rounded-[4px] flex items-center justify-center transition-colors border ${
-                      isActive ? "bg-cyan-500 border-cyan-400" : "border-slate-500 bg-slate-800/50"
-                    }`}>
-                      {isActive && (
-                        <svg className="w-3 h-3 text-black font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             );
@@ -140,8 +162,8 @@ export default function SpaceLabPage() {
       </div>
 
       {/* Instruction overlay */}
-      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 pointer-events-none bg-black/40 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10 text-white/90 text-sm flex items-center gap-2 shadow-xl">
-        <span className="animate-bounce">👆</span> Vuốt/kéo để xoay góc nhìn, cuộn để phóng to
+      <div className="absolute bottom-2 landscape:bottom-2 md:bottom-6 left-1/2 transform -translate-x-1/2 pointer-events-none bg-black/40 backdrop-blur-md px-3 py-1.5 md:px-5 md:py-2.5 rounded-full border border-white/10 text-white/90 text-[10px] md:text-sm flex items-center gap-2 shadow-xl whitespace-nowrap">
+        <span className="animate-bounce">👆</span> Vuốt để xoay góc nhìn, cuộn/zoom để phóng to
       </div>
     </div>
   );
