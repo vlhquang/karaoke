@@ -1,4 +1,5 @@
 import "./globals.css";
+import "../co-ty-phu/components/co-ty-phu.css";
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {

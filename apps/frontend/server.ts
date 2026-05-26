@@ -15,6 +15,7 @@ import { registerLiXiNamespace } from "./src/li-xi-nang-cao/socket";
 import { startKeepAlive } from "./src/lib/keep-alive";
 import { getStockAutoRefreshStatus, startStockAutoRefreshWorker } from "./src/lib/stock-auto-refresh";
 import { registerGpsTracker } from "./src/gps-tracker";
+import { registerCoTyPhuNamespace } from "./src/co-ty-phu/socket/register-co-ty-phu";
 import type {
   AddSongPayload,
   ClientToServerEvents,
@@ -400,6 +401,7 @@ app.prepare().then(() => {
     maxHttpBufferSize: Number(process.env.SOCKET_MAX_HTTP_BUFFER_SIZE ?? 20 * 1024 * 1024)
   });
   registerLiXiNamespace(io.of("/lixi"), liXiRoomService);
+  registerCoTyPhuNamespace(io.of("/co-ty-phu"));
   registerGpsTracker(io as any, null as any); // Bind socket ONLY after HTTP server starts
   setInterval(() => liXiRoomService.cleanupExpiredRooms(Date.now()), 5 * 60 * 1000);
 
