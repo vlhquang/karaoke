@@ -191,7 +191,44 @@ export function getRent(state: GameState, tile: Tile): number {
 
 export function getUpgradeCost(state: GameState, tile: Tile): number {
   const property = state.properties[tile.id];
-  return Math.round((tile.upgradeCost ?? 0) * (1 + (property?.level ?? 0) * 0.35));
+  return getUpgradeCostAtLevel(tile, property?.level ?? 0);
+}
+
+export function getRentAtLevel(tile: Tile, level: number, transportCount = 0): number {
+  if (!isOwnable(tile)) {
+    return 0;
+  }
+
+  const safeLevel = Math.max(0, Math.min(maxUpgradeLevel, level));
+  const transportBonus = tile.kind === "transport" ? transportCount * 10 : 0;
+  return Math.round((tile.baseFee ?? 0) * (1 + safeLevel * 0.9) + transportBonus);
+}
+
+export function getUpgradeCostAtLevel(tile: Tile, level: number): number {
+  if (!isOwnable(tile) || level >= maxUpgradeLevel) {
+    return 0;
+  }
+
+  const safeLevel = Math.max(0, Math.min(maxUpgradeLevel - 1, level));
+  return Math.round((tile.upgradeCost ?? 0) * (1 + safeLevel * 0.35));
+}
+
+export function getSellValue(tile: Tile, level: number): number {
+  if (!isOwnable(tile)) {
+    return 0;
+  }
+
+  const safeLevel = Math.max(0, Math.min(maxUpgradeLevel, level));
+  return Math.round((tile.price ?? 0) * 0.8 + safeLevel * (tile.upgradeCost ?? 0) * 0.5);
+}
+
+export function getMortgageValue(tile: Tile, level: number): number {
+  if (!isOwnable(tile)) {
+    return 0;
+  }
+
+  const safeLevel = Math.max(0, Math.min(maxUpgradeLevel, level));
+  return Math.round((tile.price ?? 0) * 0.5 + safeLevel * (tile.upgradeCost ?? 0) * 0.25);
 }
 
 export function canBuyCurrentTile(state: GameState): boolean {

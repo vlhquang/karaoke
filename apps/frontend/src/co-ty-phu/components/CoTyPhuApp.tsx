@@ -61,9 +61,13 @@ import {
   getOwnedTiles,
   getOwner,
   getRent,
+  getMortgageValue,
+  getRentAtLevel,
   getSelectedTile,
+  getSellValue,
   getTileById,
   getUpgradeCost,
+  getUpgradeCostAtLevel,
   isOwnable,
   playBotTurn,
   resetGame,
@@ -71,6 +75,9 @@ import {
 
 const STORAGE_KEY = "du-lich-ty-phu-viet-nam-state-v2";
 const SOCKET_NAMESPACE = "/co-ty-phu";
+const MOVEMENT_SPEED_KEY = "du-lich-ty-phu-viet-nam-move-speed-ms";
+const DEFAULT_MOVEMENT_SPEED_MS = 280;
+const TRANSACTION_HISTORY_PER_PLAYER_LIMIT = 5;
 
 interface LobbyPlayer {
   id: string;
@@ -111,6 +118,14 @@ interface MovementState {
   path: number[];
 }
 
+interface TransactionNotice {
+  id: string;
+  playerId: string;
+  playerName: string;
+  amount: number;
+  label: string;
+}
+
 interface SoloConfig {
   playerName: string;
   botCount: number;
@@ -137,21 +152,33 @@ export function CoTyPhuApp() {
   }));
   const [socket, setSocket] = useState<Socket | null>(null);
   const [inspectedTileId, setInspectedTileId] = useState(game.selectedTileId);
-  const [isSheetOpen, setIsSheetOpen] = useState(true);
+  const [detailTileId, setDetailTileId] = useState<string | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [diceMode, setDiceMode] = useState<DiceMode>(null);
   const [lockedDice, setLockedDice] = useState<LockedDice>(null);
   const [movement, setMovement] = useState<MovementState | null>(null);
+  const [transactionNotices, setTransactionNotices] = useState<TransactionNotice[]>([]);
+  const [transactionHistory, setTransactionHistory] = useState<TransactionNotice[]>([]);
+  const [movementSpeedMs, setMovementSpeedMs] = useState(() => loadMovementSpeed());
   const gameRef = useRef(game);
   const movementTimersRef = useRef<number[]>([]);
+  const noticeTimersRef = useRef<number[]>([]);
 
   const currentPlayer = getCurrentPlayer(game);
   const currentTile = getSelectedTile(game);
-  const inspectedTile = getTileById(inspectedTileId);
+  const detailTile = detailTileId ? getTileById(detailTileId) : null;
   const activeCard = game.activeCardDraw ? getCardById(game.activeCardDraw.cardId) : null;
   const isSoloMode = gameMode === "solo-ai";
   const isMultiplayerMode = gameMode === "multiplayer";
   const isRealtimeGame = Boolean(isMultiplayerMode && socket?.connected && lobby.code && lobby.status === "playing");
+  const viewerPlayerId =
+    isMultiplayerMode
+      ? lobby.ownPlayerId
+      : game.players.find((player) => !player.isBot)?.id ?? game.players[0]?.id ?? null;
+  const visibleTransactionNotices = viewerPlayerId
+    ? transactionNotices.filter((notice) => notice.playerId === viewerPlayerId)
+    : [];
   const isMovementActive = Boolean(movement);
   const isDiceLocked = Boolean(lockedDice);
   const canAct = Boolean(
@@ -213,16 +240,21 @@ export function CoTyPhuApp() {
     gameRef.current = game;
   }, [game]);
 
-  useEffect(() => () => clearMovementTimers(), []);
+  useEffect(
+    () => () => {
+      clearMovementTimers();
+      clearNoticeTimers();
+    },
+    [],
+  );
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(game));
   }, [game]);
 
   useEffect(() => {
-    setInspectedTileId(game.selectedTileId);
-    setIsSheetOpen(true);
-  }, [game.selectedTileId]);
+    window.localStorage.setItem(MOVEMENT_SPEED_KEY, String(movementSpeedMs));
+  }, [movementSpeedMs]);
 
   useEffect(() => {
     const instance = io(getSocketUrl(), {
@@ -291,7 +323,14 @@ export function CoTyPhuApp() {
 
   function inspectTile(tileId: string) {
     setInspectedTileId(tileId);
+    setDetailTileId(tileId);
     setIsSheetOpen(true);
+  }
+
+  function focusTile(tileId: string) {
+    setInspectedTileId(tileId);
+    setDetailTileId(null);
+    setIsSheetOpen(false);
   }
 
   function handleReset() {
@@ -306,8 +345,11 @@ export function CoTyPhuApp() {
         : resetGame();
     setDiceMode(null);
     setLockedDice(null);
+    setTransactionHistory([]);
     clearMovementTimers();
     setMovement(null);
+    setDetailTileId(null);
+    setIsSheetOpen(false);
     commitGame(freshGame, gameRef.current, false);
   }
 
@@ -320,8 +362,11 @@ export function CoTyPhuApp() {
     setGameMode(null);
     setDiceMode(null);
     setLockedDice(null);
+    setTransactionHistory([]);
     clearMovementTimers();
     setMovement(null);
+    setDetailTileId(null);
+    setIsSheetOpen(false);
     setShowLog(false);
     setLobby((current) => ({
       ...current,
@@ -344,8 +389,11 @@ export function CoTyPhuApp() {
     setGameMode("multiplayer");
     setDiceMode(null);
     setLockedDice(null);
+    setTransactionHistory([]);
     clearMovementTimers();
     setMovement(null);
+    setDetailTileId(null);
+    setIsSheetOpen(false);
     setLobby((current) => ({
       ...current,
       code: "",
@@ -366,8 +414,11 @@ export function CoTyPhuApp() {
     setScreen("game");
     setDiceMode(null);
     setLockedDice(null);
+    setTransactionHistory([]);
     clearMovementTimers();
     setMovement(null);
+    setDetailTileId(null);
+    setIsSheetOpen(false);
   }
 
   function handleStartRoom() {
@@ -422,7 +473,7 @@ export function CoTyPhuApp() {
     setGame(nextGame);
     gameRef.current = nextGame;
     setInspectedTileId(nextGame.selectedTileId);
-    setIsSheetOpen(true);
+    pushTransactionNotices(previousGame, nextGame);
 
     if (animate) {
       startMovementAnimation(previousGame, nextGame);
@@ -434,6 +485,30 @@ export function CoTyPhuApp() {
       window.clearTimeout(timer);
     }
     movementTimersRef.current = [];
+  }
+
+  function clearNoticeTimers() {
+    for (const timer of noticeTimersRef.current) {
+      window.clearTimeout(timer);
+    }
+    noticeTimersRef.current = [];
+  }
+
+  function pushTransactionNotices(previousGame: GameState, nextGame: GameState) {
+    const notices = getTransactionNotices(previousGame, nextGame);
+    if (notices.length === 0) {
+      return;
+    }
+
+    setTransactionNotices((current) => [...notices, ...current].slice(0, TRANSACTION_HISTORY_PER_PLAYER_LIMIT));
+    setTransactionHistory((current) => trimTransactionHistoryByPlayer([...notices, ...current]));
+
+    notices.forEach((notice) => {
+      const timer = window.setTimeout(() => {
+        setTransactionNotices((current) => current.filter((candidate) => candidate.id !== notice.id));
+      }, 3400);
+      noticeTimersRef.current.push(timer);
+    });
   }
 
   function startMovementAnimation(previousGame: GameState, nextGame: GameState) {
@@ -451,15 +526,17 @@ export function CoTyPhuApp() {
       return;
     }
 
-    const stepMs = 230;
+    const stepMs = movementSpeedMs;
     setMovement({
       playerId: movementInfo.playerId,
       displayPosition: movementInfo.from,
       path,
     });
+    setInspectedTileId(tiles[movementInfo.from]?.id ?? nextGame.selectedTileId);
 
     path.forEach((displayPosition, index) => {
       const timer = window.setTimeout(() => {
+        setInspectedTileId(tiles[displayPosition]?.id ?? nextGame.selectedTileId);
         setMovement((current) =>
           current?.playerId === movementInfo.playerId
             ? { ...current, displayPosition }
@@ -471,8 +548,9 @@ export function CoTyPhuApp() {
 
     const finishTimer = window.setTimeout(() => {
       setMovement(null);
+      setInspectedTileId(nextGame.selectedTileId);
       movementTimersRef.current = [];
-    }, stepMs * (path.length + 2));
+    }, stepMs * path.length + 450);
     movementTimersRef.current.push(finishTimer);
   }
 
@@ -538,14 +616,19 @@ export function CoTyPhuApp() {
           <GameBoard
             game={game}
             inspectedTileId={inspectedTileId}
-            activeCard={activeCard}
+            activeCard={movement ? null : activeCard}
             movement={movement}
+            viewerPlayerId={viewerPlayerId}
+            transactionHistory={transactionHistory}
+            movementSpeedMs={movementSpeedMs}
+            onMovementSpeedChange={setMovementSpeedMs}
+            onFocusTile={focusTile}
             onInspectTile={inspectTile}
           />
         </section>
 
         <aside className="side-panel" aria-label="Bảng điều khiển ván chơi">
-          <PlayerPanel game={game} gameMode={gameMode} lobby={lobby} />
+          <PlayerPanel game={game} gameMode={gameMode} lobby={lobby} viewerPlayerId={viewerPlayerId} />
 
           <ActionDock
             game={game}
@@ -571,17 +654,24 @@ export function CoTyPhuApp() {
             onLeaveRoom={handleLeaveRoom}
           />
 
-          <TileDetail
-            game={game}
-            tile={inspectedTile}
-            activeCardTitle={activeCard?.title}
-            isOpen={isSheetOpen}
-            onClose={() => setIsSheetOpen(false)}
-          />
+          {detailTile ? (
+            <TileDetail
+              game={game}
+              tile={detailTile}
+              activeCardTitle={activeCard?.title}
+              isOpen={isSheetOpen}
+              onClose={() => {
+                setIsSheetOpen(false);
+                setDetailTileId(null);
+              }}
+            />
+          ) : null}
 
           <GameLog game={game} isExpanded={showLog} onToggle={() => setShowLog((value) => !value)} />
         </aside>
       </main>
+
+      <TransactionToasts notices={visibleTransactionNotices} />
 
       <DiceRollModal
         mode={diceMode}
@@ -594,13 +684,15 @@ export function CoTyPhuApp() {
         onStartMove={handleStartLockedDice}
       />
 
-      <CardDrawModal
-        game={game}
-        card={activeCard}
-        canAct={canAct}
-        onDraw={() => submitGameAction({ type: "DRAW_CARD" })}
-        onClose={() => submitGameAction({ type: "CLOSE_CARD" })}
-      />
+      {!movement ? (
+        <CardDrawModal
+          game={game}
+          card={activeCard}
+          canAct={canAct}
+          onDraw={() => submitGameAction({ type: "DRAW_CARD" })}
+          onClose={() => submitGameAction({ type: "CLOSE_CARD" })}
+        />
+      ) : null}
     </div>
   );
 }
@@ -958,16 +1050,58 @@ function GameBoard({
   inspectedTileId,
   activeCard,
   movement,
+  viewerPlayerId,
+  transactionHistory,
+  movementSpeedMs,
+  onMovementSpeedChange,
+  onFocusTile,
   onInspectTile,
 }: {
   game: GameState;
   inspectedTileId: string;
   activeCard: DrawCard | null;
   movement: MovementState | null;
+  viewerPlayerId: string | null;
+  transactionHistory: TransactionNotice[];
+  movementSpeedMs: number;
+  onMovementSpeedChange: (speedMs: number) => void;
+  onFocusTile: (tileId: string) => void;
   onInspectTile: (tileId: string) => void;
 }) {
+  const boardWrapRef = useRef<HTMLDivElement | null>(null);
+  const movingTileId = movement ? tiles[movement.displayPosition]?.id ?? inspectedTileId : null;
+  const focusedTileId = movingTileId ?? inspectedTileId;
+  const currentTileId = movingTileId ?? game.selectedTileId;
+
+  useEffect(() => {
+    if (!movement) {
+      return;
+    }
+
+    const activeTile = boardWrapRef.current?.querySelector<HTMLElement>(
+      `[data-board-index="${movement.displayPosition}"]`,
+    ) ?? null;
+    centerTileInBoard(boardWrapRef.current, activeTile);
+  }, [movement]);
+
+  useEffect(() => {
+    if (movement) {
+      return;
+    }
+
+    const focusIndex = tiles.findIndex((tile) => tile.id === inspectedTileId);
+    if (focusIndex < 0) {
+      return;
+    }
+
+    const activeTile = boardWrapRef.current?.querySelector<HTMLElement>(
+      `[data-board-index="${focusIndex}"]`,
+    ) ?? null;
+    centerTileInBoard(boardWrapRef.current, activeTile);
+  }, [inspectedTileId, movement]);
+
   return (
-    <div className="board-wrap">
+    <div className="board-wrap" ref={boardWrapRef}>
       <div
         className={["board", movement ? "is-moving" : ""].filter(Boolean).join(" ")}
         role="grid"
@@ -979,6 +1113,14 @@ function GameBoard({
             <span className="dice-value">{game.dice ? game.dice.join(" + ") : "--"}</span>
             <span className="dice-label">Xí ngầu</span>
           </div>
+          <BoardCenterPanel
+            game={game}
+            viewerPlayerId={viewerPlayerId}
+            transactionHistory={transactionHistory}
+            movementSpeedMs={movementSpeedMs}
+            onMovementSpeedChange={onMovementSpeedChange}
+            onFocusTile={onFocusTile}
+          />
           <p>{game.message}</p>
           {activeCard ? <strong className="event-ribbon">{activeCard.title}</strong> : null}
         </div>
@@ -989,7 +1131,8 @@ function GameBoard({
             tile={tile}
             index={index}
             game={game}
-            isInspected={tile.id === inspectedTileId}
+            isInspected={tile.id === focusedTileId}
+            isCurrent={tile.id === currentTileId}
             movement={movement}
             onInspectTile={onInspectTile}
           />
@@ -1004,6 +1147,7 @@ function BoardTile({
   index,
   game,
   isInspected,
+  isCurrent,
   movement,
   onInspectTile,
 }: {
@@ -1011,6 +1155,7 @@ function BoardTile({
   index: number;
   game: GameState;
   isInspected: boolean;
+  isCurrent: boolean;
   movement: MovementState | null;
   onInspectTile: (tileId: string) => void;
 }) {
@@ -1026,7 +1171,6 @@ function BoardTile({
     const visualPosition = movement?.playerId === player.id ? movement.displayPosition : player.position;
     return !player.bankrupt && visualPosition === index;
   });
-  const isCurrent = tile.id === game.selectedTileId;
   const isOwnableTile = isOwnable(tile);
   const tileClass = [
     "board-tile",
@@ -1049,6 +1193,7 @@ function BoardTile({
       onClick={() => onInspectTile(tile.id)}
       role="gridcell"
       aria-label={tile.name}
+      data-board-index={index}
     >
       <span className="tile-accent" aria-hidden="true" />
       <span className="tile-heading">
@@ -1088,14 +1233,98 @@ function BoardTile({
   );
 }
 
+function BoardCenterPanel({
+  className = "board-dashboard",
+  game,
+  viewerPlayerId,
+  transactionHistory,
+  movementSpeedMs,
+  onMovementSpeedChange,
+  onFocusTile,
+}: {
+  className?: string;
+  game: GameState;
+  viewerPlayerId: string | null;
+  transactionHistory: TransactionNotice[];
+  movementSpeedMs: number;
+  onMovementSpeedChange: (speedMs: number) => void;
+  onFocusTile: (tileId: string) => void;
+}) {
+  const viewer = viewerPlayerId ? game.players.find((player) => player.id === viewerPlayerId) ?? null : null;
+  const ownedTiles = viewer ? getOwnedTiles(game, viewer.id) : [];
+  const visibleHistory = viewer
+    ? transactionHistory.filter((notice) => notice.playerId === viewer.id).slice(0, TRANSACTION_HISTORY_PER_PLAYER_LIMIT)
+    : [];
+
+  return (
+    <section className={className} aria-label="Thông tin cá nhân">
+      <div className="dashboard-main">
+        <span>
+          <small>Tiền hiện tại</small>
+          <strong>{viewer ? formatMoney(viewer.cash) : "--"}</strong>
+        </span>
+        <label>
+          <small>Tốc độ di chuyển</small>
+          <input
+            type="range"
+            min={140}
+            max={650}
+            step={10}
+            value={movementSpeedMs}
+            onChange={(event) => onMovementSpeedChange(Number(event.target.value))}
+          />
+          <em>{movementSpeedMs}ms/ô</em>
+        </label>
+      </div>
+
+      <div className="dashboard-owned">
+        <small>Ô đang sở hữu</small>
+        {ownedTiles.length > 0 ? (
+          <div>
+            {ownedTiles.slice(0, 8).map((tile) => (
+              <button key={tile.id} type="button" onClick={() => onFocusTile(tile.id)}>
+                <span style={{ "--tile-color": tile.color } as CSSProperties} />
+                {tile.shortName}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p>Chưa sở hữu ô nào</p>
+        )}
+      </div>
+
+      <div className="dashboard-history">
+        <small>5 giao dịch gần nhất</small>
+        {visibleHistory.length > 0 ? (
+          <ol>
+            {visibleHistory.map((notice) => (
+              <li key={notice.id} className={notice.amount >= 0 ? "is-positive" : "is-negative"}>
+                <strong>
+                  {notice.amount >= 0 ? "+" : "-"}
+                  {formatMoney(Math.abs(notice.amount))}
+                </strong>
+                <span>{notice.label}</span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>Chưa có giao dịch</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function PlayerPanel({
   game,
   gameMode,
   lobby,
+  viewerPlayerId,
 }: {
   game: GameState;
   gameMode: GameMode;
   lobby: LobbyState;
+  viewerPlayerId: string | null;
 }) {
   const currentPlayer = getCurrentPlayer(game);
 
@@ -1108,8 +1337,9 @@ function PlayerPanel({
 
       <div className="players-grid">
         {game.players.map((player) => {
-          const ownedTiles = getOwnedTiles(game, player.id);
-          const netWorth = getNetWorth(game, player.id);
+          const canSeePrivateStats = player.id === viewerPlayerId;
+          const ownedTiles = canSeePrivateStats ? getOwnedTiles(game, player.id) : [];
+          const netWorth = canSeePrivateStats ? getNetWorth(game, player.id) : 0;
           const lobbyPlayer = lobby.players.find((candidate) => candidate.id === player.id);
           const labels = [
             gameMode === "solo-ai" && player.isBot ? "Bot" : null,
@@ -1142,10 +1372,20 @@ function PlayerPanel({
                   </small>
                 </div>
               </div>
-              <div className="player-stats">
-                <span>{formatMoney(player.cash)}</span>
-                <span>{ownedTiles.length} điểm</span>
-                <span>{formatMoney(netWorth)}</span>
+              <div className={["player-stats", canSeePrivateStats ? "" : "is-private"].filter(Boolean).join(" ")}>
+                {canSeePrivateStats ? (
+                  <>
+                    <span>{formatMoney(player.cash)}</span>
+                    <span>{ownedTiles.length} điểm</span>
+                    <span>{formatMoney(netWorth)}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Riêng tư</span>
+                    <span>Đã ẩn</span>
+                    <span>Riêng tư</span>
+                  </>
+                )}
               </div>
               {player.inJail ? (
                 <strong className="jail-badge">Tù: {player.jailTurnsRemaining}/{maxJailTurns}</strong>
@@ -1320,8 +1560,16 @@ function TileDetail({
 }) {
   const owner = getOwner(game, tile.id);
   const property = game.properties[tile.id];
+  const level = property?.level ?? 0;
   const rent = getRent(game, tile);
   const upgradeCost = getUpgradeCost(game, tile);
+  const sellValue = getSellValue(tile, level);
+  const mortgageValue = getMortgageValue(tile, level);
+  const rentRows = Array.from({ length: maxUpgradeLevel + 1 }, (_, nextLevel) => ({
+    level: nextLevel,
+    rent: getRentAtLevel(tile, nextLevel),
+    upgradeCost: getUpgradeCostAtLevel(tile, nextLevel),
+  }));
   const isActionTile = tile.id === game.selectedTileId;
   const deckKind = tile.kind === "chance" || tile.kind === "fortune" ? tile.kind : null;
   const deck = deckKind ? game.decks[deckKind] : null;
@@ -1351,15 +1599,23 @@ function TileDetail({
         {isOwnable(tile) ? (
           <>
             <span>
-              <strong>Giá</strong>
+              <strong>Giá mua</strong>
               {formatMoney(tile.price ?? 0)}
             </span>
             <span>
-              <strong>Phí</strong>
+              <strong>Giá bán</strong>
+              {formatMoney(sellValue)}
+            </span>
+            <span>
+              <strong>Cầm cố</strong>
+              {formatMoney(mortgageValue)}
+            </span>
+            <span>
+              <strong>Phạt hiện tại</strong>
               {formatMoney(rent)}
             </span>
             <span>
-              <strong>Nâng cấp</strong>
+              <strong>Nâng cấp kế</strong>
               {property && property.level < maxUpgradeLevel ? formatMoney(upgradeCost) : "Tối đa"}
             </span>
             <span>
@@ -1401,6 +1657,23 @@ function TileDetail({
               key={`${tile.id}-level-${index}`}
               className={index < (property?.level ?? 0) ? "is-filled" : ""}
             />
+          ))}
+        </div>
+      ) : null}
+
+      {isOwnable(tile) ? (
+        <div className="rent-table" aria-label="Phí phạt theo cấp nâng cấp">
+          <div>
+            <strong>Cấp</strong>
+            <strong>Phạt khi vào</strong>
+            <strong>Nâng cấp</strong>
+          </div>
+          {rentRows.map((row) => (
+            <div key={`${tile.id}-rent-${row.level}`} className={row.level === level ? "is-current" : ""}>
+              <span>{row.level}</span>
+              <span>{formatMoney(row.rent)}</span>
+              <span>{row.level < maxUpgradeLevel ? formatMoney(row.upgradeCost) : "Tối đa"}</span>
+            </div>
           ))}
         </div>
       ) : null}
@@ -1564,6 +1837,30 @@ function CardDrawModal({
         )}
       </section>
     </div>
+  );
+}
+
+function TransactionToasts({ notices }: { notices: TransactionNotice[] }) {
+  if (notices.length === 0) {
+    return null;
+  }
+
+  return (
+    <aside className="transaction-toasts" aria-live="polite" aria-label="Giao dịch trong ván">
+      {notices.map((notice) => (
+        <div
+          key={notice.id}
+          className={["transaction-toast", notice.amount >= 0 ? "is-positive" : "is-negative"].join(" ")}
+        >
+          <strong>
+            {notice.amount >= 0 ? "+" : "-"}
+            {formatMoney(Math.abs(notice.amount))}
+          </strong>
+          <span>{notice.playerName}</span>
+          <small>{notice.label}</small>
+        </div>
+      ))}
+    </aside>
   );
 }
 
@@ -1764,6 +2061,78 @@ function buildMovementPath(from: number, to: number, dice: [number, number] | nu
   return path;
 }
 
+function centerTileInBoard(container: HTMLDivElement | null, tile: HTMLElement | null) {
+  if (!container || !tile) {
+    return;
+  }
+
+  const containerRect = container.getBoundingClientRect();
+  const tileRect = tile.getBoundingClientRect();
+  const left =
+    container.scrollLeft + tileRect.left - containerRect.left - container.clientWidth / 2 + tileRect.width / 2;
+  const top =
+    container.scrollTop + tileRect.top - containerRect.top - container.clientHeight / 2 + tileRect.height / 2;
+
+  container.scrollTo({
+    left: Math.max(0, left),
+    top: Math.max(0, top),
+    behavior: "smooth",
+  });
+  tile.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+}
+
+function getTransactionNotices(previousGame: GameState, nextGame: GameState): TransactionNotice[] {
+  if (
+    previousGame.room.code !== nextGame.room.code ||
+    previousGame.players.length !== nextGame.players.length ||
+    (nextGame.turnNumber === 1 && !nextGame.dice && nextGame.phase === "ready")
+  ) {
+    return [];
+  }
+
+  const label = getTransactionLabel(nextGame.message);
+  return nextGame.players.flatMap((player) => {
+    const previousPlayer = previousGame.players.find((candidate) => candidate.id === player.id);
+    if (!previousPlayer) {
+      return [];
+    }
+
+    const amount = player.cash - previousPlayer.cash;
+    if (amount === 0) {
+      return [];
+    }
+
+    return [
+      {
+        id: `${Date.now()}-${player.id}-${Math.random().toString(16).slice(2)}`,
+        playerId: player.id,
+        playerName: player.name,
+        amount,
+        label,
+      },
+    ];
+  });
+}
+
+function trimTransactionHistoryByPlayer(history: TransactionNotice[]): TransactionNotice[] {
+  const countsByPlayer = new Map<string, number>();
+
+  return history.filter((notice) => {
+    const currentCount = countsByPlayer.get(notice.playerId) ?? 0;
+    if (currentCount >= TRANSACTION_HISTORY_PER_PLAYER_LIMIT) {
+      return false;
+    }
+
+    countsByPlayer.set(notice.playerId, currentCount + 1);
+    return true;
+  });
+}
+
+function getTransactionLabel(message: string): string {
+  const normalized = message.replace(/\s+/g, " ").trim();
+  return normalized.length > 58 ? `${normalized.slice(0, 55)}...` : normalized;
+}
+
 function getSocketUrl(): string {
   const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL?.trim();
   if (!baseUrl) {
@@ -1797,4 +2166,23 @@ function loadSavedGame(): GameState {
   } catch {
     return createInitialGame();
   }
+}
+
+function loadMovementSpeed(): number {
+  if (typeof window === "undefined") {
+    return DEFAULT_MOVEMENT_SPEED_MS;
+  }
+
+  const storedSpeed = window.localStorage.getItem(MOVEMENT_SPEED_KEY);
+  if (storedSpeed === null) {
+    return DEFAULT_MOVEMENT_SPEED_MS;
+  }
+
+  const rawSpeed = Number(storedSpeed);
+  if (!Number.isFinite(rawSpeed)) {
+    return DEFAULT_MOVEMENT_SPEED_MS;
+  }
+
+  const normalizedSpeed = Math.round(rawSpeed / 10) * 10;
+  return Math.min(650, Math.max(140, normalizedSpeed));
 }
