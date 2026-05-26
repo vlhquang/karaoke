@@ -76,6 +76,7 @@ export interface GameState {
   selectedTileId: string;
   pendingCardDraw: PendingCardDraw | null;
   activeCardDraw: ActiveCardDraw | null;
+  upgradedThisTurn: boolean;
   message: string;
   log: string[];
   turnNumber: number;
@@ -135,6 +136,7 @@ export function createInitialGame(options: CreateGameOptions = {}): GameState {
     selectedTileId: "start",
     pendingCardDraw: null,
     activeCardDraw: null,
+    upgradedThisTurn: false,
     message: "Đến lượt Bạn. Hãy gieo xúc xắc để bắt đầu hành trình.",
     log: ["Ván chơi mới đã sẵn sàng."],
     turnNumber: 1,
@@ -221,6 +223,7 @@ export function canUpgradeCurrentTile(state: GameState): boolean {
     player &&
       !player.isBot &&
       !player.inJail &&
+      !state.upgradedThisTurn &&
       state.phase === "resolved" &&
       !state.pendingCardDraw &&
       !state.activeCardDraw &&
@@ -371,6 +374,7 @@ export function upgradeCurrentTile(state: GameState): GameState {
 
   const next = {
     ...state,
+    upgradedThisTurn: true,
     players: state.players.map((candidate) =>
       candidate.id === player.id ? { ...candidate, cash: candidate.cash - cost } : candidate,
     ),
@@ -507,6 +511,7 @@ export function endTurn(state: GameState): GameState {
     dice: null,
     pendingCardDraw: null,
     activeCardDraw: null,
+    upgradedThisTurn: false,
     selectedTileId: tiles[nextPlayer.position]?.id ?? "start",
     message: nextPlayer.inJail
       ? `${nextPlayer.name} đang ở tù. Trả phạt, dùng thẻ hoặc gieo đôi để ra.`
@@ -868,6 +873,7 @@ function applyBotDecision(state: GameState): GameState {
   if (
     property.ownerId === player.id &&
     property.level < maxUpgradeLevel &&
+    !state.upgradedThisTurn &&
     player.cash >= getUpgradeCost(state, tile) + 360 &&
     Math.random() > 0.35
   ) {
@@ -875,6 +881,7 @@ function applyBotDecision(state: GameState): GameState {
     const nextLevel = property.level + 1;
     const next = {
       ...state,
+      upgradedThisTurn: true,
       players: state.players.map((candidate) =>
         candidate.id === player.id ? { ...candidate, cash: candidate.cash - cost } : candidate,
       ),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -103,6 +103,13 @@ interface LobbyState {
 type DiceMode = "normal" | "jailDouble" | null;
 type AppScreen = "mode-select" | "solo-setup" | "multiplayer-lobby" | "game";
 type GameMode = "solo-ai" | "multiplayer" | null;
+type LockedDice = { mode: Exclude<DiceMode, null>; dice: [number, number] } | null;
+
+interface MovementState {
+  playerId: string;
+  displayPosition: number;
+  path: number[];
+}
 
 interface SoloConfig {
   playerName: string;
@@ -133,6 +140,10 @@ export function CoTyPhuApp() {
   const [isSheetOpen, setIsSheetOpen] = useState(true);
   const [showLog, setShowLog] = useState(false);
   const [diceMode, setDiceMode] = useState<DiceMode>(null);
+  const [lockedDice, setLockedDice] = useState<LockedDice>(null);
+  const [movement, setMovement] = useState<MovementState | null>(null);
+  const gameRef = useRef(game);
+  const movementTimersRef = useRef<number[]>([]);
 
   const currentPlayer = getCurrentPlayer(game);
   const currentTile = getSelectedTile(game);
@@ -141,10 +152,14 @@ export function CoTyPhuApp() {
   const isSoloMode = gameMode === "solo-ai";
   const isMultiplayerMode = gameMode === "multiplayer";
   const isRealtimeGame = Boolean(isMultiplayerMode && socket?.connected && lobby.code && lobby.status === "playing");
+  const isMovementActive = Boolean(movement);
+  const isDiceLocked = Boolean(lockedDice);
   const canAct = Boolean(
-    isSoloMode
-      ? currentPlayer && !currentPlayer.isBot
-      : isRealtimeGame && currentPlayer?.id === lobby.ownPlayerId,
+    !isMovementActive &&
+      !isDiceLocked &&
+      (isSoloMode
+        ? currentPlayer && !currentPlayer.isBot
+        : isRealtimeGame && currentPlayer?.id === lobby.ownPlayerId),
   );
   const canRoll = Boolean(
     currentPlayer &&
@@ -165,6 +180,12 @@ export function CoTyPhuApp() {
   );
 
   const currentActionLabel = useMemo(() => {
+    if (movement) {
+      return "Đang di chuyển";
+    }
+    if (lockedDice) {
+      return "Đã chốt số";
+    }
     if (!currentPlayer) {
       return "Đang chuẩn bị lượt";
     }
@@ -186,7 +207,13 @@ export function CoTyPhuApp() {
       return "Gieo xúc xắc";
     }
     return `Xử lý ${currentTile.shortName}`;
-  }, [currentPlayer, currentTile.shortName, game]);
+  }, [currentPlayer, currentTile.shortName, game, lockedDice, movement]);
+
+  useEffect(() => {
+    gameRef.current = game;
+  }, [game]);
+
+  useEffect(() => () => clearMovementTimers(), []);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(game));
@@ -226,11 +253,14 @@ export function CoTyPhuApp() {
     });
 
     instance.on("game:update", (nextGame: GameState) => {
-      setGame(nextGame);
+      const previousGame = gameRef.current;
+      const sameRoom =
+        previousGame.room.code === nextGame.room.code &&
+        previousGame.players.length === nextGame.players.length;
+      const isFreshStart = nextGame.turnNumber === 1 && nextGame.phase === "ready" && !nextGame.dice;
+      commitGame(nextGame, previousGame, sameRoom && !isFreshStart);
       setGameMode("multiplayer");
       setScreen("game");
-      setInspectedTileId(nextGame.selectedTileId);
-      setIsSheetOpen(true);
     });
 
     return () => {
@@ -244,7 +274,8 @@ export function CoTyPhuApp() {
     }
 
     const timer = window.setTimeout(() => {
-      setGame((previous) => playBotTurn(previous));
+      const previous = gameRef.current;
+      commitGame(playBotTurn(previous), previous);
     }, currentPlayer.inJail ? 900 : 850);
 
     return () => window.clearTimeout(timer);
@@ -273,9 +304,11 @@ export function CoTyPhuApp() {
       isSoloMode
         ? createSoloGame(soloConfig)
         : resetGame();
-    setGame(freshGame);
-    setInspectedTileId(freshGame.selectedTileId);
-    setIsSheetOpen(true);
+    setDiceMode(null);
+    setLockedDice(null);
+    clearMovementTimers();
+    setMovement(null);
+    commitGame(freshGame, gameRef.current, false);
   }
 
   function handleChangeMode() {
@@ -286,6 +319,9 @@ export function CoTyPhuApp() {
     setScreen("mode-select");
     setGameMode(null);
     setDiceMode(null);
+    setLockedDice(null);
+    clearMovementTimers();
+    setMovement(null);
     setShowLog(false);
     setLobby((current) => ({
       ...current,
@@ -307,6 +343,9 @@ export function CoTyPhuApp() {
     setScreen("multiplayer-lobby");
     setGameMode("multiplayer");
     setDiceMode(null);
+    setLockedDice(null);
+    clearMovementTimers();
+    setMovement(null);
     setLobby((current) => ({
       ...current,
       code: "",
@@ -322,11 +361,13 @@ export function CoTyPhuApp() {
   function startSoloGame(nextConfig = soloConfig) {
     const freshGame = createSoloGame(nextConfig);
     setSoloConfig(nextConfig);
-    setGame(freshGame);
+    commitGame(freshGame, gameRef.current, false);
     setGameMode("solo-ai");
     setScreen("game");
-    setInspectedTileId(freshGame.selectedTileId);
-    setIsSheetOpen(true);
+    setDiceMode(null);
+    setLockedDice(null);
+    clearMovementTimers();
+    setMovement(null);
   }
 
   function handleStartRoom() {
@@ -343,23 +384,96 @@ export function CoTyPhuApp() {
       return;
     }
 
-    setGame((previous) => applyGameAction(previous, action));
+    const previous = gameRef.current;
+    commitGame(applyGameAction(previous, action), previous);
   }
 
   function handleConfirmDice(dice: [number, number]) {
     const mode = diceMode;
-    setDiceMode(null);
     if (!mode) {
       return;
     }
 
-    submitGameAction(mode === "jailDouble" ? { type: "TRY_JAIL_DOUBLE", dice } : { type: "ROLL", dice });
+    setDiceMode(null);
+    setLockedDice({ mode, dice });
+  }
+
+  function handleStartLockedDice() {
+    if (!lockedDice) {
+      return;
+    }
+
+    const action: GameAction =
+      lockedDice.mode === "jailDouble"
+        ? { type: "TRY_JAIL_DOUBLE", dice: lockedDice.dice }
+        : { type: "ROLL", dice: lockedDice.dice };
+
+    setLockedDice(null);
+    submitGameAction(action);
   }
 
   function handleAck(response?: { ok?: boolean; error?: string }) {
     if (response?.ok === false) {
       setLobby((current) => ({ ...current, error: response.error ?? "Server từ chối action." }));
     }
+  }
+
+  function commitGame(nextGame: GameState, previousGame = gameRef.current, animate = true) {
+    setGame(nextGame);
+    gameRef.current = nextGame;
+    setInspectedTileId(nextGame.selectedTileId);
+    setIsSheetOpen(true);
+
+    if (animate) {
+      startMovementAnimation(previousGame, nextGame);
+    }
+  }
+
+  function clearMovementTimers() {
+    for (const timer of movementTimersRef.current) {
+      window.clearTimeout(timer);
+    }
+    movementTimersRef.current = [];
+  }
+
+  function startMovementAnimation(previousGame: GameState, nextGame: GameState) {
+    clearMovementTimers();
+
+    const movementInfo = getMovementInfo(previousGame, nextGame);
+    if (!movementInfo) {
+      setMovement(null);
+      return;
+    }
+
+    const path = buildMovementPath(movementInfo.from, movementInfo.to, nextGame.dice);
+    if (path.length === 0) {
+      setMovement(null);
+      return;
+    }
+
+    const stepMs = 230;
+    setMovement({
+      playerId: movementInfo.playerId,
+      displayPosition: movementInfo.from,
+      path,
+    });
+
+    path.forEach((displayPosition, index) => {
+      const timer = window.setTimeout(() => {
+        setMovement((current) =>
+          current?.playerId === movementInfo.playerId
+            ? { ...current, displayPosition }
+            : current,
+        );
+      }, stepMs * (index + 1));
+      movementTimersRef.current.push(timer);
+    });
+
+    const finishTimer = window.setTimeout(() => {
+      setMovement(null);
+      movementTimersRef.current = [];
+    }, stepMs * (path.length + 2));
+    movementTimersRef.current.push(finishTimer);
   }
 
   if (screen === "mode-select") {
@@ -425,6 +539,7 @@ export function CoTyPhuApp() {
             game={game}
             inspectedTileId={inspectedTileId}
             activeCard={activeCard}
+            movement={movement}
             onInspectTile={inspectTile}
           />
         </section>
@@ -437,7 +552,7 @@ export function CoTyPhuApp() {
             canRoll={canRoll}
             canEndTurn={canEndTurn}
             canAct={canAct}
-            waitLabel={getWaitLabel(game, gameMode, lobby)}
+            waitLabel={movement ? "Đang di chuyển" : lockedDice ? "Đã chốt số" : getWaitLabel(game, gameMode, lobby)}
             onRoll={() => setDiceMode("normal")}
             onTryJailDouble={() => setDiceMode("jailDouble")}
             onPayJailFine={() => submitGameAction({ type: "PAY_JAIL_FINE" })}
@@ -468,7 +583,16 @@ export function CoTyPhuApp() {
         </aside>
       </main>
 
-      <DiceRollModal mode={diceMode} onCancel={() => setDiceMode(null)} onConfirm={handleConfirmDice} />
+      <DiceRollModal
+        mode={diceMode}
+        lockedDice={lockedDice}
+        onCancel={() => {
+          setDiceMode(null);
+          setLockedDice(null);
+        }}
+        onConfirm={handleConfirmDice}
+        onStartMove={handleStartLockedDice}
+      />
 
       <CardDrawModal
         game={game}
@@ -833,16 +957,22 @@ function GameBoard({
   game,
   inspectedTileId,
   activeCard,
+  movement,
   onInspectTile,
 }: {
   game: GameState;
   inspectedTileId: string;
   activeCard: DrawCard | null;
+  movement: MovementState | null;
   onInspectTile: (tileId: string) => void;
 }) {
   return (
     <div className="board-wrap">
-      <div className="board" role="grid" aria-label="Bàn cờ địa danh Việt Nam">
+      <div
+        className={["board", movement ? "is-moving" : ""].filter(Boolean).join(" ")}
+        role="grid"
+        aria-label="Bàn cờ địa danh Việt Nam"
+      >
         <div className="board-center" aria-live="polite">
           <img src="/co-ty-phu/vietnam-route.svg" alt="" className="route-art" />
           <div className="dice-panel">
@@ -860,6 +990,7 @@ function GameBoard({
             index={index}
             game={game}
             isInspected={tile.id === inspectedTileId}
+            movement={movement}
             onInspectTile={onInspectTile}
           />
         ))}
@@ -873,12 +1004,14 @@ function BoardTile({
   index,
   game,
   isInspected,
+  movement,
   onInspectTile,
 }: {
   tile: Tile;
   index: number;
   game: GameState;
   isInspected: boolean;
+  movement: MovementState | null;
   onInspectTile: (tileId: string) => void;
 }) {
   const style = {
@@ -889,14 +1022,21 @@ function BoardTile({
   const TileIcon = getTileIcon(tile.kind);
   const property = game.properties[tile.id];
   const owner = getOwner(game, tile.id);
-  const tokens = game.players.filter((player) => !player.bankrupt && player.position === index);
+  const tokens = game.players.filter((player) => {
+    const visualPosition = movement?.playerId === player.id ? movement.displayPosition : player.position;
+    return !player.bankrupt && visualPosition === index;
+  });
   const isCurrent = tile.id === game.selectedTileId;
+  const isOwnableTile = isOwnable(tile);
   const tileClass = [
     "board-tile",
     `kind-${tile.kind}`,
     owner ? "is-owned" : "",
+    isOwnableTile && !owner ? "is-unowned" : "",
     isInspected ? "is-inspected" : "",
     isCurrent ? "is-current" : "",
+    movement?.displayPosition === index ? "is-moving-over" : "",
+    movement?.path.includes(index) ? "is-move-path" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -916,9 +1056,14 @@ function BoardTile({
         <span>{tile.shortName}</span>
       </span>
       <span className="tile-meta">
-        {isOwnable(tile) ? formatMoney(tile.price ?? 0) : getKindLabel(tile.kind)}
+        {isOwnableTile ? formatMoney(tile.price ?? 0) : getKindLabel(tile.kind)}
       </span>
-      {isOwnable(tile) ? (
+      {isOwnableTile ? (
+        <span className={["owner-badge", owner ? "is-owned" : "is-open"].join(" ")}>
+          {owner ? owner.name : "Trống"}
+        </span>
+      ) : null}
+      {isOwnableTile ? (
         <span className="upgrade-dots" aria-label={`Cấp ${property?.level ?? 0}`}>
           {Array.from({ length: maxUpgradeLevel }).map((_, dotIndex) => (
             <span
@@ -1267,17 +1412,21 @@ function TileDetail({
 
 function DiceRollModal({
   mode,
+  lockedDice,
   onCancel,
   onConfirm,
+  onStartMove,
 }: {
   mode: DiceMode;
+  lockedDice: LockedDice;
   onCancel: () => void;
   onConfirm: (dice: [number, number]) => void;
+  onStartMove: () => void;
 }) {
   const [previewDice, setPreviewDice] = useState<[number, number]>([1, 1]);
 
   useEffect(() => {
-    if (!mode) {
+    if (!mode || lockedDice) {
       return undefined;
     }
 
@@ -1286,39 +1435,48 @@ function DiceRollModal({
     }, 110);
 
     return () => window.clearInterval(timer);
-  }, [mode]);
+  }, [lockedDice, mode]);
 
-  if (!mode) {
+  if (!mode && !lockedDice) {
     return null;
   }
 
-  const isJailMode = mode === "jailDouble";
+  const activeMode = lockedDice?.mode ?? mode;
+  const displayDice = lockedDice?.dice ?? previewDice;
+  const isLocked = Boolean(lockedDice);
+  const isJailMode = activeMode === "jailDouble";
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Canh xí ngầu">
-      <section className="dice-modal">
+      <section className={["dice-modal", isLocked ? "is-locked" : ""].filter(Boolean).join(" ")}>
         <header>
           <div>
-            <small>{isJailMode ? "Gieo đôi để ra tù" : "Canh số nút"}</small>
-            <h2>{isJailMode ? "Chốt đúng cặp đôi" : "Tập trung và chốt số"}</h2>
+            <small>{isLocked ? "Đã chốt số" : isJailMode ? "Gieo đôi để ra tù" : "Canh số nút"}</small>
+            <h2>{isLocked ? "Sẵn sàng di chuyển" : isJailMode ? "Chốt đúng cặp đôi" : "Tập trung và chốt số"}</h2>
           </div>
-          <button className="icon-button" type="button" onClick={onCancel} aria-label="Đóng">
-            <X aria-hidden="true" size={18} />
-          </button>
+          {!isLocked ? (
+            <button className="icon-button" type="button" onClick={onCancel} aria-label="Đóng">
+              <X aria-hidden="true" size={18} />
+            </button>
+          ) : null}
         </header>
 
         <div className="dice-faces" aria-live="polite">
-          <DiceFace value={previewDice[0]} />
-          <DiceFace value={previewDice[1]} />
+          <DiceFace value={displayDice[0]} />
+          <DiceFace value={displayDice[1]} />
         </div>
 
         <strong className="dice-total">
-          {previewDice[0]} + {previewDice[1]} = {previewDice[0] + previewDice[1]}
+          {displayDice[0]} + {displayDice[1]} = {displayDice[0] + displayDice[1]}
         </strong>
 
-        <button className="dice-confirm" type="button" onClick={() => onConfirm(previewDice)}>
+        <button
+          className="dice-confirm"
+          type="button"
+          onClick={isLocked ? onStartMove : () => onConfirm(previewDice)}
+        >
           <Dice5 aria-hidden="true" size={21} />
-          <span>Chốt số</span>
+          <span>{isLocked ? "Bắt đầu di chuyển" : "Chốt số"}</span>
         </button>
       </section>
     </div>
@@ -1557,6 +1715,55 @@ function randomFace(): number {
   return Math.floor(Math.random() * 6) + 1;
 }
 
+function getMovementInfo(previousGame: GameState, nextGame: GameState) {
+  const previousCurrent = getCurrentPlayer(previousGame);
+  if (previousCurrent) {
+    const nextCurrent = nextGame.players.find((player) => player.id === previousCurrent.id);
+    if (nextCurrent && nextCurrent.position !== previousCurrent.position) {
+      return {
+        playerId: previousCurrent.id,
+        from: previousCurrent.position,
+        to: nextCurrent.position,
+      };
+    }
+  }
+
+  for (const previousPlayer of previousGame.players) {
+    const nextPlayer = nextGame.players.find((player) => player.id === previousPlayer.id);
+    if (nextPlayer && nextPlayer.position !== previousPlayer.position) {
+      return {
+        playerId: previousPlayer.id,
+        from: previousPlayer.position,
+        to: nextPlayer.position,
+      };
+    }
+  }
+
+  return null;
+}
+
+function buildMovementPath(from: number, to: number, dice: [number, number] | null): number[] {
+  if (dice) {
+    const steps = dice[0] + dice[1];
+    const path = Array.from({ length: steps }, (_, index) => (from + index + 1) % tiles.length);
+    if (path[path.length - 1] !== to) {
+      path.push(to);
+    }
+    return path;
+  }
+
+  const path: number[] = [];
+  let cursor = from;
+  for (let guard = 0; guard < tiles.length; guard += 1) {
+    cursor = (cursor + 1) % tiles.length;
+    path.push(cursor);
+    if (cursor === to) {
+      break;
+    }
+  }
+  return path;
+}
+
 function getSocketUrl(): string {
   const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL?.trim();
   if (!baseUrl) {
@@ -1586,7 +1793,7 @@ function loadSavedGame(): GameState {
       return createInitialGame();
     }
 
-    return parsed;
+    return { ...parsed, upgradedThisTurn: Boolean(parsed.upgradedThisTurn) };
   } catch {
     return createInitialGame();
   }
