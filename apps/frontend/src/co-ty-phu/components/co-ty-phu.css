@@ -1181,6 +1181,7 @@ body.co-ty-phu-browser-lock {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   width: min(460px, calc(100vw - 24px));
+  height: min(760px, calc(100dvh - 24px));
   max-height: min(760px, calc(100dvh - 24px));
   min-height: 0;
   overflow: hidden;
@@ -1257,12 +1258,16 @@ body.co-ty-phu-browser-lock {
 
 .co-ty-phu-scope .tile-card-body {
   display: grid;
+  align-content: start;
   gap: 10px;
   min-height: 0;
+  max-height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 14px;
+  padding: 14px 14px 22px;
+  scrollbar-gutter: stable;
+  scroll-padding-bottom: 84px;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
 }
@@ -1853,6 +1858,7 @@ body.co-ty-phu-browser-lock {
   }
 
   .co-ty-phu-scope .tile-detail-card {
+    height: calc(100dvh - 14px);
     max-height: calc(100dvh - 14px);
   }
 
@@ -1941,6 +1947,7 @@ body.co-ty-phu-browser-lock {
 
   .co-ty-phu-scope .tile-detail-card {
     width: 100%;
+    height: calc(100dvh - 20px);
     max-height: calc(100dvh - 20px);
   }
 
@@ -1958,7 +1965,8 @@ body.co-ty-phu-browser-lock {
 
   .co-ty-phu-scope .tile-card-body {
     gap: 8px;
-    padding: 12px;
+    padding: 12px 12px 20px;
+    scroll-padding-bottom: 76px;
   }
 
   .co-ty-phu-scope .detail-description,
