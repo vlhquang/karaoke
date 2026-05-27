@@ -245,6 +245,109 @@ export function CoTyPhuApp() {
   }, [currentPlayer, currentTile.shortName, game, lockedDice, movement]);
 
   useEffect(() => {
+    const lockClassName = "co-ty-phu-browser-lock";
+    document.documentElement.classList.add(lockClassName);
+    document.body.classList.add(lockClassName);
+
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+
+    const preventGesture = (event: Event) => {
+      event.preventDefault();
+    };
+
+    const preventCtrlWheelZoom = (event: WheelEvent) => {
+      if (event.ctrlKey) {
+        event.preventDefault();
+      }
+    };
+
+    const canScroll = (element: HTMLElement, axis: "x" | "y", delta: number) => {
+      if (axis === "x") {
+        return delta > 0
+          ? element.scrollLeft > 0
+          : element.scrollLeft + element.clientWidth < element.scrollWidth - 1;
+      }
+
+      return delta > 0
+        ? element.scrollTop > 0
+        : element.scrollTop + element.clientHeight < element.scrollHeight - 1;
+    };
+
+    const findScrollableAncestor = (target: EventTarget | null, axis: "x" | "y") => {
+      if (!(target instanceof Element)) {
+        return null;
+      }
+
+      let element: Element | null = target;
+      while (element && element !== document.body) {
+        if (element instanceof HTMLElement) {
+          const style = window.getComputedStyle(element);
+          const overflow = axis === "x" ? style.overflowX : style.overflowY;
+          const canOverflow = overflow === "auto" || overflow === "scroll" || overflow === "overlay";
+          const hasScrollableSpace =
+            axis === "x"
+              ? element.scrollWidth > element.clientWidth + 1
+              : element.scrollHeight > element.clientHeight + 1;
+
+          if (canOverflow && hasScrollableSpace) {
+            return element;
+          }
+        }
+        element = element.parentElement;
+      }
+
+      return null;
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (event.touches.length === 1) {
+        lastTouchX = event.touches[0].clientX;
+        lastTouchY = event.touches[0].clientY;
+      }
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (event.touches.length > 1) {
+        event.preventDefault();
+        return;
+      }
+
+      const touch = event.touches[0];
+      const deltaX = touch.clientX - lastTouchX;
+      const deltaY = touch.clientY - lastTouchY;
+      const axis = Math.abs(deltaX) > Math.abs(deltaY) ? "x" : "y";
+      const delta = axis === "x" ? deltaX : deltaY;
+      const scrollable = findScrollableAncestor(event.target, axis);
+
+      if (!scrollable || !canScroll(scrollable, axis, delta)) {
+        event.preventDefault();
+      }
+
+      lastTouchX = touch.clientX;
+      lastTouchY = touch.clientY;
+    };
+
+    window.addEventListener("wheel", preventCtrlWheelZoom, { passive: false });
+    document.addEventListener("gesturestart", preventGesture, { passive: false });
+    document.addEventListener("gesturechange", preventGesture, { passive: false });
+    document.addEventListener("gestureend", preventGesture, { passive: false });
+    document.addEventListener("touchstart", handleTouchStart, { passive: false });
+    document.addEventListener("touchmove", handleTouchMove, { passive: false });
+
+    return () => {
+      document.documentElement.classList.remove(lockClassName);
+      document.body.classList.remove(lockClassName);
+      window.removeEventListener("wheel", preventCtrlWheelZoom);
+      document.removeEventListener("gesturestart", preventGesture);
+      document.removeEventListener("gesturechange", preventGesture);
+      document.removeEventListener("gestureend", preventGesture);
+      document.removeEventListener("touchstart", handleTouchStart);
+      document.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, []);
+
+  useEffect(() => {
     gameRef.current = game;
   }, [game]);
 
