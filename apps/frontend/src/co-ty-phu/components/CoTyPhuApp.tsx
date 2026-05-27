@@ -245,6 +245,23 @@ export function CoTyPhuApp() {
   }, [currentPlayer, currentTile.shortName, game, lockedDice, movement]);
 
   useEffect(() => {
+    const lockClassName = "co-ty-phu-detail-open";
+
+    if (detailTileId) {
+      document.documentElement.classList.add(lockClassName);
+      document.body.classList.add(lockClassName);
+    } else {
+      document.documentElement.classList.remove(lockClassName);
+      document.body.classList.remove(lockClassName);
+    }
+
+    return () => {
+      document.documentElement.classList.remove(lockClassName);
+      document.body.classList.remove(lockClassName);
+    };
+  }, [detailTileId]);
+
+  useEffect(() => {
     const lockClassName = "co-ty-phu-browser-lock";
     document.documentElement.classList.add(lockClassName);
     document.body.classList.add(lockClassName);
@@ -256,8 +273,30 @@ export function CoTyPhuApp() {
       event.preventDefault();
     };
 
-    const preventCtrlWheelZoom = (event: WheelEvent) => {
+    const isDetailModalTarget = (target: EventTarget | null) =>
+      target instanceof Element ? target.closest(".detail-modal-backdrop") : null;
+
+    const getTileCardBodyTarget = (target: EventTarget | null) =>
+      target instanceof Element ? (target.closest(".tile-card-body") as HTMLElement | null) : null;
+
+    const handleWheel = (event: WheelEvent) => {
       if (event.ctrlKey) {
+        event.preventDefault();
+        return;
+      }
+
+      if (!document.querySelector(".detail-modal-backdrop")) {
+        return;
+      }
+
+      const modal = isDetailModalTarget(event.target);
+      if (!modal) {
+        event.preventDefault();
+        return;
+      }
+
+      const body = getTileCardBodyTarget(event.target);
+      if (!body || !canScroll(body, "y", -event.deltaY)) {
         event.preventDefault();
       }
     };
@@ -318,6 +357,21 @@ export function CoTyPhuApp() {
       const deltaY = touch.clientY - lastTouchY;
       const axis = Math.abs(deltaX) > Math.abs(deltaY) ? "x" : "y";
       const delta = axis === "x" ? deltaX : deltaY;
+      const hasDetailModal = Boolean(document.querySelector(".detail-modal-backdrop"));
+
+      if (hasDetailModal) {
+        const modal = isDetailModalTarget(event.target);
+        const body = getTileCardBodyTarget(event.target);
+
+        if (!modal || !body || axis !== "y" || !canScroll(body, "y", deltaY)) {
+          event.preventDefault();
+        }
+
+        lastTouchX = touch.clientX;
+        lastTouchY = touch.clientY;
+        return;
+      }
+
       const scrollable = findScrollableAncestor(event.target, axis);
 
       if (!scrollable || !canScroll(scrollable, axis, delta)) {
@@ -328,7 +382,7 @@ export function CoTyPhuApp() {
       lastTouchY = touch.clientY;
     };
 
-    window.addEventListener("wheel", preventCtrlWheelZoom, { passive: false });
+    window.addEventListener("wheel", handleWheel, { passive: false });
     document.addEventListener("gesturestart", preventGesture, { passive: false });
     document.addEventListener("gesturechange", preventGesture, { passive: false });
     document.addEventListener("gestureend", preventGesture, { passive: false });
@@ -338,7 +392,7 @@ export function CoTyPhuApp() {
     return () => {
       document.documentElement.classList.remove(lockClassName);
       document.body.classList.remove(lockClassName);
-      window.removeEventListener("wheel", preventCtrlWheelZoom);
+      window.removeEventListener("wheel", handleWheel);
       document.removeEventListener("gesturestart", preventGesture);
       document.removeEventListener("gesturechange", preventGesture);
       document.removeEventListener("gestureend", preventGesture);
@@ -1205,7 +1259,7 @@ function GameBoard({
     const activeTile = boardWrapRef.current?.querySelector<HTMLElement>(
       `[data-board-index="${movement.displayPosition}"]`,
     ) ?? null;
-    centerTileInBoard(boardWrapRef.current, activeTile);
+    centerTileInBoard(boardWrapRef.current, activeTile, "auto");
   }, [movement]);
 
   useEffect(() => {
@@ -1221,7 +1275,7 @@ function GameBoard({
     const activeTile = boardWrapRef.current?.querySelector<HTMLElement>(
       `[data-board-index="${focusIndex}"]`,
     ) ?? null;
-    centerTileInBoard(boardWrapRef.current, activeTile);
+    centerTileInBoard(boardWrapRef.current, activeTile, "smooth");
   }, [inspectedTileId, movement]);
 
   return (
@@ -2342,24 +2396,50 @@ function buildMovementPath(from: number, to: number, dice: [number, number] | nu
   return path;
 }
 
-function centerTileInBoard(container: HTMLDivElement | null, tile: HTMLElement | null) {
+function centerTileInBoard(
+  container: HTMLDivElement | null,
+  tile: HTMLElement | null,
+  behavior: ScrollBehavior = "smooth",
+) {
   if (!container || !tile) {
     return;
   }
 
   const containerRect = container.getBoundingClientRect();
   const tileRect = tile.getBoundingClientRect();
+  const margin = 36;
+  const isVisible =
+    tileRect.left >= containerRect.left + margin &&
+    tileRect.right <= containerRect.right - margin &&
+    tileRect.top >= containerRect.top + margin &&
+    tileRect.bottom <= containerRect.bottom - margin;
+
+  if (isVisible) {
+    return;
+  }
+
+  const maxLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+  const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
   const left =
     container.scrollLeft + tileRect.left - containerRect.left - container.clientWidth / 2 + tileRect.width / 2;
   const top =
     container.scrollTop + tileRect.top - containerRect.top - container.clientHeight / 2 + tileRect.height / 2;
+  const nextLeft = clamp(left, 0, maxLeft);
+  const nextTop = clamp(top, 0, maxTop);
+
+  if (Math.abs(container.scrollLeft - nextLeft) < 2 && Math.abs(container.scrollTop - nextTop) < 2) {
+    return;
+  }
 
   container.scrollTo({
-    left: Math.max(0, left),
-    top: Math.max(0, top),
-    behavior: "smooth",
+    left: nextLeft,
+    top: nextTop,
+    behavior,
   });
-  tile.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function getTransactionNotices(previousGame: GameState, nextGame: GameState): TransactionNotice[] {
