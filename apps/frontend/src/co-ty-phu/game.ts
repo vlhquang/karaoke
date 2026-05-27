@@ -8,7 +8,6 @@ import {
   jailFine,
   maxJailTurns,
   maxRoomPlayers,
-  maxUpgradeLevel,
   regionLabels,
   restBonus,
   startBonus,
@@ -34,6 +33,8 @@ export interface Player {
 export interface PropertyState {
   ownerId: string | null;
   level: number;
+  mortgaged: boolean;
+  investedUpgradeCost: number;
 }
 
 export interface SharedDeckState {
@@ -89,7 +90,10 @@ export type GameAction =
   | { type: "DRAW_CARD" }
   | { type: "CLOSE_CARD" }
   | { type: "BUY_TILE" }
-  | { type: "UPGRADE_TILE" }
+  | { type: "UPGRADE_TILE"; tileId?: string }
+  | { type: "SELL_TILE"; tileId: string }
+  | { type: "MORTGAGE_TILE"; tileId: string }
+  | { type: "REDEEM_MORTGAGE"; tileId: string }
   | { type: "END_TURN" }
   | { type: "PAY_JAIL_FINE" }
   | { type: "USE_JAIL_FREE_CARD" };
@@ -106,7 +110,7 @@ const defaultNames = ["Bạn", "Lan", "Minh", "An"];
 export function createInitialGame(options: CreateGameOptions = {}): GameState {
   const properties = tiles.reduce<Record<string, PropertyState>>((acc, tile) => {
     if (isOwnable(tile)) {
-      acc[tile.id] = { ownerId: null, level: 0 };
+      acc[tile.id] = createEmptyProperty();
     }
     return acc;
   }, {});
@@ -117,7 +121,7 @@ export function createInitialGame(options: CreateGameOptions = {}): GameState {
   const humanPlayerCount = options.humanPlayerCount ?? 1;
 
   return {
-    version: 2,
+    version: 3,
     room: {
       code: options.roomCode ?? "LOCAL",
       hostPlayerId: "p1",
@@ -146,6 +150,10 @@ export function createInitialGame(options: CreateGameOptions = {}): GameState {
 
 export function isOwnable(tile: Tile): boolean {
   return tile.kind === "landmark" || tile.kind === "transport";
+}
+
+export function createEmptyProperty(): PropertyState {
+  return { ownerId: null, level: 0, mortgaged: false, investedUpgradeCost: 0 };
 }
 
 export function getCurrentPlayer(state: GameState): Player | null {
@@ -179,14 +187,14 @@ export function getRent(state: GameState, tile: Tile): number {
   }
 
   const property = state.properties[tile.id];
-  const level = property?.level ?? 0;
-  const baseFee = tile.baseFee ?? 0;
-  const transportBonus =
-    tile.kind === "transport" && property?.ownerId
-      ? countOwnedTransports(state, property.ownerId) * 10
-      : 0;
+  if (property?.mortgaged) {
+    return 0;
+  }
 
-  return Math.round(baseFee * (1 + level * 0.9) + transportBonus);
+  const level = property?.level ?? 0;
+  const transportCount = tile.kind === "transport" && property?.ownerId ? countOwnedActiveTransports(state, property.ownerId) : 0;
+
+  return getRentAtLevel(tile, level, transportCount);
 }
 
 export function getUpgradeCost(state: GameState, tile: Tile): number {
@@ -199,36 +207,41 @@ export function getRentAtLevel(tile: Tile, level: number, transportCount = 0): n
     return 0;
   }
 
-  const safeLevel = Math.max(0, Math.min(maxUpgradeLevel, level));
-  const transportBonus = tile.kind === "transport" ? transportCount * 10 : 0;
-  return Math.round((tile.baseFee ?? 0) * (1 + safeLevel * 0.9) + transportBonus);
+  if (tile.kind === "transport") {
+    return Math.round((tile.baseFee ?? 0) * getTransportRentMultiplier(transportCount));
+  }
+
+  const safeLevel = Math.max(0, level);
+  return Math.round((tile.baseFee ?? 0) * (1 + safeLevel * 0.75));
 }
 
 export function getUpgradeCostAtLevel(tile: Tile, level: number): number {
-  if (!isOwnable(tile) || level >= maxUpgradeLevel) {
+  if (tile.kind !== "landmark") {
     return 0;
   }
 
-  const safeLevel = Math.max(0, Math.min(maxUpgradeLevel - 1, level));
+  const safeLevel = Math.max(0, level);
   return Math.round((tile.upgradeCost ?? 0) * (1 + safeLevel * 0.35));
 }
 
-export function getSellValue(tile: Tile, level: number): number {
+export function getSellValue(tile: Tile, property?: PropertyState | null): number {
   if (!isOwnable(tile)) {
     return 0;
   }
 
-  const safeLevel = Math.max(0, Math.min(maxUpgradeLevel, level));
-  return Math.round((tile.price ?? 0) * 0.8 + safeLevel * (tile.upgradeCost ?? 0) * 0.5);
+  return Math.round((tile.price ?? 0) * 0.8 + (property?.investedUpgradeCost ?? 0) * 0.5);
 }
 
-export function getMortgageValue(tile: Tile, level: number): number {
+export function getMortgageValue(tile: Tile, property?: PropertyState | null): number {
   if (!isOwnable(tile)) {
     return 0;
   }
 
-  const safeLevel = Math.max(0, Math.min(maxUpgradeLevel, level));
-  return Math.round((tile.price ?? 0) * 0.5 + safeLevel * (tile.upgradeCost ?? 0) * 0.25);
+  return Math.round((tile.price ?? 0) * 0.5 + (property?.investedUpgradeCost ?? 0) * 0.25);
+}
+
+export function getRedeemMortgageValue(tile: Tile, property?: PropertyState | null): number {
+  return Math.round(getMortgageValue(tile, property) * 1.1);
 }
 
 export function canBuyCurrentTile(state: GameState): boolean {
@@ -251,8 +264,12 @@ export function canBuyCurrentTile(state: GameState): boolean {
 }
 
 export function canUpgradeCurrentTile(state: GameState): boolean {
+  return canUpgradeTile(state, state.selectedTileId);
+}
+
+export function canUpgradeTile(state: GameState, tileId: string): boolean {
   const player = getCurrentPlayer(state);
-  const tile = getSelectedTile(state);
+  const tile = getTileById(tileId);
   const property = state.properties[tile.id];
   const cost = getUpgradeCost(state, tile);
 
@@ -264,11 +281,70 @@ export function canUpgradeCurrentTile(state: GameState): boolean {
       state.phase === "resolved" &&
       !state.pendingCardDraw &&
       !state.activeCardDraw &&
+      tile.kind === "landmark" &&
+      property &&
+      property.ownerId === player.id &&
+      !property.mortgaged &&
+      player.cash >= cost,
+  );
+}
+
+export function canSellTile(state: GameState, tileId: string): boolean {
+  const player = getCurrentPlayer(state);
+  const property = state.properties[tileId];
+  const tile = getTileById(tileId);
+
+  return Boolean(
+    player &&
+      !player.isBot &&
+      !player.inJail &&
+      (state.phase === "ready" || state.phase === "resolved") &&
+      !state.pendingCardDraw &&
+      !state.activeCardDraw &&
       isOwnable(tile) &&
       property &&
       property.ownerId === player.id &&
-      property.level < maxUpgradeLevel &&
-      player.cash >= cost,
+      !property.mortgaged,
+  );
+}
+
+export function canMortgageTile(state: GameState, tileId: string): boolean {
+  const player = getCurrentPlayer(state);
+  const property = state.properties[tileId];
+  const tile = getTileById(tileId);
+
+  return Boolean(
+    player &&
+      !player.isBot &&
+      !player.inJail &&
+      (state.phase === "ready" || state.phase === "resolved") &&
+      !state.pendingCardDraw &&
+      !state.activeCardDraw &&
+      isOwnable(tile) &&
+      property &&
+      property.ownerId === player.id &&
+      !property.mortgaged,
+  );
+}
+
+export function canRedeemMortgageTile(state: GameState, tileId: string): boolean {
+  const player = getCurrentPlayer(state);
+  const property = state.properties[tileId];
+  const tile = getTileById(tileId);
+  const redeemValue = getRedeemMortgageValue(tile, property);
+
+  return Boolean(
+    player &&
+      !player.isBot &&
+      !player.inJail &&
+      (state.phase === "ready" || state.phase === "resolved") &&
+      !state.pendingCardDraw &&
+      !state.activeCardDraw &&
+      isOwnable(tile) &&
+      property &&
+      property.ownerId === player.id &&
+      property.mortgaged &&
+      player.cash >= redeemValue,
   );
 }
 
@@ -295,7 +371,13 @@ export function applyGameAction(state: GameState, action: GameAction): GameState
     case "BUY_TILE":
       return buyCurrentTile(state);
     case "UPGRADE_TILE":
-      return upgradeCurrentTile(state);
+      return upgradeTile(state, action.tileId ?? state.selectedTileId);
+    case "SELL_TILE":
+      return sellTile(state, action.tileId);
+    case "MORTGAGE_TILE":
+      return mortgageTile(state, action.tileId);
+    case "REDEEM_MORTGAGE":
+      return redeemMortgageTile(state, action.tileId);
     case "END_TURN":
       return endTurn(state);
     case "PAY_JAIL_FINE":
@@ -390,7 +472,7 @@ export function buyCurrentTile(state: GameState): GameState {
     ),
     properties: {
       ...state.properties,
-      [tile.id]: { ownerId: player.id, level: 0 },
+      [tile.id]: { ...createEmptyProperty(), ownerId: player.id },
     },
     message: `${player.name} đã mua ${tile.name} với giá ${formatMoney(tile.price ?? 0)}.`,
   };
@@ -399,12 +481,16 @@ export function buyCurrentTile(state: GameState): GameState {
 }
 
 export function upgradeCurrentTile(state: GameState): GameState {
-  if (!canUpgradeCurrentTile(state)) {
+  return upgradeTile(state, state.selectedTileId);
+}
+
+export function upgradeTile(state: GameState, tileId: string): GameState {
+  if (!canUpgradeTile(state, tileId)) {
     return state;
   }
 
   const player = getCurrentPlayer(state)!;
-  const tile = getSelectedTile(state);
+  const tile = getTileById(tileId);
   const cost = getUpgradeCost(state, tile);
   const property = state.properties[tile.id];
   const nextLevel = (property?.level ?? 0) + 1;
@@ -417,12 +503,90 @@ export function upgradeCurrentTile(state: GameState): GameState {
     ),
     properties: {
       ...state.properties,
-      [tile.id]: { ownerId: player.id, level: nextLevel },
+      [tile.id]: {
+        ...property,
+        ownerId: player.id,
+        level: nextLevel,
+        mortgaged: false,
+        investedUpgradeCost: (property?.investedUpgradeCost ?? 0) + cost,
+      },
     },
     message: `${player.name} nâng cấp ${tile.name} lên cấp ${nextLevel}.`,
   };
 
   return finalizeState(addLog(next, `${next.message} Chi phí ${formatMoney(cost)}.`));
+}
+
+export function sellTile(state: GameState, tileId: string): GameState {
+  if (!canSellTile(state, tileId)) {
+    return state;
+  }
+
+  const player = getCurrentPlayer(state)!;
+  const tile = getTileById(tileId);
+  const property = state.properties[tile.id];
+  const sellValue = getSellValue(tile, property);
+  const next: GameState = {
+    ...state,
+    players: state.players.map((candidate) =>
+      candidate.id === player.id ? { ...candidate, cash: candidate.cash + sellValue } : candidate,
+    ),
+    properties: {
+      ...state.properties,
+      [tile.id]: createEmptyProperty(),
+    },
+    message: `${player.name} bán ${tile.name} và nhận ${formatMoney(sellValue)}.`,
+  };
+
+  return finalizeState(addLog(next, next.message));
+}
+
+export function mortgageTile(state: GameState, tileId: string): GameState {
+  if (!canMortgageTile(state, tileId)) {
+    return state;
+  }
+
+  const player = getCurrentPlayer(state)!;
+  const tile = getTileById(tileId);
+  const property = state.properties[tile.id];
+  const mortgageValue = getMortgageValue(tile, property);
+  const next: GameState = {
+    ...state,
+    players: state.players.map((candidate) =>
+      candidate.id === player.id ? { ...candidate, cash: candidate.cash + mortgageValue } : candidate,
+    ),
+    properties: {
+      ...state.properties,
+      [tile.id]: { ...property, ownerId: player.id, mortgaged: true },
+    },
+    message: `${player.name} cầm cố ${tile.name} và nhận ${formatMoney(mortgageValue)}.`,
+  };
+
+  return finalizeState(addLog(next, `${next.message} Ô cầm cố không thu phí và không thể nâng cấp.`));
+}
+
+export function redeemMortgageTile(state: GameState, tileId: string): GameState {
+  if (!canRedeemMortgageTile(state, tileId)) {
+    return state;
+  }
+
+  const player = getCurrentPlayer(state)!;
+  const tile = getTileById(tileId);
+  const property = state.properties[tile.id];
+  const redeemValue = getRedeemMortgageValue(tile, property);
+  const next: GameState = {
+    ...state,
+    players: state.players.map((candidate) =>
+      candidate.id === player.id ? { ...candidate, cash: candidate.cash - redeemValue } : candidate,
+    ),
+    properties: {
+      ...state.properties,
+      [tile.id]: { ...property, ownerId: player.id, mortgaged: false },
+    },
+    message: `${player.name} chuộc ${tile.name} với ${formatMoney(redeemValue)}.`,
+  };
+
+  return settleBankruptcy(addLog(next, next.message), player.id);
 }
 
 export function payJailFine(state: GameState): GameState {
@@ -688,10 +852,17 @@ function resolveLanding(state: GameState, playerId: string, tile: Tile): GameSta
   }
 
   if (property.ownerId === playerId) {
-    if (property.level >= maxUpgradeLevel) {
+    if (property.mortgaged) {
       return {
         ...state,
-        message: `${player.name} ghé ${tile.name}. Địa danh này đã đạt cấp tối đa.`,
+        message: `${player.name} ghé ${tile.name}. Tài sản đang cầm cố, cần chuộc trước khi khai thác.`,
+      };
+    }
+
+    if (tile.kind !== "landmark") {
+      return {
+        ...state,
+        message: `${player.name} ghé ${tile.name}. Trạm giao thông thu phí theo số lượng sở hữu.`,
       };
     }
 
@@ -704,6 +875,13 @@ function resolveLanding(state: GameState, playerId: string, tile: Tile): GameSta
   }
 
   const owner = state.players.find((candidate) => candidate.id === property.ownerId);
+  if (property.mortgaged) {
+    return {
+      ...state,
+      message: `${tile.name} đang được ${owner?.name ?? "chủ sở hữu"} cầm cố. Không thu phí lượt này.`,
+    };
+  }
+
   const rent = getRent(state, tile);
 
   return transferMoney(
@@ -900,7 +1078,7 @@ function applyBotDecision(state: GameState): GameState {
       ),
       properties: {
         ...state.properties,
-        [tile.id]: { ownerId: player.id, level: 0 },
+        [tile.id]: { ...createEmptyProperty(), ownerId: player.id },
       },
       message: `${player.name} mua ${tile.name}.`,
     };
@@ -909,7 +1087,8 @@ function applyBotDecision(state: GameState): GameState {
 
   if (
     property.ownerId === player.id &&
-    property.level < maxUpgradeLevel &&
+    tile.kind === "landmark" &&
+    !property.mortgaged &&
     !state.upgradedThisTurn &&
     player.cash >= getUpgradeCost(state, tile) + 360 &&
     Math.random() > 0.35
@@ -924,7 +1103,12 @@ function applyBotDecision(state: GameState): GameState {
       ),
       properties: {
         ...state.properties,
-        [tile.id]: { ownerId: player.id, level: nextLevel },
+        [tile.id]: {
+          ...property,
+          ownerId: player.id,
+          level: nextLevel,
+          investedUpgradeCost: (property.investedUpgradeCost ?? 0) + cost,
+        },
       },
       message: `${player.name} nâng cấp ${tile.shortName} lên cấp ${nextLevel}.`,
     };
@@ -1099,7 +1283,7 @@ function settleBankruptcy(state: GameState, playerId: string): GameState {
     properties: Object.fromEntries(
       Object.entries(state.properties).map(([tileId, property]) => [
         tileId,
-        property.ownerId === playerId ? { ownerId: null, level: 0 } : property,
+        property.ownerId === playerId ? createEmptyProperty() : property,
       ]),
     ),
   };
@@ -1135,10 +1319,24 @@ function findNextActivePlayerIndex(candidates: Player[], currentIndex: number): 
   return currentIndex;
 }
 
-function countOwnedTransports(state: GameState, playerId: string): number {
-  return tiles.filter(
-    (tile) => tile.kind === "transport" && state.properties[tile.id]?.ownerId === playerId,
-  ).length;
+function countOwnedActiveTransports(state: GameState, playerId: string): number {
+  return tiles.filter((tile) => {
+    const property = state.properties[tile.id];
+    return tile.kind === "transport" && property?.ownerId === playerId && !property.mortgaged;
+  }).length;
+}
+
+function getTransportRentMultiplier(transportCount: number): number {
+  if (transportCount <= 1) {
+    return 1;
+  }
+  if (transportCount === 2) {
+    return 2;
+  }
+  if (transportCount === 3) {
+    return 4;
+  }
+  return 6;
 }
 
 function addLog(state: GameState, entry: string): GameState {

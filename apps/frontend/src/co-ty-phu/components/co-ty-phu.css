@@ -329,8 +329,8 @@
 .co-ty-phu-scope .board {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  grid-template-rows: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  grid-template-rows: repeat(9, minmax(0, 1fr));
   gap: 3px;
   width: min(100%, 720px);
   min-width: 312px;
@@ -359,8 +359,8 @@
 .co-ty-phu-scope .board-center {
   position: relative;
   z-index: 1;
-  grid-row: 2 / span 6;
-  grid-column: 2 / span 6;
+  grid-row: 2 / span 7;
+  grid-column: 2 / span 7;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto auto;
   gap: 8px;
@@ -435,7 +435,7 @@
 }
 
 .co-ty-phu-scope .dashboard-main > span,
-.co-ty-phu-scope .dashboard-main > label {
+.co-ty-phu-scope .dashboard-settings {
   display: grid;
   gap: 4px;
   min-width: 0;
@@ -443,6 +443,22 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface-soft);
+}
+
+.co-ty-phu-scope .dashboard-settings {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  color: var(--green);
+  cursor: pointer;
+}
+
+.co-ty-phu-scope .dashboard-settings span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .co-ty-phu-scope .dashboard-main small,
@@ -635,6 +651,16 @@
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--owner-color) 30%, transparent);
 }
 
+.co-ty-phu-scope .board-tile.is-mortgaged {
+  background:
+    repeating-linear-gradient(
+      -35deg,
+      rgba(53, 66, 74, 0.08) 0 8px,
+      rgba(255, 255, 255, 0.95) 8px 16px
+    ),
+    rgba(255, 255, 255, 0.94);
+}
+
 .co-ty-phu-scope .board-tile.is-unowned {
   border-style: dashed;
   border-color: rgba(47, 126, 121, 0.34);
@@ -734,25 +760,24 @@
   background: var(--owner-color);
 }
 
-.co-ty-phu-scope .upgrade-dots,
-.co-ty-phu-scope .level-row {
-  display: flex;
-  gap: 3px;
+.co-ty-phu-scope .owner-badge.is-mortgaged {
+  color: #ffffff;
+  background: var(--jail, #35424a);
 }
 
-.co-ty-phu-scope .upgrade-dots span,
-.co-ty-phu-scope .level-row span {
-  width: 7px;
-  height: 7px;
-  border: 1px solid rgba(23, 52, 59, 0.2);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.co-ty-phu-scope .upgrade-dots span.is-filled,
-.co-ty-phu-scope .level-row span.is-filled {
-  border-color: var(--owner-color, var(--green));
-  background: var(--owner-color, var(--green));
+.co-ty-phu-scope .level-badge {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  padding: 2px 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  color: var(--owner-color);
+  background: color-mix(in srgb, var(--owner-color) 12%, #ffffff);
+  font-size: 0.53rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .co-ty-phu-scope .tile-tokens {
@@ -1113,6 +1138,101 @@
   opacity: 0.42;
 }
 
+.co-ty-phu-scope .detail-modal-backdrop,
+.co-ty-phu-scope .settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(23, 52, 59, 0.32);
+  backdrop-filter: blur(10px);
+}
+
+.co-ty-phu-scope .tile-detail-card {
+  display: grid;
+  width: min(460px, calc(100vw - 24px));
+  max-height: min(760px, calc(100dvh - 24px));
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 28px 80px rgba(23, 52, 59, 0.32);
+}
+
+.co-ty-phu-scope .tile-card-image {
+  position: relative;
+  min-height: 190px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 24% 20%, rgba(255, 255, 255, 0.4), transparent 26%),
+    linear-gradient(135deg, rgba(47, 126, 121, 0.92), rgba(242, 165, 65, 0.72));
+}
+
+.co-ty-phu-scope .tile-card-image img {
+  width: 100%;
+  height: 100%;
+  min-height: 190px;
+  object-fit: cover;
+  opacity: 0.56;
+  mix-blend-mode: multiply;
+}
+
+.co-ty-phu-scope .tile-card-overlay {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  gap: 5px;
+  padding: 42px 16px 14px;
+  color: #ffffff;
+  background: linear-gradient(180deg, transparent, rgba(23, 52, 59, 0.88));
+}
+
+.co-ty-phu-scope .tile-card-overlay small {
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.co-ty-phu-scope .tile-card-overlay h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 4vw, 2rem);
+  line-height: 1.05;
+}
+
+.co-ty-phu-scope .property-status {
+  display: inline-flex;
+  justify-self: start;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.co-ty-phu-scope .property-status.is-mortgaged {
+  background: rgba(53, 66, 74, 0.86);
+}
+
+.co-ty-phu-scope .detail-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.co-ty-phu-scope .tile-card-body {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+}
+
 .co-ty-phu-scope .detail-sheet {
   position: fixed;
   right: 12px;
@@ -1224,11 +1344,90 @@
   font-weight: 850;
 }
 
+.co-ty-phu-scope .detail-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.co-ty-phu-scope .detail-actions button,
+.co-ty-phu-scope .settings-actions button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 0.78rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.co-ty-phu-scope .detail-actions button:disabled,
+.co-ty-phu-scope .settings-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .co-ty-phu-scope .action-note {
   display: block;
   margin-top: 12px;
   color: var(--green);
   font-size: 0.82rem;
+}
+
+.co-ty-phu-scope .speed-settings {
+  display: grid;
+  gap: 14px;
+  width: min(360px, calc(100vw - 28px));
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 28px 80px rgba(23, 52, 59, 0.28);
+}
+
+.co-ty-phu-scope .speed-settings header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.co-ty-phu-scope .speed-settings h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.08rem;
+}
+
+.co-ty-phu-scope .speed-settings small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.co-ty-phu-scope .speed-settings label {
+  display: grid;
+  gap: 8px;
+  color: var(--green);
+  font-weight: 900;
+}
+
+.co-ty-phu-scope .speed-settings input {
+  width: 100%;
+  accent-color: var(--green);
+}
+
+.co-ty-phu-scope .settings-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .co-ty-phu-scope .game-log {
@@ -1691,8 +1890,8 @@
   }
 
   .co-ty-phu-scope .board {
-    width: 650px;
-    min-width: 650px;
+    width: 760px;
+    min-width: 760px;
     max-width: none;
   }
 
@@ -1718,16 +1917,24 @@
   .co-ty-phu-scope .dashboard-main {
     grid-row: 1;
     grid-column: 1;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) 30px;
   }
 
-  .co-ty-phu-scope .dashboard-main > label {
-    display: none;
+  .co-ty-phu-scope .dashboard-settings {
+    display: inline-flex;
+    min-height: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
   }
 
   .co-ty-phu-scope .dashboard-main > span,
-  .co-ty-phu-scope .dashboard-main > label {
+  .co-ty-phu-scope .dashboard-settings {
     padding: 4px 6px;
+  }
+
+  .co-ty-phu-scope .dashboard-settings span {
+    display: none;
   }
 
   .co-ty-phu-scope .dashboard-main > span {

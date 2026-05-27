@@ -11,6 +11,7 @@ export type TileKind =
 
 export type DeckKind = "chance" | "fortune";
 export type Region = "mien-bac" | "mien-trung" | "mien-nam";
+export type TransportGroup = "airport" | "bus" | "rail" | "water";
 
 export type CardEffect =
   | { type: "cash"; amount: number }
@@ -32,6 +33,9 @@ export interface Tile {
   price?: number;
   baseFee?: number;
   upgradeCost?: number;
+  transportGroup?: TransportGroup;
+  imageUrl?: string;
+  imageAlt?: string;
 }
 
 export interface DrawCard {
@@ -57,7 +61,7 @@ export const startingCash = 1500;
 export const startBonus = 200;
 export const taxAmount = 120;
 export const restBonus = 100;
-export const maxUpgradeLevel = 3;
+export const rentPreviewLevels = 5;
 export const deckSize = 50;
 export const jailFine = 150;
 export const maxJailTurns = 3;
@@ -76,7 +80,7 @@ const colors = {
   start: "#17343b",
 };
 
-export const tiles: Tile[] = [
+const baseTiles: Tile[] = [
   {
     id: "start",
     name: "Xuất phát",
@@ -126,6 +130,7 @@ export const tiles: Tile[] = [
     price: 180,
     baseFee: 24,
     upgradeCost: 120,
+    transportGroup: "airport",
     description: "Trạm trung chuyển giúp tạo dòng tiền đều trong suốt ván chơi.",
   },
   {
@@ -139,6 +144,18 @@ export const tiles: Tile[] = [
     baseFee: 32,
     upgradeCost: 150,
     description: "Địa danh biểu tượng của du lịch biển đảo miền Bắc.",
+  },
+  {
+    id: "cat-ba",
+    name: "Đảo Cát Bà",
+    shortName: "Cát Bà",
+    kind: "landmark",
+    region: "mien-bac",
+    color: colors.north,
+    price: 280,
+    baseFee: 35,
+    upgradeCost: 165,
+    description: "Đảo du lịch xanh kết nối Hạ Long, mạnh ở nhóm nghỉ dưỡng biển phía Bắc.",
   },
   {
     id: "sa-pa",
@@ -249,6 +266,7 @@ export const tiles: Tile[] = [
     price: 180,
     baseFee: 24,
     upgradeCost: 120,
+    transportGroup: "rail",
     description: "Trạm giao thông nối tuyến Bắc - Trung - Nam.",
   },
   {
@@ -282,6 +300,18 @@ export const tiles: Tile[] = [
     baseFee: 40,
     upgradeCost: 180,
     description: "Thành phố biển có dòng khách cao trong các mùa nghỉ lễ.",
+  },
+  {
+    id: "quy-nhon",
+    name: "Biển Quy Nhơn",
+    shortName: "Quy Nhơn",
+    kind: "landmark",
+    region: "mien-trung",
+    color: colors.central,
+    price: 300,
+    baseFee: 38,
+    upgradeCost: 175,
+    description: "Điểm đến biển miền Trung tăng trưởng nhanh, phù hợp chiến thuật giữ dài hạn.",
   },
   {
     id: "nghi-duong",
@@ -328,6 +358,18 @@ export const tiles: Tile[] = [
     description: "Điểm check-in biểu tượng với giá mua trung bình cao.",
   },
   {
+    id: "san-bay-tan-son-nhat",
+    name: "Sân bay Tân Sơn Nhất",
+    shortName: "Tân Sơn Nhất",
+    kind: "transport",
+    color: colors.transport,
+    price: 220,
+    baseFee: 30,
+    upgradeCost: 130,
+    transportGroup: "airport",
+    description: "Cửa ngõ hàng không phía Nam, tăng mạnh phí khi sở hữu nhiều trạm giao thông.",
+  },
+  {
     id: "vao-tu",
     name: "Vào tù",
     shortName: "Vào tù",
@@ -348,6 +390,18 @@ export const tiles: Tile[] = [
     description: "Tour lịch sử có chi phí đầu tư thấp và dễ hoàn vốn.",
   },
   {
+    id: "ben-xe-mien-dong",
+    name: "Bến xe Miền Đông",
+    shortName: "Bến xe MĐ",
+    kind: "transport",
+    color: colors.transport,
+    price: 190,
+    baseFee: 26,
+    upgradeCost: 120,
+    transportGroup: "bus",
+    description: "Đầu mối xe khách lớn, thu phí dựa trên số lượng bến và sân bay đang sở hữu.",
+  },
+  {
     id: "ben-cai-rang",
     name: "Bến Cái Răng",
     shortName: "Bến CR",
@@ -356,6 +410,7 @@ export const tiles: Tile[] = [
     price: 180,
     baseFee: 24,
     upgradeCost: 120,
+    transportGroup: "water",
     description: "Điểm trung chuyển đường thủy, mạnh khi sở hữu nhiều trạm.",
   },
   {
@@ -379,6 +434,42 @@ export const tiles: Tile[] = [
     description: "Đảo nghỉ dưỡng cao cấp với mức phí tham quan lớn nhất miền Nam.",
   },
 ];
+
+const tileImageIds = [
+  "ho-guom",
+  "van-mieu",
+  "san-bay-noi-bai",
+  "vinh-ha-long",
+  "cat-ba",
+  "sa-pa",
+  "trang-an",
+  "phong-nha",
+  "co-do-hue",
+  "hoi-an",
+  "cau-rong",
+  "ba-na-hills",
+  "ga-da-nang",
+  "my-son",
+  "nha-trang",
+  "quy-nhon",
+  "mui-ne",
+  "cho-ben-thanh",
+  "nha-tho-duc-ba",
+  "san-bay-tan-son-nhat",
+  "cu-chi",
+  "ben-xe-mien-dong",
+  "ben-cai-rang",
+  "phu-quoc",
+] as const;
+
+const tileImages = Object.fromEntries(
+  tileImageIds.map((id) => [id, { imageUrl: `/co-ty-phu/places/${id}.webp` }]),
+) as Record<string, Pick<Tile, "imageUrl" | "imageAlt">>;
+
+export const tiles: Tile[] = baseTiles.map((tile) => ({
+  ...tile,
+  ...tileImages[tile.id],
+}));
 
 const chanceTemplates: CardTemplate[] = [
   {

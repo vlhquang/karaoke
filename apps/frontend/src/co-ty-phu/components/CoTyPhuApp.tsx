@@ -21,6 +21,7 @@ import {
   Plane,
   Play,
   RotateCcw,
+  Settings,
   ShieldQuestion,
   ShoppingBag,
   Sparkles,
@@ -39,7 +40,7 @@ import {
   jailFine,
   maxJailTurns,
   maxRoomPlayers,
-  maxUpgradeLevel,
+  rentPreviewLevels,
   regionLabels,
   Tile,
   TileKind,
@@ -48,9 +49,14 @@ import {
 import {
   applyGameAction,
   canBuyCurrentTile,
+  canMortgageTile,
   canPayJailFine,
+  canRedeemMortgageTile,
+  canSellTile,
+  canUpgradeTile,
   canUpgradeCurrentTile,
   canUseJailFreeCard,
+  createEmptyProperty,
   createInitialGame,
   formatMoney,
   GameAction,
@@ -62,6 +68,7 @@ import {
   getOwner,
   getRent,
   getMortgageValue,
+  getRedeemMortgageValue,
   getRentAtLevel,
   getSelectedTile,
   getSellValue,
@@ -161,6 +168,7 @@ export function CoTyPhuApp() {
   const [transactionNotices, setTransactionNotices] = useState<TransactionNotice[]>([]);
   const [transactionHistory, setTransactionHistory] = useState<TransactionNotice[]>([]);
   const [movementSpeedMs, setMovementSpeedMs] = useState(() => loadMovementSpeed());
+  const [isSpeedSettingsOpen, setIsSpeedSettingsOpen] = useState(false);
   const gameRef = useRef(game);
   const movementTimersRef = useRef<number[]>([]);
   const noticeTimersRef = useRef<number[]>([]);
@@ -621,7 +629,7 @@ export function CoTyPhuApp() {
             viewerPlayerId={viewerPlayerId}
             transactionHistory={transactionHistory}
             movementSpeedMs={movementSpeedMs}
-            onMovementSpeedChange={setMovementSpeedMs}
+            onOpenSpeedSettings={() => setIsSpeedSettingsOpen(true)}
             onFocusTile={focusTile}
             onInspectTile={inspectTile}
           />
@@ -660,6 +668,12 @@ export function CoTyPhuApp() {
               tile={detailTile}
               activeCardTitle={activeCard?.title}
               isOpen={isSheetOpen}
+              canAct={canAct}
+              onBuy={() => submitGameAction({ type: "BUY_TILE" })}
+              onUpgrade={() => submitGameAction({ type: "UPGRADE_TILE", tileId: detailTile.id })}
+              onSell={() => submitGameAction({ type: "SELL_TILE", tileId: detailTile.id })}
+              onMortgage={() => submitGameAction({ type: "MORTGAGE_TILE", tileId: detailTile.id })}
+              onRedeemMortgage={() => submitGameAction({ type: "REDEEM_MORTGAGE", tileId: detailTile.id })}
               onClose={() => {
                 setIsSheetOpen(false);
                 setDetailTileId(null);
@@ -672,6 +686,13 @@ export function CoTyPhuApp() {
       </main>
 
       <TransactionToasts notices={visibleTransactionNotices} />
+
+      <SpeedSettingsModal
+        isOpen={isSpeedSettingsOpen}
+        movementSpeedMs={movementSpeedMs}
+        onChange={setMovementSpeedMs}
+        onClose={() => setIsSpeedSettingsOpen(false)}
+      />
 
       <DiceRollModal
         mode={diceMode}
@@ -1053,7 +1074,7 @@ function GameBoard({
   viewerPlayerId,
   transactionHistory,
   movementSpeedMs,
-  onMovementSpeedChange,
+  onOpenSpeedSettings,
   onFocusTile,
   onInspectTile,
 }: {
@@ -1064,7 +1085,7 @@ function GameBoard({
   viewerPlayerId: string | null;
   transactionHistory: TransactionNotice[];
   movementSpeedMs: number;
-  onMovementSpeedChange: (speedMs: number) => void;
+  onOpenSpeedSettings: () => void;
   onFocusTile: (tileId: string) => void;
   onInspectTile: (tileId: string) => void;
 }) {
@@ -1118,7 +1139,7 @@ function GameBoard({
             viewerPlayerId={viewerPlayerId}
             transactionHistory={transactionHistory}
             movementSpeedMs={movementSpeedMs}
-            onMovementSpeedChange={onMovementSpeedChange}
+            onOpenSpeedSettings={onOpenSpeedSettings}
             onFocusTile={onFocusTile}
           />
           <p>{game.message}</p>
@@ -1177,6 +1198,7 @@ function BoardTile({
     `kind-${tile.kind}`,
     owner ? "is-owned" : "",
     isOwnableTile && !owner ? "is-unowned" : "",
+    property?.mortgaged ? "is-mortgaged" : "",
     isInspected ? "is-inspected" : "",
     isCurrent ? "is-current" : "",
     movement?.displayPosition === index ? "is-moving-over" : "",
@@ -1204,18 +1226,13 @@ function BoardTile({
         {isOwnableTile ? formatMoney(tile.price ?? 0) : getKindLabel(tile.kind)}
       </span>
       {isOwnableTile ? (
-        <span className={["owner-badge", owner ? "is-owned" : "is-open"].join(" ")}>
-          {owner ? owner.name : "Trống"}
+        <span className={["owner-badge", owner ? "is-owned" : "is-open", property?.mortgaged ? "is-mortgaged" : ""].join(" ")}>
+          {property?.mortgaged ? "Cầm cố" : owner ? owner.name : "Trống"}
         </span>
       ) : null}
-      {isOwnableTile ? (
-        <span className="upgrade-dots" aria-label={`Cấp ${property?.level ?? 0}`}>
-          {Array.from({ length: maxUpgradeLevel }).map((_, dotIndex) => (
-            <span
-              key={`${tile.id}-${dotIndex}`}
-              className={dotIndex < (property?.level ?? 0) ? "is-filled" : ""}
-            />
-          ))}
+      {isOwnableTile && property?.ownerId ? (
+        <span className="level-badge" aria-label={`Cấp ${property.level}`}>
+          {tile.kind === "landmark" ? `Cấp ${property.level}` : getTransportGroupLabel(tile)}
         </span>
       ) : null}
       <span className="tile-tokens">
@@ -1239,7 +1256,7 @@ function BoardCenterPanel({
   viewerPlayerId,
   transactionHistory,
   movementSpeedMs,
-  onMovementSpeedChange,
+  onOpenSpeedSettings,
   onFocusTile,
 }: {
   className?: string;
@@ -1247,7 +1264,7 @@ function BoardCenterPanel({
   viewerPlayerId: string | null;
   transactionHistory: TransactionNotice[];
   movementSpeedMs: number;
-  onMovementSpeedChange: (speedMs: number) => void;
+  onOpenSpeedSettings: () => void;
   onFocusTile: (tileId: string) => void;
 }) {
   const viewer = viewerPlayerId ? game.players.find((player) => player.id === viewerPlayerId) ?? null : null;
@@ -1263,18 +1280,10 @@ function BoardCenterPanel({
           <small>Tiền hiện tại</small>
           <strong>{viewer ? formatMoney(viewer.cash) : "--"}</strong>
         </span>
-        <label>
-          <small>Tốc độ di chuyển</small>
-          <input
-            type="range"
-            min={140}
-            max={650}
-            step={10}
-            value={movementSpeedMs}
-            onChange={(event) => onMovementSpeedChange(Number(event.target.value))}
-          />
-          <em>{movementSpeedMs}ms/ô</em>
-        </label>
+        <button className="dashboard-settings" type="button" onClick={onOpenSpeedSettings}>
+          <Settings aria-hidden="true" size={15} />
+          <span>{movementSpeedMs}ms/ô</span>
+        </button>
       </div>
 
       <div className="dashboard-owned">
@@ -1550,136 +1559,273 @@ function TileDetail({
   tile,
   activeCardTitle,
   isOpen,
+  canAct,
+  onBuy,
+  onUpgrade,
+  onSell,
+  onMortgage,
+  onRedeemMortgage,
   onClose,
 }: {
   game: GameState;
   tile: Tile;
   activeCardTitle?: string;
   isOpen: boolean;
+  canAct: boolean;
+  onBuy: () => void;
+  onUpgrade: () => void;
+  onSell: () => void;
+  onMortgage: () => void;
+  onRedeemMortgage: () => void;
   onClose: () => void;
 }) {
+  if (!isOpen) {
+    return null;
+  }
+
   const owner = getOwner(game, tile.id);
+  const currentPlayer = getCurrentPlayer(game);
   const property = game.properties[tile.id];
   const level = property?.level ?? 0;
   const rent = getRent(game, tile);
   const upgradeCost = getUpgradeCost(game, tile);
-  const sellValue = getSellValue(tile, level);
-  const mortgageValue = getMortgageValue(tile, level);
-  const rentRows = Array.from({ length: maxUpgradeLevel + 1 }, (_, nextLevel) => ({
-    level: nextLevel,
-    rent: getRentAtLevel(tile, nextLevel),
-    upgradeCost: getUpgradeCostAtLevel(tile, nextLevel),
-  }));
+  const sellValue = getSellValue(tile, property);
+  const mortgageValue = getMortgageValue(tile, property);
+  const redeemValue = getRedeemMortgageValue(tile, property);
+  const rentRows =
+    tile.kind === "transport"
+      ? Array.from({ length: rentPreviewLevels }, (_, index) => ({
+          label: `${index + 1} trạm`,
+          rent: getRentAtLevel(tile, 0, index + 1),
+          upgradeCost: null as number | null,
+        }))
+      : getPreviewLevels(level).map((nextLevel) => ({
+          label: `Cấp ${nextLevel}`,
+          rent: getRentAtLevel(tile, nextLevel),
+          upgradeCost: getUpgradeCostAtLevel(tile, nextLevel),
+        }));
   const isActionTile = tile.id === game.selectedTileId;
   const deckKind = tile.kind === "chance" || tile.kind === "fortune" ? tile.kind : null;
   const deck = deckKind ? game.decks[deckKind] : null;
+  const isOwner = Boolean(currentPlayer && owner?.id === currentPlayer.id);
+  const canBuyThisTile = canAct && isActionTile && canBuyCurrentTile(game);
+  const canUpgradeThisTile = canAct && canUpgradeTile(game, tile.id);
+  const canSellThisTile = canAct && canSellTile(game, tile.id);
+  const canMortgageThisTile = canAct && canMortgageTile(game, tile.id);
+  const canRedeemThisTile = canAct && canRedeemMortgageTile(game, tile.id);
 
   return (
-    <section className={["detail-sheet", isOpen ? "is-open" : ""].join(" ")}>
-      <span className="sheet-handle" aria-hidden="true" />
-      <header className="detail-header">
-        <div>
-          <small>{getKindLabel(tile.kind)}</small>
-          <h2>{tile.name}</h2>
-        </div>
-        <button className="icon-button sheet-close" type="button" onClick={onClose} aria-label="Đóng">
-          <X aria-hidden="true" size={18} />
-        </button>
-      </header>
-
-      <p className="detail-description">{tile.description}</p>
-
-      <div className="detail-stats">
-        {tile.region ? (
-          <span>
-            <strong>Vùng</strong>
-            {regionLabels[tile.region]}
-          </span>
-        ) : null}
-        {isOwnable(tile) ? (
-          <>
-            <span>
-              <strong>Giá mua</strong>
-              {formatMoney(tile.price ?? 0)}
+    <div className="detail-modal-backdrop" role="presentation">
+      <section className="tile-detail-card" role="dialog" aria-modal="true" aria-label={tile.name}>
+        <div className="tile-card-image">
+          <img
+            src={getTileImageUrl(tile)}
+            alt={getTileImageAlt(tile)}
+            onError={(event) => {
+              if (!event.currentTarget.src.endsWith("/co-ty-phu/vietnam-route.svg")) {
+                event.currentTarget.src = "/co-ty-phu/vietnam-route.svg";
+              }
+            }}
+          />
+          <div className="tile-card-overlay">
+            <small>{tile.region ? regionLabels[tile.region] : getKindLabel(tile.kind)}</small>
+            <h2>{tile.name}</h2>
+            <span className={["property-status", property?.mortgaged ? "is-mortgaged" : ""].join(" ")}>
+              {property?.mortgaged ? "Đang cầm cố" : owner ? `Chủ: ${owner.name}` : getKindLabel(tile.kind)}
             </span>
-            <span>
-              <strong>Giá bán</strong>
-              {formatMoney(sellValue)}
-            </span>
-            <span>
-              <strong>Cầm cố</strong>
-              {formatMoney(mortgageValue)}
-            </span>
-            <span>
-              <strong>Phạt hiện tại</strong>
-              {formatMoney(rent)}
-            </span>
-            <span>
-              <strong>Nâng cấp kế</strong>
-              {property && property.level < maxUpgradeLevel ? formatMoney(upgradeCost) : "Tối đa"}
-            </span>
-            <span>
-              <strong>Chủ</strong>
-              {owner?.name ?? "Chưa có"}
-            </span>
-          </>
-        ) : null}
-        {deckKind && deck ? (
-          <>
-            <span>
-              <strong>Lượt rút kế</strong>
-              {deck.nextDrawNumber}/50
-            </span>
-            <span>
-              <strong>Vòng deck</strong>
-              {deck.cycle}
-            </span>
-          </>
-        ) : null}
-        {tile.kind === "jail" ? (
-          <span>
-            <strong>Phạt ra tù</strong>
-            {formatMoney(jailFine)}
-          </span>
-        ) : null}
-        {(tile.kind === "chance" || tile.kind === "fortune") && activeCardTitle ? (
-          <span>
-            <strong>Thẻ vừa rút</strong>
-            {activeCardTitle}
-          </span>
-        ) : null}
-      </div>
-
-      {isOwnable(tile) ? (
-        <div className="level-row" aria-label={`Cấp nâng cấp ${property?.level ?? 0}`}>
-          {Array.from({ length: maxUpgradeLevel }).map((_, index) => (
-            <span
-              key={`${tile.id}-level-${index}`}
-              className={index < (property?.level ?? 0) ? "is-filled" : ""}
-            />
-          ))}
-        </div>
-      ) : null}
-
-      {isOwnable(tile) ? (
-        <div className="rent-table" aria-label="Phí phạt theo cấp nâng cấp">
-          <div>
-            <strong>Cấp</strong>
-            <strong>Phạt khi vào</strong>
-            <strong>Nâng cấp</strong>
           </div>
-          {rentRows.map((row) => (
-            <div key={`${tile.id}-rent-${row.level}`} className={row.level === level ? "is-current" : ""}>
-              <span>{row.level}</span>
-              <span>{formatMoney(row.rent)}</span>
-              <span>{row.level < maxUpgradeLevel ? formatMoney(row.upgradeCost) : "Tối đa"}</span>
-            </div>
-          ))}
+          <button className="icon-button detail-close" type="button" onClick={onClose} aria-label="Đóng">
+            <X aria-hidden="true" size={18} />
+          </button>
         </div>
-      ) : null}
 
-      {isActionTile ? <strong className="action-note">Ô hiện tại của lượt chơi</strong> : null}
-    </section>
+        <div className="tile-card-body">
+          <p className="detail-description">{tile.description}</p>
+
+          <div className="detail-stats">
+            {tile.region ? (
+              <span>
+                <strong>Vùng</strong>
+                {regionLabels[tile.region]}
+              </span>
+            ) : null}
+            {tile.kind === "transport" ? (
+              <span>
+                <strong>Nhóm</strong>
+                {getTransportGroupLabel(tile)}
+              </span>
+            ) : null}
+            {isOwnable(tile) ? (
+              <>
+                <span>
+                  <strong>Giá mua</strong>
+                  {formatMoney(tile.price ?? 0)}
+                </span>
+                <span>
+                  <strong>Giá bán</strong>
+                  {formatMoney(sellValue)}
+                </span>
+                <span>
+                  <strong>Cầm cố</strong>
+                  {formatMoney(mortgageValue)}
+                </span>
+                <span>
+                  <strong>Chuộc</strong>
+                  {property?.mortgaged ? formatMoney(redeemValue) : "-"}
+                </span>
+                <span>
+                  <strong>Phạt hiện tại</strong>
+                  {property?.mortgaged ? "Không thu" : formatMoney(rent)}
+                </span>
+                <span>
+                  <strong>Nâng cấp kế</strong>
+                  {tile.kind === "landmark" && property && !property.mortgaged ? formatMoney(upgradeCost) : "-"}
+                </span>
+                <span>
+                  <strong>Cấp</strong>
+                  {tile.kind === "landmark" ? level : "Theo số trạm"}
+                </span>
+                <span>
+                  <strong>Chủ</strong>
+                  {owner?.name ?? "Chưa có"}
+                </span>
+              </>
+            ) : null}
+            {deckKind && deck ? (
+              <>
+                <span>
+                  <strong>Lượt rút kế</strong>
+                  {deck.nextDrawNumber}/50
+                </span>
+                <span>
+                  <strong>Vòng deck</strong>
+                  {deck.cycle}
+                </span>
+              </>
+            ) : null}
+            {tile.kind === "jail" ? (
+              <span>
+                <strong>Phạt ra tù</strong>
+                {formatMoney(jailFine)}
+              </span>
+            ) : null}
+            {(tile.kind === "chance" || tile.kind === "fortune") && activeCardTitle ? (
+              <span>
+                <strong>Thẻ vừa rút</strong>
+                {activeCardTitle}
+              </span>
+            ) : null}
+          </div>
+
+          {isOwnable(tile) ? (
+            <div className="rent-table" aria-label="Phí phạt theo cấp nâng cấp">
+              <div>
+                <strong>{tile.kind === "transport" ? "Sở hữu" : "Cấp"}</strong>
+                <strong>Phạt khi vào</strong>
+                <strong>Nâng cấp</strong>
+              </div>
+              {rentRows.map((row) => (
+                <div key={`${tile.id}-rent-${row.label}`} className={row.label === `Cấp ${level}` ? "is-current" : ""}>
+                  <span>{row.label}</span>
+                  <span>{formatMoney(row.rent)}</span>
+                  <span>{row.upgradeCost === null ? "-" : formatMoney(row.upgradeCost)}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="detail-actions" aria-label="Quản lý tài sản">
+            {!owner && isOwnable(tile) ? (
+              <button type="button" onClick={onBuy} disabled={!canBuyThisTile}>
+                <ShoppingBag aria-hidden="true" size={17} />
+                <span>Mua</span>
+              </button>
+            ) : null}
+            {isOwner && tile.kind === "landmark" ? (
+              <button type="button" onClick={onUpgrade} disabled={!canUpgradeThisTile}>
+                <TrendingUp aria-hidden="true" size={17} />
+                <span>Nâng cấp</span>
+              </button>
+            ) : null}
+            {isOwner && property?.mortgaged ? (
+              <button type="button" onClick={onRedeemMortgage} disabled={!canRedeemThisTile}>
+                <KeyRound aria-hidden="true" size={17} />
+                <span>Chuộc</span>
+              </button>
+            ) : null}
+            {isOwner && !property?.mortgaged ? (
+              <button type="button" onClick={onMortgage} disabled={!canMortgageThisTile}>
+                <Coins aria-hidden="true" size={17} />
+                <span>Cầm cố</span>
+              </button>
+            ) : null}
+            {isOwner ? (
+              <button type="button" onClick={onSell} disabled={!canSellThisTile}>
+                <ShoppingBag aria-hidden="true" size={17} />
+                <span>Bán</span>
+              </button>
+            ) : null}
+          </div>
+
+          {property?.mortgaged ? (
+            <strong className="action-note">Tài sản đang cầm cố: không thu phí và không thể nâng cấp.</strong>
+          ) : isActionTile ? (
+            <strong className="action-note">Ô hiện tại của lượt chơi</strong>
+          ) : null}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SpeedSettingsModal({
+  isOpen,
+  movementSpeedMs,
+  onChange,
+  onClose,
+}: {
+  isOpen: boolean;
+  movementSpeedMs: number;
+  onChange: (speedMs: number) => void;
+  onClose: () => void;
+}) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div className="settings-backdrop" role="presentation">
+      <section className="speed-settings" role="dialog" aria-modal="true" aria-label="Cấu hình tốc độ di chuyển">
+        <header>
+          <div>
+            <small>Cấu hình</small>
+            <h2>Tốc độ quân cờ</h2>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Đóng cấu hình">
+            <X aria-hidden="true" size={18} />
+          </button>
+        </header>
+        <label>
+          <span>{movementSpeedMs}ms/ô</span>
+          <input
+            type="range"
+            min={80}
+            max={650}
+            step={10}
+            value={movementSpeedMs}
+            onChange={(event) => onChange(Number(event.target.value))}
+          />
+        </label>
+        <div className="settings-actions">
+          <button type="button" onClick={() => onChange(DEFAULT_MOVEMENT_SPEED_MS)}>
+            Mặc định
+          </button>
+          <button type="button" onClick={onClose}>
+            Xong
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -1889,16 +2035,16 @@ function GameLog({
 }
 
 function getBoardPosition(index: number): CSSProperties {
-  if (index <= 7) {
-    return { gridRow: 8, gridColumn: 8 - index };
+  if (index <= 8) {
+    return { gridRow: 9, gridColumn: 9 - index };
   }
-  if (index <= 14) {
-    return { gridRow: 15 - index, gridColumn: 1 };
+  if (index <= 16) {
+    return { gridRow: 17 - index, gridColumn: 1 };
   }
-  if (index <= 21) {
-    return { gridRow: 1, gridColumn: index - 14 + 1 };
+  if (index <= 24) {
+    return { gridRow: 1, gridColumn: index - 16 + 1 };
   }
-  return { gridRow: index - 21 + 1, gridColumn: 8 };
+  return { gridRow: index - 24 + 1, gridColumn: 9 };
 }
 
 function getTileIcon(kind: TileKind): LucideIcon {
@@ -1949,6 +2095,37 @@ function getKindLabel(kind: TileKind): string {
   }
 }
 
+function getTransportGroupLabel(tile: Tile): string {
+  switch (tile.transportGroup) {
+    case "airport":
+      return "Sân bay";
+    case "bus":
+      return "Bến xe";
+    case "rail":
+      return "Ga tàu";
+    case "water":
+      return "Bến thủy";
+    default:
+      return "Giao thông";
+  }
+}
+
+function getTileImageUrl(tile: Tile): string {
+  return tile.imageUrl ?? "/co-ty-phu/vietnam-route.svg";
+}
+
+function getTileImageAlt(tile: Tile): string {
+  return tile.imageAlt ?? `Hình minh họa ${tile.name}`;
+}
+
+function getPreviewLevels(currentLevel: number): number[] {
+  if (currentLevel <= 3) {
+    return Array.from({ length: rentPreviewLevels }, (_, index) => index);
+  }
+
+  return Array.from({ length: rentPreviewLevels }, (_, index) => currentLevel - 2 + index);
+}
+
 function getEffectLabel(card: DrawCard): string {
   switch (card.effect.type) {
     case "cash":
@@ -1970,7 +2147,8 @@ function getEffectLabel(card: DrawCard): string {
 function getNetWorth(game: GameState, playerId: string): number {
   return getOwnedTiles(game, playerId).reduce((sum, tile) => {
     const property = game.properties[tile.id];
-    return sum + (tile.price ?? 0) + (property?.level ?? 0) * (tile.upgradeCost ?? 0);
+    const mortgageDebt = property?.mortgaged ? getRedeemMortgageValue(tile, property) : 0;
+    return sum + getSellValue(tile, property) - mortgageDebt;
   }, game.players.find((player) => player.id === playerId)?.cash ?? 0);
 }
 
@@ -2158,11 +2336,31 @@ function loadSavedGame(): GameState {
     }
 
     const parsed = JSON.parse(raw) as GameState;
-    if (parsed.version !== 2 || !Array.isArray(parsed.players) || !parsed.properties || !parsed.decks) {
+    if (![2, 3].includes(parsed.version) || !Array.isArray(parsed.players) || !parsed.properties || !parsed.decks) {
       return createInitialGame();
     }
 
-    return { ...parsed, upgradedThisTurn: Boolean(parsed.upgradedThisTurn) };
+    const properties = tiles.reduce<GameState["properties"]>((acc, tile) => {
+      if (!isOwnable(tile)) {
+        return acc;
+      }
+
+      const savedProperty = parsed.properties[tile.id];
+      acc[tile.id] = savedProperty
+        ? {
+            ...createEmptyProperty(),
+            ownerId: savedProperty.ownerId ?? null,
+            level: Math.max(0, savedProperty.level ?? 0),
+            mortgaged: Boolean(savedProperty.mortgaged),
+            investedUpgradeCost:
+              savedProperty.investedUpgradeCost ??
+              Math.max(0, savedProperty.level ?? 0) * (tile.upgradeCost ?? 0),
+          }
+        : createEmptyProperty();
+      return acc;
+    }, {});
+
+    return { ...parsed, version: 3, properties, upgradedThisTurn: Boolean(parsed.upgradedThisTurn) };
   } catch {
     return createInitialGame();
   }
@@ -2184,5 +2382,5 @@ function loadMovementSpeed(): number {
   }
 
   const normalizedSpeed = Math.round(rawSpeed / 10) * 10;
-  return Math.min(650, Math.max(140, normalizedSpeed));
+  return Math.min(650, Math.max(80, normalizedSpeed));
 }
