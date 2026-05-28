@@ -19,6 +19,10 @@ interface PlayerState {
   screenId: PlayerSlot;
   socketId: string;
   connected: boolean;
+  isAi: boolean;
+  aiSkill: number;
+  aiNextPunchAt: number;
+  aiGuardUntil: number;
   input: Required<FitnessInput>;
   distance: number;
   speed: number;
@@ -60,8 +64,6 @@ const makeMatchId = (): string => {
   return matches.has(id) ? makeMatchId() : id;
 };
 
-const otherSlot = (slot: PlayerSlot): PlayerSlot => (slot === "A" ? "B" : "A");
-
 const serializeMatch = (match: FitnessMatch) => ({
   id: match.id,
   mode: match.mode,
@@ -82,6 +84,7 @@ const serializeMatch = (match: FitnessMatch) => ({
           name: player.name,
           screenId: player.screenId,
           connected: player.connected,
+          isAi: player.isAi,
           distance: player.distance,
           speed: player.speed,
           hp: player.hp,
@@ -114,6 +117,10 @@ const createPlayer = (slot: PlayerSlot, name: string, screenId: PlayerSlot, sock
   screenId,
   socketId,
   connected: true,
+  isAi: false,
+  aiSkill: 0,
+  aiNextPunchAt: 0,
+  aiGuardUntil: 0,
   input: { runPower: 0, jump: false, punch: false, guard: false },
   distance: 0,
   speed: 0,
@@ -126,6 +133,25 @@ const createPlayer = (slot: PlayerSlot, name: string, screenId: PlayerSlot, sock
   finishedAt: null,
   hurdleHits: new Set()
 });
+
+const createAiPlayer = (slot: PlayerSlot, match: FitnessMatch): PlayerState => ({
+  ...createPlayer(slot, `AI ${slot}`, slot, `ai:${match.id}:${slot}`),
+  id: `ai-${slot}-${match.id}`,
+  connected: true,
+  isAi: true,
+  aiSkill: 0.58 + Math.random() * 0.18,
+  aiNextPunchAt: Date.now() + 600 + Math.random() * 500,
+  aiGuardUntil: 0
+});
+
+const realPlayerCount = (match: FitnessMatch): number =>
+  Object.values(match.players).filter((player) => player && !player.isAi && player.connected).length;
+
+const ensureAiOpponent = (match: FitnessMatch): void => {
+  if (match.players.A && match.players.B) return;
+  const emptySlot: PlayerSlot = match.players.A ? "B" : "A";
+  match.players[emptySlot] = createAiPlayer(emptySlot, match);
+};
 
 const resetMatchForPlay = (match: FitnessMatch): void => {
   match.winnerSlot = null;
@@ -145,11 +171,58 @@ const resetMatchForPlay = (match: FitnessMatch): void => {
 };
 
 const startCountdown = (match: FitnessMatch, seconds: number): void => {
+  if (realPlayerCount(match) < 1) return;
+  ensureAiOpponent(match);
   if (!match.players.A || !match.players.B) return;
   resetMatchForPlay(match);
   match.status = "countdown";
   match.countdownEndsAt = Date.now() + seconds * 1000;
   match.lastTickAt = Date.now();
+};
+
+const updateAiPlayers = (match: FitnessMatch, now: number): void => {
+  for (const player of Object.values(match.players)) {
+    if (!player?.isAi) continue;
+
+    if (match.gameType === "race") {
+      const wave = Math.sin(now / 430 + (player.slot === "A" ? 0.4 : 1.8)) * 0.08;
+      let jump = false;
+      if (match.hurdles) {
+        const hurdleCount = match.raceDistance === 100 ? 5 : match.raceDistance === 200 ? 8 : 14;
+        const spacing = match.raceDistance / (hurdleCount + 1);
+        for (let i = 1; i <= hurdleCount; i += 1) {
+          const hurdleAt = spacing * i;
+          if (player.distance > hurdleAt - 2.4 && player.distance < hurdleAt + 0.8) {
+            jump = true;
+            break;
+          }
+        }
+      }
+      player.input = {
+        runPower: clamp(player.aiSkill + wave, 0.35, 0.88),
+        jump,
+        punch: false,
+        guard: false
+      };
+      continue;
+    }
+
+    const opponent = match.players[player.slot === "A" ? "B" : "A"];
+    const opponentPunching = opponent ? now < opponent.punchUntil : false;
+    if (opponentPunching && player.stamina > 14) {
+      player.aiGuardUntil = now + 380;
+    }
+    const shouldPunch = now >= player.aiNextPunchAt && player.stamina > 24;
+    if (shouldPunch) {
+      player.aiNextPunchAt = now + 620 + Math.random() * 620;
+    }
+    player.input = {
+      runPower: clamp(player.aiSkill + Math.sin(now / 510) * 0.08, 0.35, 0.88),
+      jump: false,
+      punch: shouldPunch,
+      guard: now < player.aiGuardUntil
+    };
+  }
 };
 
 const updateRace = (match: FitnessMatch, dt: number, now: number): void => {
@@ -231,6 +304,7 @@ const tickMatch = (namespace: Namespace, match: FitnessMatch, now: number): void
   if (match.status !== "playing") return;
   const dt = Math.min(0.08, Math.max(0.001, (now - match.lastTickAt) / 1000));
   match.lastTickAt = now;
+  updateAiPlayers(match, now);
   if (match.gameType === "race") updateRace(match, dt, now);
   if (match.gameType === "boxing") updateBoxing(match, dt, now);
   match.updatedAt = now;
@@ -338,8 +412,8 @@ export const registerFitnessGameNamespace = (namespace: Namespace): void => {
     socket.on("match:start", (payload, ack) => {
       const id = String(payload?.matchId ?? "").trim().toUpperCase();
       const match = matches.get(id);
-      if (!match || !match.players.A || !match.players.B) {
-        ack?.({ ok: false, message: "Cần đủ 2 người chơi." });
+      if (!match || realPlayerCount(match) < 1) {
+        ack?.({ ok: false, message: "Cần tối thiểu 1 người chơi join." });
         return;
       }
       startCountdown(match, Number(payload?.seconds) === 10 ? 10 : 5);

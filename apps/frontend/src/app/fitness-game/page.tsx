@@ -15,6 +15,7 @@ interface FitnessPlayer {
   name: string;
   screenId: PlayerSlot;
   connected: boolean;
+  isAi: boolean;
   distance: number;
   speed: number;
   hp: number;
@@ -291,7 +292,8 @@ export default function FitnessGamePage() {
     });
   };
 
-  const playersReady = Boolean(getPlayer(match, "A") && getPlayer(match, "B"));
+  const humanPlayerCount = match?.players.filter((player) => player && !player.isAi && player.connected).length ?? 0;
+  const canStart = humanPlayerCount >= 1;
   const winner = match?.winnerSlot ? getPlayer(match, match.winnerSlot) : null;
 
   return (
@@ -317,7 +319,7 @@ export default function FitnessGamePage() {
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-lg font-bold text-slate-100">{player?.name ?? `Người chơi ${slot}`}</p>
                     <span className={player?.connected ? "text-sm text-emerald-300" : "text-sm text-slate-500"}>
-                      {player ? (player.connected ? "Online" : "Mất kết nối") : "Đang chờ"}
+                      {player ? (player.isAi ? "AI" : player.connected ? "Online" : "Mất kết nối") : "Đang chờ"}
                     </span>
                   </div>
                   <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
@@ -397,12 +399,14 @@ export default function FitnessGamePage() {
                 <div className="rounded-lg bg-white p-3">
                   {controllerUrl ? <QRCodeCanvas value={controllerUrl} size={260} className="mx-auto" /> : null}
                 </div>
-                <p className="text-center text-sm text-slate-400">Quét QR bằng điện thoại để dùng cảm biến vận động.</p>
+                <p className="text-center text-sm text-slate-400">
+                  Quét QR bằng điện thoại. Cần tối thiểu 1 người chơi; slot còn thiếu sẽ do AI điều khiển.
+                </p>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => start(5)} disabled={!playersReady} className="flex items-center justify-center gap-2 rounded-lg bg-emerald-300 px-3 py-3 font-bold text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">
+                  <button onClick={() => start(5)} disabled={!canStart} className="flex items-center justify-center gap-2 rounded-lg bg-emerald-300 px-3 py-3 font-bold text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">
                     <Play size={17} /> 5s
                   </button>
-                  <button onClick={() => start(10)} disabled={!playersReady} className="flex items-center justify-center gap-2 rounded-lg border border-emerald-300/70 px-3 py-3 font-bold text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40">
+                  <button onClick={() => start(10)} disabled={!canStart} className="flex items-center justify-center gap-2 rounded-lg border border-emerald-300/70 px-3 py-3 font-bold text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40">
                     <RotateCcw size={17} /> 10s
                   </button>
                 </div>
