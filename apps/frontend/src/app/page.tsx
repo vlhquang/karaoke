@@ -31,6 +31,7 @@ export default function HomePage() {
       description: "Tập hợp các mini game giải trí đa dạng.",
       badge: "New",
       subItems: [
+        { href: "/fitness-game", title: "Fitness Game TV" },
         { href: "/li-xi-nang-cao", title: "Mini game realtime (Lì xì)" },
         { href: "/co-ty-phu", title: "Cờ tỷ phú Việt Nam" },
         { href: "/game-battle/index.html", title: "Thủ thành (Quiz Survival)" }
