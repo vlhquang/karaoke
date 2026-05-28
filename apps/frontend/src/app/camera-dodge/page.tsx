@@ -6,12 +6,13 @@ import Link from "next/link";
 import { Camera, Play, RotateCcw, ShieldAlert } from "lucide-react";
 
 type GameStatus = "idle" | "ready" | "playing" | "result";
-type ItemKind = "hazard" | "food" | "drink";
+type ItemType = "rock" | "bomb" | "lightning" | "burger" | "water" | "fruit" | "heart" | "shield";
+type ItemGroup = "hazard" | "heal" | "power";
 type PoseStatus = "idle" | "loading" | "ready" | "tracking" | "lost" | "error";
 
 interface FallingItem {
   id: string;
-  kind: ItemKind;
+  type: ItemType;
   x: number;
   y: number;
   speed: number;
@@ -21,8 +22,12 @@ interface FallingItem {
 interface GameState {
   status: GameStatus;
   energy: number;
+  score: number;
+  bestScore: number;
+  combo: number;
   energyPulse: number;
   playerHitPulse: number;
+  shieldUntil: number;
   playerX: number;
   targetX: number;
   survivedMs: number;
@@ -38,14 +43,19 @@ interface EnergyFeedback {
   y: number;
   amount: number;
   kind: "damage" | "gain";
+  label?: string;
   createdAt: number;
 }
 
 const initialGameState = (): GameState => ({
   status: "idle",
   energy: 100,
+  score: 0,
+  bestScore: 0,
+  combo: 0,
   energyPulse: 0,
   playerHitPulse: 0,
+  shieldUntil: 0,
   playerX: 0.5,
   targetX: 0.5,
   survivedMs: 0,
@@ -56,6 +66,16 @@ const initialGameState = (): GameState => ({
 });
 
 const clamp = (value: number, min = 0, max = 1) => Math.min(max, Math.max(min, value));
+const itemConfigs: Record<ItemType, { group: ItemGroup; energy: number; score: number; radius: number; speed: number }> = {
+  rock: { group: "hazard", energy: -12, score: 2, radius: 0.045, speed: 1 },
+  bomb: { group: "hazard", energy: -26, score: 4, radius: 0.052, speed: 0.9 },
+  lightning: { group: "hazard", energy: -14, score: 3, radius: 0.04, speed: 1.45 },
+  burger: { group: "heal", energy: 10, score: 8, radius: 0.038, speed: 1 },
+  water: { group: "heal", energy: 16, score: 10, radius: 0.038, speed: 1.06 },
+  fruit: { group: "heal", energy: 8, score: 7, radius: 0.036, speed: 1.12 },
+  heart: { group: "heal", energy: 24, score: 18, radius: 0.04, speed: 0.95 },
+  shield: { group: "power", energy: 0, score: 20, radius: 0.043, speed: 0.92 }
+};
 const posePointIndices = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26];
 const poseConnections: Array<[number, number]> = [
   [11, 12],
@@ -73,14 +93,30 @@ const poseConnections: Array<[number, number]> = [
 const createItem = (elapsedMs: number): FallingItem => {
   const difficulty = Math.min(1, elapsedMs / 90_000);
   const roll = Math.random();
-  const kind: ItemKind = roll < 0.7 + difficulty * 0.12 ? "hazard" : roll < 0.86 ? "food" : "drink";
+  const type: ItemType =
+    roll < 0.36 + difficulty * 0.1
+      ? "rock"
+      : roll < 0.52 + difficulty * 0.12
+        ? "bomb"
+        : roll < 0.64 + difficulty * 0.12
+          ? "lightning"
+          : roll < 0.76
+            ? "burger"
+            : roll < 0.86
+              ? "water"
+              : roll < 0.93
+                ? "fruit"
+                : roll < 0.98
+                  ? "heart"
+                  : "shield";
+  const config = itemConfigs[type];
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    kind,
+    type,
     x: 0.08 + Math.random() * 0.84,
     y: -0.08,
-    speed: 0.18 + Math.random() * 0.12 + difficulty * 0.16,
-    radius: kind === "hazard" ? 0.045 : 0.038
+    speed: (0.18 + Math.random() * 0.12 + difficulty * 0.16) * config.speed,
+    radius: config.radius
   };
 };
 
@@ -159,6 +195,112 @@ const drawWater = (ctx: CanvasRenderingContext2D, x: number, y: number, radius: 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText("H2O", 0, radius * 0.16);
+  ctx.restore();
+};
+
+const drawBomb = (ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) => {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = "#1f2937";
+  ctx.strokeStyle = "#020617";
+  ctx.lineWidth = Math.max(2, radius * 0.12);
+  ctx.beginPath();
+  ctx.arc(0, radius * 0.08, radius * 0.82, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = "#f97316";
+  ctx.lineWidth = Math.max(3, radius * 0.12);
+  ctx.beginPath();
+  ctx.moveTo(radius * 0.34, -radius * 0.58);
+  ctx.quadraticCurveTo(radius * 0.56, -radius * 1.05, radius * 0.98, -radius * 0.86);
+  ctx.stroke();
+  ctx.fillStyle = "#facc15";
+  ctx.beginPath();
+  for (let i = 0; i < 8; i += 1) {
+    const angle = (Math.PI * 2 * i) / 8;
+    const spike = i % 2 === 0 ? radius * 0.24 : radius * 0.1;
+    ctx.lineTo(radius * 1.04 + Math.cos(angle) * spike, -radius * 0.92 + Math.sin(angle) * spike);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+};
+
+const drawLightning = (ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) => {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = "#fde047";
+  ctx.strokeStyle = "#a16207";
+  ctx.lineWidth = Math.max(2, radius * 0.08);
+  ctx.beginPath();
+  ctx.moveTo(-radius * 0.1, -radius);
+  ctx.lineTo(radius * 0.52, -radius * 0.2);
+  ctx.lineTo(radius * 0.12, -radius * 0.18);
+  ctx.lineTo(radius * 0.48, radius);
+  ctx.lineTo(-radius * 0.54, radius * 0.02);
+  ctx.lineTo(-radius * 0.08, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+};
+
+const drawFruit = (ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) => {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = "#fb7185";
+  ctx.strokeStyle = "#7f1d1d";
+  ctx.lineWidth = Math.max(2, radius * 0.1);
+  ctx.beginPath();
+  ctx.arc(0, radius * 0.12, radius * 0.72, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#22c55e";
+  ctx.beginPath();
+  ctx.ellipse(radius * 0.24, -radius * 0.72, radius * 0.28, radius * 0.13, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.beginPath();
+  ctx.arc(-radius * 0.22, -radius * 0.08, radius * 0.12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+};
+
+const drawHeart = (ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) => {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = "#fb7185";
+  ctx.strokeStyle = "#881337";
+  ctx.lineWidth = Math.max(2, radius * 0.1);
+  ctx.beginPath();
+  ctx.moveTo(0, radius * 0.78);
+  ctx.bezierCurveTo(-radius * 1.1, radius * 0.05, -radius * 0.82, -radius * 0.78, -radius * 0.24, -radius * 0.56);
+  ctx.bezierCurveTo(0, -radius * 0.9, radius * 0.86, -radius * 0.8, radius * 0.86, -radius * 0.1);
+  ctx.bezierCurveTo(radius * 0.86, radius * 0.3, radius * 0.42, radius * 0.58, 0, radius * 0.78);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+};
+
+const drawShield = (ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) => {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = "#67e8f9";
+  ctx.strokeStyle = "#0e7490";
+  ctx.lineWidth = Math.max(2, radius * 0.12);
+  ctx.beginPath();
+  ctx.moveTo(0, -radius);
+  ctx.lineTo(radius * 0.78, -radius * 0.58);
+  ctx.quadraticCurveTo(radius * 0.62, radius * 0.54, 0, radius);
+  ctx.quadraticCurveTo(-radius * 0.62, radius * 0.54, -radius * 0.78, -radius * 0.58);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#083344";
+  ctx.font = `900 ${radius * 0.78}px Avenir Next, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("S", 0, -radius * 0.04);
   ctx.restore();
 };
 
@@ -279,13 +421,43 @@ function drawGame(canvas: HTMLCanvasElement, state: GameState) {
   ctx.font = "900 27px Avenir Next, sans-serif";
   ctx.fillText(timeText, width - 158, hudY + 48);
 
+  const scoreWidth = Math.min(300, width * 0.28);
+  const scoreX = (width - scoreWidth) / 2;
+  if (width > 980) {
+    ctx.fillStyle = "rgba(2, 6, 23, 0.72)";
+    ctx.beginPath();
+    ctx.roundRect(scoreX, hudY, scoreWidth, 72, 12);
+    ctx.fill();
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "700 13px Avenir Next, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("Điểm", scoreX + 18, hudY + 23);
+    ctx.fillText("Kỷ lục", scoreX + 150, hudY + 23);
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "900 24px Avenir Next, sans-serif";
+    ctx.fillText(`${Math.floor(state.score)}`, scoreX + 18, hudY + 52);
+    ctx.fillStyle = "#fbbf24";
+    ctx.fillText(`${Math.floor(state.bestScore)}`, scoreX + 150, hudY + 52);
+    if (state.combo > 1) {
+      ctx.fillStyle = "#67e8f9";
+      ctx.font = "900 15px Avenir Next, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(`combo x${state.combo}`, scoreX + scoreWidth - 50, hudY + 52);
+    }
+  }
+
   for (const item of state.items) {
     const x = item.x * width;
     const y = item.y * height;
     const radius = item.radius * Math.min(width, height);
-    if (item.kind === "hazard") drawRock(ctx, x, y, radius);
-    if (item.kind === "food") drawBurger(ctx, x, y, radius);
-    if (item.kind === "drink") drawWater(ctx, x, y, radius);
+    if (item.type === "rock") drawRock(ctx, x, y, radius);
+    if (item.type === "bomb") drawBomb(ctx, x, y, radius);
+    if (item.type === "lightning") drawLightning(ctx, x, y, radius);
+    if (item.type === "burger") drawBurger(ctx, x, y, radius);
+    if (item.type === "water") drawWater(ctx, x, y, radius);
+    if (item.type === "fruit") drawFruit(ctx, x, y, radius);
+    if (item.type === "heart") drawHeart(ctx, x, y, radius);
+    if (item.type === "shield") drawShield(ctx, x, y, radius);
   }
 
   const playerY = height * 0.86;
@@ -293,6 +465,18 @@ function drawGame(canvas: HTMLCanvasElement, state: GameState) {
   const playerRadius = Math.min(width, height) * 0.07;
   const shake = state.playerHitPulse > 0 ? Math.sin(Date.now() / 28) * state.playerHitPulse * 12 : 0;
   drawPlayer(ctx, playerX + shake, playerY, playerRadius);
+  if (Date.now() < state.shieldUntil) {
+    const pulse = 0.5 + Math.sin(Date.now() / 130) * 0.18;
+    ctx.save();
+    ctx.strokeStyle = `rgba(103, 232, 249, ${pulse})`;
+    ctx.lineWidth = Math.max(4, playerRadius * 0.11);
+    ctx.beginPath();
+    ctx.arc(playerX + shake, playerY, playerRadius * 1.72, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(103, 232, 249, 0.1)";
+    ctx.fill();
+    ctx.restore();
+  }
 
   for (const feedback of state.feedbacks) {
     const age = Date.now() - feedback.createdAt;
@@ -300,7 +484,7 @@ function drawGame(canvas: HTMLCanvasElement, state: GameState) {
     const alpha = 1 - progress;
     const y = feedback.y * height - progress * 72;
     const x = feedback.x * width;
-    const text = `${feedback.amount > 0 ? "+" : ""}${feedback.amount}`;
+    const text = feedback.label ?? `${feedback.amount > 0 ? "+" : ""}${feedback.amount}`;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = feedback.kind === "damage" ? "#fb7185" : "#bef264";
@@ -388,6 +572,7 @@ export default function CameraDodgePage() {
   const [poseError, setPoseError] = useState("");
   const [poseCenter, setPoseCenter] = useState(0.5);
   const [poseSensitivity, setPoseSensitivity] = useState(2.4);
+  const [bestScore, setBestScore] = useState(0);
 
   const updateGame = (patch: Partial<GameState>) => {
     gameRef.current = { ...gameRef.current, ...patch };
@@ -464,6 +649,7 @@ export default function CameraDodgePage() {
   const startGame = () => {
     const next = initialGameState();
     next.status = "playing";
+    next.bestScore = bestScore;
     next.startedAt = performance.now();
     next.lastSpawnAt = performance.now();
     next.playerX = gameRef.current.playerX;
@@ -471,6 +657,15 @@ export default function CameraDodgePage() {
     gameRef.current = next;
     setGame(next);
   };
+
+  useEffect(() => {
+    const storedBest = Number(localStorage.getItem("camera-dodge-best-score") ?? 0);
+    if (Number.isFinite(storedBest) && storedBest > 0) {
+      gameRef.current.bestScore = storedBest;
+      setBestScore(storedBest);
+      setGame({ ...gameRef.current });
+    }
+  }, []);
 
   useEffect(() => {
     const trackPose = () => {
@@ -563,6 +758,12 @@ export default function CameraDodgePage() {
         }
 
         state.energy = Math.max(0, state.energy - (0.8 + difficulty * 0.65) * dt);
+        state.score += (8 + difficulty * 9) * dt;
+        if (state.score > state.bestScore) {
+          state.bestScore = Math.floor(state.score);
+          localStorage.setItem("camera-dodge-best-score", String(state.bestScore));
+          setBestScore(state.bestScore);
+        }
         state.survivedMs = elapsed;
         const playerY = 0.86;
         const playerRadius = 0.075;
@@ -573,11 +774,31 @@ export default function CameraDodgePage() {
           const dy = item.y - playerY;
           const hit = Math.sqrt(dx * dx + dy * dy) < item.radius + playerRadius;
           if (hit) {
-            let amount = 0;
-            if (item.kind === "hazard") amount = -Math.round(12 + difficulty * 6);
-            if (item.kind === "food") amount = 10;
-            if (item.kind === "drink") amount = 16;
+            const config = itemConfigs[item.type];
+            const shieldActive = Date.now() < state.shieldUntil;
+            let amount = config.energy;
+            let label: string | undefined;
+            if (config.group === "hazard") {
+              amount = -Math.round(Math.abs(config.energy) + difficulty * 8);
+              if (shieldActive) {
+                amount = 0;
+                label = "BLOCK";
+              }
+            }
+            if (item.type === "shield") {
+              state.shieldUntil = Date.now() + 6_000;
+              label = "SHIELD";
+            }
             state.energy = clamp(state.energy + amount, 0, 100);
+            state.score += config.score + Math.min(30, state.combo * 2);
+            state.bestScore = Math.max(state.bestScore, Math.floor(state.score));
+            localStorage.setItem("camera-dodge-best-score", String(state.bestScore));
+            setBestScore(state.bestScore);
+            if (config.group === "hazard" && amount < 0) {
+              state.combo = 0;
+            } else {
+              state.combo += 1;
+            }
             state.energyPulse = 1;
             state.playerHitPulse = amount < 0 ? 1 : 0;
             state.feedbacks.push({
@@ -586,6 +807,7 @@ export default function CameraDodgePage() {
               y: Math.min(item.y, 0.82),
               amount,
               kind: amount < 0 ? "damage" : "gain",
+              label,
               createdAt: Date.now()
             });
             continue;
@@ -722,20 +944,29 @@ export default function CameraDodgePage() {
                 <p className="text-2xl font-black text-slate-100">{timeLabel}</p>
               </div>
               <div className="rounded-lg bg-slate-950 p-3">
-                <p className="text-slate-500">Vị trí</p>
-                <p className="text-2xl font-black text-cyan-200">{Math.round(trackingX * 100)}%</p>
+                <p className="text-slate-500">Điểm</p>
+                <p className="text-2xl font-black text-cyan-200">{Math.floor(game.score)}</p>
+              </div>
+              <div className="rounded-lg bg-slate-950 p-3">
+                <p className="text-slate-500">Kỷ lục</p>
+                <p className="text-2xl font-black text-amber-200">{Math.floor(game.bestScore)}</p>
+              </div>
+              <div className="rounded-lg bg-slate-950 p-3">
+                <p className="text-slate-500">Combo</p>
+                <p className="text-2xl font-black text-lime-200">x{game.combo}</p>
               </div>
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
               <div className="h-full bg-cyan-300 transition-all" style={{ width: `${motionLevel * 100}%` }} />
             </div>
+            <p className="mt-2 text-xs text-slate-500">Vị trí pose: {Math.round(trackingX * 100)}%</p>
           </div>
 
           <div className="rounded-lg border border-slate-700 bg-slate-900/75 p-3 text-sm leading-6 text-slate-300">
             <div className="mb-2 flex items-center gap-2 font-bold text-slate-100">
               <ShieldAlert size={18} /> Luật chơi
             </div>
-            Né vật đỏ. Hứng đồ ăn xanh lá và nước xanh dương để hồi năng lượng. Người chơi thua khi năng lượng về 0.
+            Né đá, bom và sét. Hứng burger, nước, trái cây, tim để hồi năng lượng. Khiên chặn sát thương trong vài giây. Combo tăng điểm khi hứng liên tiếp.
           </div>
         </aside>
       </div>
