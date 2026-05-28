@@ -32,6 +32,7 @@ export default function HomePage() {
       badge: "New",
       subItems: [
         { href: "/fitness-game", title: "Fitness Game TV" },
+        { href: "/camera-dodge", title: "Né vật rơi bằng camera" },
         { href: "/li-xi-nang-cao", title: "Mini game realtime (Lì xì)" },
         { href: "/co-ty-phu", title: "Cờ tỷ phú Việt Nam" },
         { href: "/game-battle/index.html", title: "Thủ thành (Quiz Survival)" }
