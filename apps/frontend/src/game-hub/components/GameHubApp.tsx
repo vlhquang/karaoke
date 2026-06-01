@@ -44,7 +44,7 @@ export function GameHubApp() {
 
   if (activeGame) {
     return (
-      <main className="game-hub-play-screen">
+      <main className={["game-hub-play-screen", activeGame.id === "ghost-hunters-3d" ? "is-ghost-game" : ""].filter(Boolean).join(" ")}>
         <header className="game-hub-playbar">
           <button type="button" onClick={() => setActiveGame(null)} aria-label="Quay lại Game Hub">
             <ArrowLeft aria-hidden="true" size={18} />

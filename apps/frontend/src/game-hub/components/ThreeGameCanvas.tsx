@@ -73,7 +73,8 @@ type ActorVariant =
   | "ring-thrower"
   | "robot"
   | "shooter"
-  | "sport";
+  | "sport"
+  | "ghost-hunter";
 
 type HealthMode = "none" | "players" | "base";
 
@@ -122,6 +123,7 @@ const gameDuration: Record<GameDefinition["id"], number> = {
   "memory-match-3d": 120,
   "color-catch-3d": 60,
   "treasure-hunt-3d": 150,
+  "ghost-hunters-3d": 120,
 };
 
 const brawlerGames = new Set<GameId>(["mini-brawler-3d", "island-box-push-3d", "toy-robot-duel-3d"]);
@@ -130,6 +132,7 @@ const shooterGames = new Set<GameId>(["arena-shooter-3d", "bubble-arena-3d"]);
 const puzzleGames = new Set<GameId>(["duo-puzzle-3d", "teddy-rescue-3d", "bridge-builder-3d", "treasure-hunt-3d"]);
 const kitchenGames = new Set<GameId>(["chaos-kitchen-3d", "fire-rescue-3d"]);
 const racingGames = new Set<GameId>(["racing-casual-3d", "hopper-race-3d"]);
+const ghostGames = new Set<GameId>(["ghost-hunters-3d"]);
 const miniPartyGames = new Set<GameId>([
   "mini-games-3d",
   "whack-mole-3d",
@@ -168,6 +171,7 @@ const actorVariants: Record<GameId, ActorVariant> = {
   "memory-match-3d": "party",
   "color-catch-3d": "party",
   "treasure-hunt-3d": "explorer",
+  "ghost-hunters-3d": "ghost-hunter",
 };
 
 const gameplayProfiles: Record<GameId, GameplayProfile> = {
@@ -201,12 +205,19 @@ const gameplayProfiles: Record<GameId, GameplayProfile> = {
   "memory-match-3d": { primaryAction: "Lật khối trí nhớ", healthMode: "none" },
   "color-catch-3d": { primaryAction: "Bắt bóng đúng màu", healthMode: "none" },
   "treasure-hunt-3d": { primaryAction: "Kích hoạt gần kho báu", healthMode: "none" },
+  "ghost-hunters-3d": {
+    primaryAction: "Bắn tia sáng",
+    secondaryAction: "Đặt vòng bảo vệ",
+    extraHint: "Nhặt linh quang để hồi căn cứ",
+    healthMode: "base",
+  },
 };
 
 export function ThreeGameCanvas({ game, paused, restartKey }: ThreeGameCanvasProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const pausedRef = useRef(paused);
   const profile = gameplayProfiles[game.id];
+  const shellClassName = ["three-game-shell", ghostGames.has(game.id) ? "is-ghost-game" : ""].filter(Boolean).join(" ");
   const [stats, setStats] = useState<RuntimeStats>({
     ...initialStats,
     timeLeft: gameDuration[game.id],
@@ -226,7 +237,7 @@ export function ThreeGameCanvas({ game, paused, restartKey }: ThreeGameCanvasPro
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -286,7 +297,7 @@ export function ThreeGameCanvas({ game, paused, restartKey }: ThreeGameCanvasPro
   }, [game, restartKey]);
 
   return (
-    <div className="three-game-shell">
+    <div className={shellClassName}>
       <div className="three-game-canvas" ref={mountRef} />
 
       <div className="three-game-hud" aria-live="polite">
@@ -439,6 +450,16 @@ function createRuntime(
   if (game.id === "tower-defense-3d") {
     addBase(scene, "#facc15");
     baseHealthFill = addBaseHealthBar(scene);
+  }
+
+  if (ghostGames.has(game.id)) {
+    players[0].group.position.set(-1.35, 0, 1.25);
+    players[1].group.position.set(1.35, 0, 1.25);
+    addGhostLantern(scene, "#fde047");
+    baseHealthFill = addBaseHealthBar(scene);
+    spawnGhost();
+    spawnGhost();
+    spawnPickup("spirit", new THREE.Vector3(0, 0.25, -1.65), "#fde047", 1);
   }
 
   if (racingGames.has(game.id)) {
@@ -595,7 +616,7 @@ function createRuntime(
 
     const timeLeft = Math.max(0, gameDuration[game.id] - elapsed);
     if (timeLeft <= 0) {
-      finish(getWinnerText(players[0].score, players[1].score, sharedScore));
+      finish(ghostGames.has(game.id) ? `Bảo vệ thành công đèn linh quang với ${sharedScore} bóng ma bị đẩy lui!` : getWinnerText(players[0].score, players[1].score, sharedScore));
     }
 
     if (racingGames.has(game.id)) {
@@ -616,6 +637,8 @@ function createRuntime(
       updateKitchen(dt);
     } else if (game.id === "tower-defense-3d") {
       updateTower(dt);
+    } else if (ghostGames.has(game.id)) {
+      updateGhostBattle(dt);
     } else if (racingGames.has(game.id)) {
       updateRacingObjects(dt);
     } else if (miniPartyGames.has(game.id)) {
@@ -862,6 +885,80 @@ function createRuntime(
         setMessage(`Căn cứ còn ${Math.max(0, Math.round(baseHealth))}%`);
         if (baseHealth <= 0) {
           finish("Căn cứ bị slime chạm tới. Thử lại nào!");
+        }
+      }
+    }
+  }
+
+  function updateGhostBattle(dt: number) {
+    const nextLevel = 1 + Math.floor(elapsed / 24);
+    if (nextLevel > level) {
+      level = nextLevel;
+      setMessage(`Đợt ${level}: bóng ma tới nhanh hơn!`, 2);
+    }
+
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+      spawnTimer = Math.max(0.7, 2.15 - level * 0.18);
+      spawnGhost();
+      if (Math.random() > 0.62) {
+        spawnPickup("spirit", randomPoint(4.6, 2.9), "#fde047", 1);
+      }
+    }
+
+    for (const player of players) {
+      const controls = input.getPlayerInput(player.id);
+      if (controls.action && player.cooldown <= 0) {
+        shootLight(player);
+      } else if (controls.alt && player.cooldown <= 0) {
+        player.cooldown = 0.65;
+        if (resource > 0) {
+          resource -= 1;
+          spawnWard(player);
+          setMessage(`P${player.id} đặt vòng bảo vệ!`, 1.2);
+        } else {
+          setMessage("Cần linh quang để đặt vòng bảo vệ.", 1.2);
+        }
+      }
+    }
+
+    for (const ghost of objects.filter((object) => object.kind === "ghost")) {
+      const ghostPosition = ghost.mesh.position;
+      const nearestPlayer = players
+        .map((player) => ({
+          distance: ghostPosition.distanceTo(player.group.position),
+          player,
+        }))
+        .sort((a, b) => a.distance - b.distance)[0];
+      const target = nearestPlayer && nearestPlayer.distance < 2.8 ? nearestPlayer.player.group.position : new THREE.Vector3(0, 0, 0);
+      const direction = target.clone().sub(ghostPosition);
+      direction.y = 0;
+      if (direction.lengthSq() > 0.001) {
+        const speed = typeof ghost.data.speed === "number" ? ghost.data.speed : 0.9;
+        ghostPosition.addScaledVector(direction.normalize(), dt * speed);
+        ghost.mesh.rotation.y = Math.atan2(direction.x, direction.z);
+      }
+      ghost.mesh.position.y = 0.28 + Math.sin(elapsed * 4 + ghost.value) * 0.08;
+
+      for (const player of players) {
+        if (ghostPosition.distanceTo(player.group.position) < 0.58) {
+          const push = player.group.position.clone().sub(ghostPosition);
+          push.y = 0;
+          if (push.lengthSq() > 0.001) {
+            player.velocity.add(push.normalize().multiplyScalar(0.72));
+          }
+          player.stun = Math.max(player.stun, 0.22);
+        }
+      }
+
+      if (ghostPosition.clone().setY(0).length() < 0.64) {
+        const damage = typeof ghost.data.damage === "number" ? ghost.data.damage : 8;
+        baseHealth -= damage;
+        removeSceneObject(objects, ghost, scene);
+        addPulse(scene, new THREE.Vector3(0, 0.05, 0), "#fca5a5");
+        setMessage(`Đèn linh quang còn ${Math.max(0, Math.round(baseHealth))}%`);
+        if (baseHealth <= 0) {
+          finish("Đèn linh quang đã tắt. Cùng thử lại nhé!");
         }
       }
     }
@@ -1140,6 +1237,10 @@ function createRuntime(
     }
 
     for (const object of [...objects]) {
+      if (!objects.includes(object)) {
+        continue;
+      }
+
       object.life -= dt;
       object.mesh.position.addScaledVector(object.velocity, dt);
 
@@ -1173,6 +1274,43 @@ function createRuntime(
         continue;
       }
 
+      if (object.kind === "light-orb") {
+        object.mesh.rotation.y += dt * 12;
+        const ghost = objects.find((candidate) => candidate.kind === "ghost" && candidate.mesh.position.distanceTo(object.mesh.position) < 0.56);
+        if (ghost) {
+          ghost.value -= object.value;
+          addPulse(scene, ghost.mesh.position, object.owner === 1 ? game.accent : game.secondaryAccent);
+          removeSceneObject(objects, object, scene);
+          if (ghost.value <= 0) {
+            defeatGhost(ghost, object.owner);
+          }
+          continue;
+        }
+      }
+
+      if (object.kind === "ward") {
+        if (object.life <= 0) {
+          removeSceneObject(objects, object, scene);
+          continue;
+        }
+
+        object.mesh.rotation.z += dt * 1.8;
+        const pulse = 1 + Math.sin(elapsed * 6) * 0.04;
+        object.mesh.scale.setScalar(pulse);
+        for (const ghost of objects.filter((candidate) => candidate.kind === "ghost" && candidate.mesh.position.distanceTo(object.mesh.position) < 1.24)) {
+          ghost.value -= dt * 1.45;
+          const away = ghost.mesh.position.clone().sub(object.mesh.position);
+          away.y = 0;
+          if (away.lengthSq() > 0.001) {
+            ghost.mesh.position.addScaledVector(away.normalize(), dt * 0.72);
+          }
+          if (ghost.value <= 0) {
+            defeatGhost(ghost, object.owner);
+          }
+        }
+        continue;
+      }
+
       if (object.kind === "projectile") {
         object.mesh.rotation.y += dt * 10;
         const target = players.find((player) => player.id !== object.owner);
@@ -1192,7 +1330,7 @@ function createRuntime(
         }
       }
 
-      if (["heart", "gem", "boost", "star", "crate", "falling", "red-ball", "blue-ball"].includes(object.kind)) {
+      if (["heart", "gem", "spirit", "boost", "star", "crate", "falling", "red-ball", "blue-ball"].includes(object.kind)) {
         object.mesh.rotation.y += dt * 2.4;
         for (const player of players) {
           if (object.mesh.position.distanceTo(player.group.position) < 0.62) {
@@ -1202,6 +1340,10 @@ function createRuntime(
             } else if (object.kind === "gem") {
               resource += 1;
               setMessage(`P${player.id} nhặt sao xây trụ.`);
+            } else if (object.kind === "spirit") {
+              resource += 1;
+              baseHealth = Math.min(100, baseHealth + 8);
+              setMessage(`P${player.id} nhặt linh quang hồi đèn.`);
             } else if (object.kind === "boost") {
               player.raceSpeed = Math.min(7.5, player.raceSpeed + 1.8);
               setMessage(`P${player.id} tăng tốc!`);
@@ -1255,6 +1397,29 @@ function createRuntime(
     setMessage(`P${player.id} bắn bóng nước!`, 1);
   }
 
+  function shootLight(player: PlayerActor) {
+    const color = player.id === 1 ? game.accent : game.secondaryAccent;
+    const start = player.group.position.clone().add(player.facing.clone().multiplyScalar(0.58)).setY(0.54);
+    const orb = createLightOrbObject(start, color);
+    orb.owner = player.id;
+    orb.velocity.copy(player.facing).multiplyScalar(8.2);
+    orb.life = 1.05;
+    objects.push(orb);
+    scene.add(orb.mesh);
+    player.cooldown = 0.28;
+    addMuzzleFlash(scene, orb.mesh.position, color);
+    addBeam(scene, player.group.position.clone().setY(0.6), orb.mesh.position.clone().add(player.facing.clone().multiplyScalar(0.6)), color, 110, 0.022);
+  }
+
+  function spawnWard(player: PlayerActor) {
+    const ward = createWardObject(player.group.position.clone().setY(0.08), player.id === 1 ? game.accent : game.secondaryAccent);
+    ward.owner = player.id;
+    ward.life = 5.4;
+    objects.push(ward);
+    scene.add(ward.mesh);
+    addPulse(scene, ward.mesh.position, player.id === 1 ? game.accent : game.secondaryAccent);
+  }
+
   function spawnThrownRing(player: PlayerActor, landing: THREE.Vector3, hit: boolean, peg?: SceneObject) {
     const start = player.group.position.clone().add(player.facing.clone().multiplyScalar(0.62)).setY(0.72);
     const thrownRing = createRingObject("thrown-ring", start, player.id === 1 ? game.accent : game.secondaryAccent, 1);
@@ -1275,7 +1440,9 @@ function createRuntime(
 
   function spawnPickup(kind: string, position: THREE.Vector3, color: string, value: number) {
     const radius = ["crate", "falling", "mole"].includes(kind) ? 0.24 : 0.18;
-    const object = createSphereObject(kind, position.setY(0.28), radius, color, value);
+    const object = kind === "spirit"
+      ? createSpiritPickupObject(position.setY(0.28), color)
+      : createSphereObject(kind, position.setY(0.28), radius, color, value);
     const lifeByKind: Record<string, number> = {
       boost: 5,
       crate: 4.5,
@@ -1283,6 +1450,7 @@ function createRuntime(
       gem: 6,
       heart: 6,
       mole: 2.2,
+      spirit: 5.5,
       "blue-ball": 4,
       "red-ball": 4,
       star: 4.5,
@@ -1299,6 +1467,44 @@ function createRuntime(
     enemy.life = 90;
     objects.push(enemy);
     scene.add(enemy.mesh);
+  }
+
+  function spawnGhost() {
+    const angle = Math.random() * Math.PI * 2;
+    const position = new THREE.Vector3(Math.cos(angle) * 5.35, 0.3, Math.sin(angle) * 3.55);
+    const roll = Math.random();
+    const type = level >= 4 && roll > 0.76 ? "shield" : level >= 2 && roll < 0.32 ? "fast" : "normal";
+    const ghost = createGhostObject(type, position);
+    const hpByType: Record<string, number> = {
+      fast: 1.8 + level * 0.35,
+      normal: 2.6 + level * 0.5,
+      shield: 4.8 + level * 0.8,
+    };
+    const speedByType: Record<string, number> = {
+      fast: 1.35 + level * 0.06,
+      normal: 0.86 + level * 0.05,
+      shield: 0.56 + level * 0.04,
+    };
+    ghost.value = hpByType[type];
+    ghost.data.speed = speedByType[type];
+    ghost.data.damage = type === "shield" ? 14 : type === "fast" ? 7 : 9;
+    ghost.data.type = type;
+    objects.push(ghost);
+    scene.add(ghost.mesh);
+  }
+
+  function defeatGhost(ghost: SceneObject, owner?: 1 | 2) {
+    const scorer = players.find((player) => player.id === owner);
+    if (scorer) {
+      scorer.score += 1;
+    }
+    sharedScore += 1;
+    addImpactWave(scene, ghost.mesh.position, owner === 1 ? game.accent : game.secondaryAccent);
+    if (Math.random() > 0.72) {
+      spawnPickup("spirit", ghost.mesh.position.clone().setY(0.25), "#fde047", 1);
+    }
+    removeSceneObject(objects, ghost, scene);
+    setMessage(owner ? `P${owner} đẩy lui một bóng ma!` : "Bóng ma tan vào ánh sáng.", 1.1);
   }
 
   function spawnTurret(position: THREE.Vector3, owner: 1 | 2) {
@@ -1319,7 +1525,7 @@ function createRuntime(
     emitStats({
       p1Score: players[0].score,
       p2Score: players[1].score,
-      p1Health: game.id === "tower-defense-3d" ? baseHealth : players[0].health,
+      p1Health: game.id === "tower-defense-3d" || ghostGames.has(game.id) ? baseHealth : players[0].health,
       p2Health: players[1].health,
       sharedScore,
       timeLeft: Math.max(0, gameDuration[game.id] - elapsed),
@@ -1343,18 +1549,24 @@ function createRuntime(
 }
 
 function setupWorld(scene: THREE.Scene, game: GameDefinition, theme: { floor: string; accent: string; secondary: string }) {
+  if (ghostGames.has(game.id)) {
+    scene.background = new THREE.Color("#07111f");
+    scene.fog = new THREE.Fog("#07111f", 10, 24);
+  }
+
   const floor = new THREE.Mesh(
     new THREE.BoxGeometry(racingGames.has(game.id) ? 5.2 : 12, 0.12, 8),
-    material(theme.floor),
+    material(ghostGames.has(game.id) ? "#10243b" : theme.floor),
   );
   floor.receiveShadow = true;
   floor.position.y = -0.08;
   scene.add(floor);
 
-  const ambient = new THREE.HemisphereLight("#ffffff", "#7dd3fc", 1.4);
+  const isGhostGame = ghostGames.has(game.id);
+  const ambient = new THREE.HemisphereLight(isGhostGame ? "#d7f7ff" : "#ffffff", isGhostGame ? "#070b16" : "#7dd3fc", isGhostGame ? 1.05 : 1.4);
   scene.add(ambient);
-  const sun = new THREE.DirectionalLight("#ffffff", 2.2);
-  sun.position.set(-3, 9, 5);
+  const sun = new THREE.DirectionalLight(isGhostGame ? "#b8f2ff" : "#ffffff", isGhostGame ? 1.55 : 2.2);
+  sun.position.set(isGhostGame ? -4.6 : -3, isGhostGame ? 8.2 : 9, isGhostGame ? 4.4 : 5);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
   scene.add(sun);
@@ -1372,9 +1584,94 @@ function setupWorld(scene: THREE.Scene, game: GameDefinition, theme: { floor: st
       });
   }
 
-  for (let index = 0; index < 18; index += 1) {
-    addDecoration(scene, randomPoint(5.4, 3.4), index % 2 === 0 ? theme.accent : theme.secondary);
+  if (isGhostGame) {
+    addGhostArena(scene, theme);
+  } else {
+    for (let index = 0; index < 18; index += 1) {
+      addDecoration(scene, randomPoint(5.4, 3.4), index % 2 === 0 ? theme.accent : theme.secondary);
+    }
   }
+}
+
+function addGhostArena(scene: THREE.Scene, theme: { accent: string; secondary: string }) {
+  const arenaDisc = new THREE.Mesh(new THREE.CylinderGeometry(3.75, 3.95, 0.045, 48), material("#163354"));
+  arenaDisc.position.y = -0.025;
+  arenaDisc.receiveShadow = true;
+  scene.add(arenaDisc);
+
+  const rings = [
+    { radius: 3.52, tube: 0.035, color: "#22d3ee", opacity: 0.88 },
+    { radius: 2.08, tube: 0.026, color: "#fde047", opacity: 0.76 },
+    { radius: 1.12, tube: 0.02, color: "#f97316", opacity: 0.68 },
+  ];
+  for (const ringConfig of rings) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(ringConfig.radius, ringConfig.tube, 8, 72),
+      glowMaterial(ringConfig.color, ringConfig.opacity),
+    );
+    ring.position.y = 0.025;
+    ring.rotation.x = Math.PI / 2;
+    scene.add(ring);
+  }
+
+  for (let index = 0; index < 8; index += 1) {
+    const angle = (index / 8) * Math.PI * 2;
+    const x = Math.cos(angle) * 2.72;
+    const z = Math.sin(angle) * 2.72;
+    const rune = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.026, 0.54), glowMaterial(index % 2 === 0 ? theme.accent : theme.secondary, 0.78));
+    rune.position.set(x, 0.035, z);
+    rune.rotation.y = -angle;
+    scene.add(rune);
+  }
+
+  for (let index = 0; index < 16; index += 1) {
+    const angle = (index / 16) * Math.PI * 2;
+    const position = new THREE.Vector3(Math.cos(angle) * 5.55, 0, Math.sin(angle) * 3.72);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.075, 0.55, 8), material(index % 2 === 0 ? "#31506f" : "#213957"));
+    post.position.copy(position).setY(0.24);
+    post.castShadow = true;
+    scene.add(post);
+  }
+
+  const lanternPositions = [
+    new THREE.Vector3(-4.72, 0, -3.05),
+    new THREE.Vector3(4.72, 0, -3.05),
+    new THREE.Vector3(-4.72, 0, 3.05),
+    new THREE.Vector3(4.72, 0, 3.05),
+  ];
+  lanternPositions.forEach((position, index) => {
+    addArenaLantern(scene, position, index % 2 === 0 ? "#fde047" : "#67e8f9");
+  });
+
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(0.32, 20, 14), glowMaterial("#dff8ff", 0.96));
+  moon.position.set(-4.85, 3.6, -3.35);
+  scene.add(moon);
+
+  for (let index = 0; index < 20; index += 1) {
+    const sparkle = new THREE.Mesh(new THREE.OctahedronGeometry(randomRange(0.025, 0.05), 0), glowMaterial(index % 3 === 0 ? "#fde047" : "#bae6fd", 0.72));
+    sparkle.position.set(randomRange(-5.2, 5.2), randomRange(1.1, 2.4), randomRange(-3.3, 3.3));
+    scene.add(sparkle);
+  }
+}
+
+function addArenaLantern(scene: THREE.Scene, position: THREE.Vector3, color: string) {
+  const group = new THREE.Group();
+  group.position.copy(position);
+
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.9, 10), material("#23364f"));
+  pole.position.y = 0.45;
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.11, 12), material("#334155"));
+  cap.position.y = 0.92;
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 10), glowMaterial(color, 0.92));
+  glow.position.y = 0.74;
+  const light = new THREE.PointLight(color, 1.25, 3.8);
+  light.position.y = 0.78;
+
+  pole.castShadow = true;
+  cap.castShadow = true;
+  glow.castShadow = true;
+  group.add(pole, cap, glow, light);
+  scene.add(group);
 }
 
 function createPlayer(id: 1 | 2, color: string, position: THREE.Vector3, variant: ActorVariant): PlayerActor {
@@ -1482,6 +1779,24 @@ function createPlayer(id: 1 | 2, color: string, position: THREE.Vector3, variant
       const ring = addMesh(new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.035, 8, 22), material("#fde047")));
       ring.position.set(0.42, 0.52, 0.08);
       ring.rotation.x = Math.PI / 2;
+    } else if (variant === "ghost-hunter") {
+      const hood = addMesh(new THREE.Mesh(new THREE.ConeGeometry(0.33, 0.42, 14), material(blendColor(color, "#111827", 0.22))));
+      hood.position.y = 1.07;
+      const visor = addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.08, 0.04), glowMaterial("#dff8ff", 0.92)));
+      visor.position.set(0, 0.86, 0.3);
+      const lantern = addMesh(new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 10), glowMaterial("#fde047", 0.96)));
+      lantern.position.set(0.42, 0.54, 0.18);
+      const handle = addMesh(new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.018, 8, 14), material("#f8fafc")));
+      handle.position.set(0.42, 0.76, 0.18);
+      handle.rotation.x = Math.PI / 2;
+      const cape = addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.42, 0.05), material("#334155")));
+      cape.position.set(0, 0.46, -0.34);
+      const beamEmitter = addMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.42, 10), glowMaterial(id === 1 ? "#fed7aa" : "#a5f3fc", 0.9)));
+      beamEmitter.position.set(-0.34, 0.54, 0.18);
+      beamEmitter.rotation.z = Math.PI / 2.5;
+      const lanternLight = new THREE.PointLight("#fde047", 0.52, 1.8);
+      lanternLight.position.set(0.42, 0.56, 0.18);
+      group.add(lanternLight);
     } else if (variant === "explorer") {
       const hat = addMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.13, 14), material("#a16207")));
       hat.position.y = 1.05;
@@ -1579,6 +1894,45 @@ function createRingObject(kind: string, position: THREE.Vector3, color: string, 
   return { mesh, kind, velocity: new THREE.Vector3(), life: 999, value, data: {} };
 }
 
+function createWardObject(position: THREE.Vector3, color: string): SceneObject {
+  const group = new THREE.Group();
+  group.position.copy(position);
+
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.92, 0.045, 10, 36), glowMaterial(color, 0.82));
+  ring.rotation.x = Math.PI / 2;
+  const innerRing = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.026, 8, 28), glowMaterial(blendColor(color, "#ffffff", 0.35), 0.74));
+  innerRing.rotation.x = Math.PI / 2;
+  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.18, 0.62, 12), glowMaterial(blendColor(color, "#ffffff", 0.28), 0.32));
+  pillar.position.y = 0.31;
+  const light = new THREE.PointLight(color, 0.7, 2.6);
+  light.position.y = 0.28;
+  group.add(ring, innerRing, pillar, light);
+
+  return { mesh: group, kind: "ward", velocity: new THREE.Vector3(), life: 5.4, value: 1, data: {} };
+}
+
+function createLightOrbObject(position: THREE.Vector3, color: string): SceneObject {
+  const group = new THREE.Group();
+  group.position.copy(position);
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 10), glowMaterial(color, 0.95));
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.018, 8, 22), glowMaterial(blendColor(color, "#ffffff", 0.32), 0.62));
+  halo.rotation.x = Math.PI / 2;
+  const light = new THREE.PointLight(color, 0.55, 2.2);
+  group.add(core, halo, light);
+  return { mesh: group, kind: "light-orb", velocity: new THREE.Vector3(), life: 1.05, value: 1.2, data: {} };
+}
+
+function createSpiritPickupObject(position: THREE.Vector3, color: string): SceneObject {
+  const group = new THREE.Group();
+  group.position.copy(position);
+  const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), glowMaterial(color, 0.96));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.024, 8, 22), glowMaterial("#fff7ad", 0.64));
+  ring.rotation.x = Math.PI / 2;
+  const light = new THREE.PointLight(color, 0.6, 2.4);
+  group.add(core, ring, light);
+  return { mesh: group, kind: "spirit", velocity: new THREE.Vector3(), life: 5.5, value: 1, data: {} };
+}
+
 function createPegObject(kind: string, position: THREE.Vector3, color: string, value: number): SceneObject {
   const group = new THREE.Group();
   group.position.copy(position);
@@ -1599,6 +1953,66 @@ function createPegObject(kind: string, position: THREE.Vector3, color: string, v
   group.add(top);
 
   return { mesh: group, kind, velocity: new THREE.Vector3(), life: 999, value, data: {} };
+}
+
+function createGhostObject(type: string, position: THREE.Vector3): SceneObject {
+  const group = new THREE.Group();
+  group.position.copy(position);
+
+  const colorByType: Record<string, string> = {
+    fast: "#bae6fd",
+    normal: "#ddd6fe",
+    shield: "#fbcfe8",
+  };
+  const color = colorByType[type] ?? colorByType.normal;
+  const ghostMaterial = new THREE.MeshStandardMaterial({
+    color,
+    emissive: new THREE.Color(color),
+    emissiveIntensity: 0.46,
+    flatShading: true,
+    metalness: 0,
+    opacity: type === "shield" ? 0.78 : 0.68,
+    roughness: 0.54,
+    transparent: true,
+    depthWrite: false,
+  });
+
+  const body = new THREE.Mesh(new THREE.ConeGeometry(type === "shield" ? 0.46 : 0.37, type === "fast" ? 0.78 : 0.88, 14), ghostMaterial);
+  body.position.y = 0.4;
+  body.rotation.x = Math.PI;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(type === "shield" ? 0.38 : 0.31, 18, 12), ghostMaterial);
+  head.position.y = 0.81;
+  const eyeMaterial = glowMaterial("#0f172a", 1);
+  const eyeLeft = new THREE.Mesh(new THREE.SphereGeometry(0.046, 10, 8), eyeMaterial);
+  const eyeRight = eyeLeft.clone();
+  eyeLeft.position.set(-0.105, 0.84, 0.265);
+  eyeRight.position.set(0.105, 0.84, 0.265);
+  const blushLeft = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), glowMaterial(type === "fast" ? "#67e8f9" : "#f9a8d4", 0.72));
+  const blushRight = blushLeft.clone();
+  blushLeft.position.set(-0.18, 0.76, 0.245);
+  blushRight.position.set(0.18, 0.76, 0.245);
+
+  for (let index = 0; index < 3; index += 1) {
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 7), ghostMaterial);
+    tail.position.set((index - 1) * 0.2, 0.1, 0);
+    group.add(tail);
+  }
+
+  const aura = new THREE.Mesh(new THREE.TorusGeometry(type === "shield" ? 0.52 : 0.42, 0.025, 8, 30), glowMaterial(color, 0.45));
+  aura.position.y = 0.55;
+  aura.rotation.x = Math.PI / 2;
+  const light = new THREE.PointLight(color, type === "shield" ? 0.82 : 0.55, type === "fast" ? 2.5 : 3.1);
+  light.position.y = 0.62;
+  group.add(body, head, eyeLeft, eyeRight, blushLeft, blushRight, aura, light);
+
+  if (type === "shield") {
+    const shieldRing = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.035, 8, 34), glowMaterial("#fef3c7", 0.62));
+    shieldRing.position.y = 0.57;
+    shieldRing.rotation.x = Math.PI / 2;
+    group.add(shieldRing);
+  }
+
+  return { mesh: group, kind: "ghost", velocity: new THREE.Vector3(), life: 90, value: 3, data: { type } };
 }
 
 function createTeddyObject(position: THREE.Vector3, color: string): SceneObject {
@@ -1722,6 +2136,31 @@ function addBase(scene: THREE.Scene, color: string) {
   base.position.y = 0.35;
   base.castShadow = true;
   scene.add(base);
+}
+
+function addGhostLantern(scene: THREE.Scene, color: string) {
+  const group = new THREE.Group();
+  group.position.set(0, 0, 0);
+
+  const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.72, 0.34, 14), material("#334155"));
+  pedestal.position.y = 0.17;
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.42, 22, 16), glowMaterial(color, 0.96));
+  glow.position.y = 0.72;
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 0.58, 16), glowMaterial("#fff7ad", 0.28));
+  glass.position.y = 0.72;
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.045, 10, 36), glowMaterial(blendColor(color, "#ffffff", 0.24), 0.7));
+  halo.position.y = 0.9;
+  halo.rotation.x = Math.PI / 2;
+  const floorHalo = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.035, 10, 42), glowMaterial("#fde047", 0.46));
+  floorHalo.position.y = 0.04;
+  floorHalo.rotation.x = Math.PI / 2;
+  const light = new THREE.PointLight(color, 2.7, 6.6);
+  light.position.y = 0.95;
+
+  pedestal.castShadow = true;
+  glow.castShadow = true;
+  group.add(pedestal, glow, glass, halo, floorHalo, light);
+  scene.add(group);
 }
 
 function attachPlayerHealthBars(players: [PlayerActor, PlayerActor]) {
@@ -1919,6 +2358,19 @@ function material(color: string) {
     roughness: 0.78,
     metalness: 0.03,
     flatShading: true,
+  });
+}
+
+function glowMaterial(color: string, opacity = 1) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    emissive: new THREE.Color(color),
+    emissiveIntensity: 0.72,
+    flatShading: true,
+    metalness: 0,
+    opacity,
+    roughness: 0.36,
+    transparent: opacity < 1,
   });
 }
 

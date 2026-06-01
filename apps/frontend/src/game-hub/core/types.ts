@@ -25,7 +25,8 @@ export type GameId =
   | "tic-tac-toe-3d"
   | "memory-match-3d"
   | "color-catch-3d"
-  | "treasure-hunt-3d";
+  | "treasure-hunt-3d"
+  | "ghost-hunters-3d";
 
 export interface GameDefinition {
   id: GameId;
