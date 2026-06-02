@@ -8,6 +8,7 @@ interface ThreeGameCanvasProps {
   game: GameDefinition;
   paused: boolean;
   restartKey: number;
+  playerCount?: number;
 }
 
 interface PlayerInput {
@@ -213,7 +214,7 @@ const gameplayProfiles: Record<GameId, GameplayProfile> = {
   },
 };
 
-export function ThreeGameCanvas({ game, paused, restartKey }: ThreeGameCanvasProps) {
+export function ThreeGameCanvas({ game, paused, restartKey, playerCount = 2 }: ThreeGameCanvasProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const pausedRef = useRef(paused);
   const profile = gameplayProfiles[game.id];
@@ -322,7 +323,7 @@ export function ThreeGameCanvas({ game, paused, restartKey }: ThreeGameCanvasPro
         <strong>{game.shortTitle}</strong>
         <span>{paused ? "Tạm dừng" : stats.message}</span>
         <small>
-          Điểm chung: {stats.sharedScore} | Tài nguyên: {stats.resource}
+          Người chơi: {playerCount} | Điểm chung: {stats.sharedScore} | Tài nguyên: {stats.resource}
         </small>
       </div>
 

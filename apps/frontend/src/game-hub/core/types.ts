@@ -1,5 +1,15 @@
 export type GameCategory = "competitive" | "coop" | "party";
 
+export type GameRuntimeKind = "legacy-three" | "r3f-ghost" | "camera-dodge";
+
+export type GamePlatform = "desktop" | "tv" | "mobile" | "camera";
+
+export interface GameHelpContent {
+  goal: string;
+  controls: string[];
+  tips: string[];
+}
+
 export type GameId =
   | "mini-brawler-3d"
   | "sport-action-3d"
@@ -42,6 +52,22 @@ export interface GameDefinition {
   objective: string;
   mechanics: string[];
   kidTheme: string;
+  runtime?: GameRuntimeKind;
+  supportedPlayers?: number[];
+  defaultPlayers?: number;
+  requiresCamera?: boolean;
+  supportedPlatforms?: GamePlatform[];
+  help?: GameHelpContent;
+}
+
+export interface PlayableGameDefinition extends Omit<GameDefinition, "id"> {
+  id: GameId | "camera-dodge";
+  runtime: GameRuntimeKind;
+  supportedPlayers: number[];
+  defaultPlayers: number;
+  requiresCamera: boolean;
+  supportedPlatforms: GamePlatform[];
+  help: GameHelpContent;
 }
 
 export interface RuntimeStats {
