@@ -64,6 +64,12 @@ export default function HomePage() {
       badge: "New"
     },
     {
+      href: "/mo-phong",
+      title: "Mô phỏng",
+      description: "Bàn mô phỏng 3D với thư viện vật thể, Trái đất cầu/phẳng, tàu chở hàng, đường di chuyển, camera và ống nhòm.",
+      badge: "New"
+    },
+    {
       href: "/hien-tuong-khoa-hoc",
       title: "Hiện tượng khoa học",
       description: "Phòng Thí Nghiệm Vũ Trụ Của Bé - Mô phỏng 3D hiện tượng thiên văn (Ngày/đêm, Các mùa, Thủy triều).",
