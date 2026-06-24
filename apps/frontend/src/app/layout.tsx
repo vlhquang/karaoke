@@ -2,9 +2,23 @@ import "./globals.css";
 import "../co-ty-phu/components/co-ty-phu.css";
 import "../game-hub/components/game-hub.css";
 import type { Metadata, Viewport } from "next";
+import { Orbitron } from "next/font/google";
+
+const orbitron = Orbitron({
+  subsets: ["latin"],
+  weight: ["400", "700", "900"],
+  variable: "--font-orbitron",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://karaoke-lqjm.onrender.com'),
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "HUD GPS",
+  },
   title: {
     default: "Portal Dịch vụ Tiện ích & Giải trí",
     template: "%s | Portal Dịch vụ"
@@ -37,7 +51,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi" suppressHydrationWarning>
+    <html lang="vi" suppressHydrationWarning className={orbitron.variable}>
       <body>{children}</body>
     </html>
   );

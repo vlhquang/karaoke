@@ -65,7 +65,24 @@ export const useHudStore = create<HudStore>((set, get) => ({
       return;
     }
 
-    socket.on("connect", () => set(() => ({ connected: true })));
+    let wasConnected = false;
+    socket.on("connect", () => {
+      const { roomCode, role } = get();
+      set(() => ({ connected: true }));
+      // Auto-rejoin khi reconnect (không phải lần connect đầu tiên)
+      if (wasConnected && roomCode && role === "remote") {
+        socket.emit(
+          "hud_join_room",
+          { roomCode },
+          (response: { ok: boolean; state?: HudState; message?: string }) => {
+            if (!response.ok) {
+              set(() => ({ roomCode: "", role: null, error: "Phòng đã hết hạn. Vui lòng kết nối lại." }));
+            }
+          }
+        );
+      }
+      wasConnected = true;
+    });
     socket.on("disconnect", () => set(() => ({ connected: false })));
 
     // Nhận cập nhật từ remote controller

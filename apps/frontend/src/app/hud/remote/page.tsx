@@ -38,6 +38,7 @@ function HudRemoteContent() {
   const [adminPassword, setAdminPassword] = useState("");
   const [laneCount, setLaneCount] = useState<1 | 2>(1);
   const [saveFeedback, setSaveFeedback] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
 
@@ -460,11 +461,7 @@ function HudRemoteContent() {
                     </button>
 
                     <button
-                      onClick={() => {
-                        if (confirm("Bạn có chắc chắn muốn xoá vĩnh viễn biển báo này khỏi Google Sheet không?")) {
-                          z.id && speedZoneStore.deleteZone(z.id);
-                        }
-                      }}
+                      onClick={() => z.id && setDeleteConfirmId(z.id)}
                       className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-950/30 transition shrink-0 rounded-lg"
                       title="Xoá vĩnh viễn"
                     >
@@ -484,6 +481,30 @@ function HudRemoteContent() {
           )}
         </div>
       </div>
+
+      {/* Modal xác nhận xoá biển báo */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+          <div className="bg-slate-900 border border-red-500/40 rounded-2xl p-5 max-w-xs w-full">
+            <h3 className="text-base font-bold text-red-400 mb-2">Xoá biển báo?</h3>
+            <p className="text-sm text-slate-400 mb-5">Biển báo sẽ bị xoá vĩnh viễn khỏi Google Sheet và không thể khôi phục.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 py-3 bg-slate-800 rounded-xl text-slate-300 font-bold text-sm transition active:scale-95"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={() => { speedZoneStore.deleteZone(deleteConfirmId); setDeleteConfirmId(null); }}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-500 rounded-xl text-white font-bold text-sm transition active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Trash2 size={16} /> Xoá
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

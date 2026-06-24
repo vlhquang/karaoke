@@ -123,7 +123,7 @@ export default function SpeedZoneMap({ zones, onToggleStatus, onDelete, onUpdate
   };
 
   return (
-    <div className="w-full h-[500px] rounded-xl overflow-hidden border border-slate-700 mt-3 relative z-0">
+    <div className="w-full h-[40dvh] min-h-[240px] max-h-[500px] rounded-xl overflow-hidden border border-slate-700 mt-3 relative z-0">
       <MapContainer center={defaultCenter} zoom={13} className="w-full h-full">
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
@@ -199,11 +199,7 @@ export default function SpeedZoneMap({ zones, onToggleStatus, onDelete, onUpdate
                     {z.status === "inactive" ? <><Eye size={14} /> Bật</> : <><EyeOff size={14} /> Tắt</>}
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm("Xoá vĩnh viễn biển báo này?")) {
-                        z.id && onDelete(z.id);
-                      }
-                    }}
+                    onClick={() => z.id && onDelete(z.id)}
                     className="flex-1 py-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition"
                   >
                     <Trash2 size={14} /> Xoá
