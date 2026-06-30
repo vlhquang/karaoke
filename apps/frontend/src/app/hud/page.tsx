@@ -4,8 +4,9 @@ import { useEffect, useState, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
 import {
-  ArrowLeft, Car, Bike, Settings, Plus, Minus, Mic, MicOff, X,
+  ArrowLeft, Car, Bike, Settings, Plus, Minus, X,
   Maximize, Minimize, Radio, QrCode, MapPin, Save, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium,
+  Sun, Moon,
 } from "lucide-react";
 import { useHudStore } from "../../store/hud-store";
 import { useSpeedZoneStore, calcHeading, haversineDistance } from "../../store/speed-zone-store";
@@ -28,17 +29,18 @@ export default function HUDPage() {
   const [showSaveConfirm, setShowSaveConfirm] = useState<boolean>(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [battery, setBattery] = useState<{ level: number; charging: boolean } | null>(null);
-  const [isListening, setIsListening] = useState<boolean>(false);
   const [speechFeedback, setSpeechFeedback] = useState<string>("");
   const [compassGranted, setCompassGranted] = useState<boolean | null>(null);
+  const [brightMode, setBrightMode] = useState<"day" | "night">("night");
 
   const mainRef = useRef<HTMLElement>(null);
   const prevCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const lastSavedZoneRef = useRef<{ lat: number; lng: number; heading: number; maxSpeed: number; zone: "residential" | "outside" } | null>(null);
-  const recognitionRef = useRef<any>(null);
   const watchId = useRef<number | null>(null);
   const compassHeadingRef = useRef<number | null>(null);
   const lastGpsSpeedKmhRef = useRef<number>(0);
+  const swipeStartYRef = useRef<number>(0);
+  const swipeStartOffsetRef = useRef<number>(0);
 
   const [remoteUrl, setRemoteUrl] = useState<string>("");
   useEffect(() => {
@@ -72,6 +74,8 @@ export default function HUDPage() {
           offset: config.offset !== undefined ? config.offset : 0,
         });
       }
+      const savedBright = localStorage.getItem("hud_bright_mode");
+      if (savedBright === "day" || savedBright === "night") setBrightMode(savedBright);
     } catch (e) { console.error("Lỗi đọc cache", e); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -112,16 +116,46 @@ export default function HUDPage() {
 
   // ── GPS + WakeLock ──
   useEffect(() => {
-    let wakeLockObj: any = null;
-    const requestWakeLock = async () => {
-      try {
-        if ("wakeLock" in navigator) wakeLockObj = await (navigator as any).wakeLock.request("screen");
-      } catch { /* ignore */ }
+    // WakeLock layer 1: native Screen Wake Lock API (Chrome, iOS 16.4+)
+    // WakeLock layer 2: hidden looping video fallback (iOS < 16.4)
+    const noSleepVideo = document.createElement("video");
+    noSleepVideo.src = "/nosleep.mp4";
+    noSleepVideo.setAttribute("playsinline", "");
+    noSleepVideo.setAttribute("webkit-playsinline", "");
+    noSleepVideo.muted = true;
+    noSleepVideo.loop = true;
+
+    const playVideo = () => noSleepVideo.play().catch(() => {});
+
+    const enableNativeWakeLock = async (): Promise<void> => {
+      const sentinel: any = await (navigator as any).wakeLock.request("screen");
+      // Re-acquire automatically when sentinel is released (screen dim, tab switch)
+      sentinel.addEventListener("release", () => {
+        if (document.visibilityState === "visible") enableNativeWakeLock().catch(playVideo);
+      });
     };
-    requestWakeLock();
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === "visible") requestWakeLock();
+
+    const handleFirstTouch = () => playVideo();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        if ("wakeLock" in navigator) enableNativeWakeLock().catch(playVideo);
+        else playVideo();
+      } else {
+        noSleepVideo.pause();
+      }
     };
+
+    if ("wakeLock" in navigator) {
+      enableNativeWakeLock().catch(() => {
+        // Native failed (older Safari, permissions) → activate video on first touch
+        document.addEventListener("touchstart", handleFirstTouch, { once: true });
+      });
+    } else {
+      // iOS < 16.4: video-only, must start from user gesture
+      document.addEventListener("touchstart", handleFirstTouch, { once: true });
+    }
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     if ("geolocation" in navigator) {
@@ -184,9 +218,10 @@ export default function HUDPage() {
 
     return () => {
       if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
-      if (wakeLockObj) wakeLockObj.release();
+      noSleepVideo.pause();
+      noSleepVideo.src = "";
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      if (recognitionRef.current) recognitionRef.current.stop();
+      document.removeEventListener("touchstart", handleFirstTouch);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -248,48 +283,7 @@ export default function HUDPage() {
     };
   }, []);
 
-  // ── Speech Recognition ──
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.lang = "vi-VN";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    recognition.onresult = (event: any) => {
-      const command = event.results[0][0].transcript.toLowerCase();
-      let parsed = false;
-      if (command.includes("hết khu dân cư") || command.includes("ngoài khu dân cư")) {
-        hudStore.updateState({ zone: "outside" }); setSpeechFeedback("Ngoài KDC"); parsed = true;
-      } else if (command.includes("khu dân cư")) {
-        hudStore.updateState({ zone: "residential" }); setSpeechFeedback("Trong KDC"); parsed = true;
-      } else {
-        const speeds: [RegExp, number][] = [
-          [/\b(40|bốn mươi|bốn chục)\b/, 40], [/\b(50|năm mươi|năm chục)\b/, 50],
-          [/\b(60|sáu mươi|sáu chục)\b/, 60], [/\b(70|bảy mươi|bảy chục)\b/, 70],
-          [/\b(80|tám mươi|tám chục)\b/, 80], [/\b(90|chín mươi|chín chục)\b/, 90],
-          [/\b(100|một trăm|trăm chẵn)\b/, 100], [/\b(120|trăm hai|một trăm hai)\b/, 120],
-        ];
-        for (const [re, s] of speeds) {
-          if (command.match(re)) { hudStore.updateState({ roadType: "manual", manualMax: s }); setSpeechFeedback(`${s} km/h`); parsed = true; break; }
-        }
-      }
-      if (!parsed) setSpeechFeedback("Không hiểu: " + command);
-      setTimeout(() => setSpeechFeedback(""), 3000);
-    };
-    recognition.onerror = (e: any) => { setIsListening(false); setSpeechFeedback("Lỗi micro: " + e.error); setTimeout(() => setSpeechFeedback(""), 3000); };
-    recognition.onend = () => setIsListening(false);
-    recognitionRef.current = recognition;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   // ── Handlers ──
-  const toggleListening = () => {
-    if (isListening) { setIsListening(false); setSpeechFeedback(""); try { recognitionRef.current?.stop(); } catch { /* ignore */ } }
-    else { setSpeechFeedback("Đang nghe..."); recognitionRef.current?.start(); setIsListening(true); }
-  };
-
   const autoSaveZone = async (newMaxSpeed: number, newZone: "residential" | "outside") => {
     if (!coords) return;
     setSpeechFeedback("⏳ Đang lưu...");
@@ -347,6 +341,55 @@ export default function HUDPage() {
   const BatteryIcon = battery?.charging ? BatteryCharging : battery && battery.level > 60 ? BatteryFull : battery && battery.level > 20 ? BatteryMedium : BatteryLow;
   const batteryColor = !battery ? "text-slate-500" : battery.charging ? "text-green-400" : battery.level > 30 ? "text-green-400" : battery.level > 15 ? "text-yellow-400" : "text-red-400";
 
+  const toggleBrightMode = () => {
+    const next = brightMode === "day" ? "night" : "day";
+    setBrightMode(next);
+    localStorage.setItem("hud_bright_mode", next);
+  };
+
+  const handleSwipeStart = (e: React.TouchEvent) => {
+    swipeStartYRef.current = e.touches[0].clientY;
+    swipeStartOffsetRef.current = offset;
+  };
+  const handleSwipeMove = (e: React.TouchEvent) => {
+    const deltaY = swipeStartYRef.current - e.touches[0].clientY;
+    const newOffset = swipeStartOffsetRef.current + Math.round(deltaY / 24);
+    const clamped = Math.max(-20, Math.min(20, newOffset));
+    if (clamped !== offset) {
+      hudStore.updateState({ offset: clamped });
+      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
+    }
+  };
+  const handleSwipeEnd = () => { swipeStartYRef.current = 0; };
+
+  // Color palette — day (amber) vs night (green) vs overspeed (red)
+  // Day amber: high luminance, pierces sunlight reflection on glass
+  // Night green: low eye strain, classic HUD color
+  // White core glow in day mode makes numbers visible in bright ambient light
+  const palette = (() => {
+    if (isOverSpeed) return {
+      hex: "#FF2200",
+      speedGlow: "0 0 8px rgba(255,255,255,0.7), 0 0 35px rgba(255,34,0,1), 0 0 70px rgba(255,34,0,0.6), 0 0 120px rgba(255,34,0,0.25)",
+      kmhGlow: "0 0 12px rgba(255,34,0,0.8)",
+      divBg: "linear-gradient(to right, transparent 0%, rgba(255,34,0,0.5) 20%, rgba(255,34,0,1) 50%, rgba(255,34,0,0.5) 80%, transparent 100%)",
+      divGlow: "0 0 10px rgba(255,34,0,0.9), 0 0 25px rgba(255,34,0,0.5)",
+    };
+    if (brightMode === "day") return {
+      hex: "#FFB800",
+      speedGlow: "0 0 8px rgba(255,255,255,0.95), 0 0 40px rgba(255,184,0,1), 0 0 80px rgba(255,184,0,0.75), 0 0 150px rgba(255,184,0,0.35)",
+      kmhGlow: "0 0 6px rgba(255,255,255,0.8), 0 0 14px rgba(255,184,0,1)",
+      divBg: "linear-gradient(to right, transparent 0%, rgba(255,184,0,0.5) 20%, rgba(255,184,0,1) 50%, rgba(255,184,0,0.5) 80%, transparent 100%)",
+      divGlow: "0 0 10px rgba(255,184,0,1), 0 0 28px rgba(255,184,0,0.6)",
+    };
+    return {
+      hex: "#4ade80",
+      speedGlow: "0 0 30px rgba(74,222,128,0.9), 0 0 60px rgba(74,222,128,0.5), 0 0 100px rgba(74,222,128,0.2)",
+      kmhGlow: "0 0 10px rgba(74,222,128,0.6)",
+      divBg: "linear-gradient(to right, transparent 0%, rgba(74,222,128,0.5) 20%, rgba(74,222,128,1) 50%, rgba(74,222,128,0.5) 80%, transparent 100%)",
+      divGlow: "0 0 8px rgba(74,222,128,0.8), 0 0 20px rgba(74,222,128,0.4)",
+    };
+  })();
+
   // ══════════════════════════════════════
   //  RENDER
   // ══════════════════════════════════════
@@ -359,48 +402,157 @@ export default function HUDPage() {
         body, html { overflow: hidden; overscroll-behavior: none; touch-action: none; background: #000; }
       `}</style>
 
-      <div className={`flex flex-col w-full h-full ${mode === "car" && !showSettings ? "scale-y-[-1]" : ""}`}>
+      <div className={`flex flex-col w-full h-full ${mode === "car" ? "scale-y-[-1]" : ""}`}>
 
         {/* ═══ TOP BAR ═══ */}
-        <div className="flex items-center justify-between px-4 pt-3 pb-1 shrink-0 z-20">
-          {/* Left: back + GPS */}
-          <div className="flex items-center gap-2">
-            {!isFullscreen && (
-              <Link href="/" className="p-1 text-slate-600 hover:text-white transition">
-                <ArrowLeft size={16} />
-              </Link>
-            )}
+        {mode === "car" ? (
+          // Car/HUD mode: ultra-minimal — low opacity so it barely shows in windshield reflection
+          <div className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 z-20 opacity-40">
             <div className={`w-2 h-2 rounded-full shrink-0 ${status === "Đã kết nối GPS" ? "bg-green-400" : status === "Lỗi GPS" ? "bg-red-500" : "bg-yellow-400 animate-pulse"}`} />
-            <span className="text-[11px] font-bold tracking-[0.15em] uppercase text-green-400">GPS</span>
-            {accuracy !== null && (
-              <span className={`text-[9px] font-medium ${accuracy <= 10 ? "text-green-500" : accuracy <= 30 ? "text-yellow-500" : "text-red-500"}`}>
-                ±{Math.round(accuracy)}m
-              </span>
-            )}
+            <button onClick={toggleBrightMode} className="p-1.5 transition active:scale-90" style={{ color: palette.hex }}>
+              {brightMode === "day" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
           </div>
+        ) : (
+          // Normal mode: full top bar
+          <div className="flex items-center justify-between px-4 pt-3 pb-1 shrink-0 z-20">
+            <div className="flex items-center gap-2">
+              {!isFullscreen && (
+                <Link href="/" className="p-1 text-slate-600 hover:text-white transition">
+                  <ArrowLeft size={16} />
+                </Link>
+              )}
+              <div className={`w-2 h-2 rounded-full shrink-0 ${status === "Đã kết nối GPS" ? "bg-green-400" : status === "Lỗi GPS" ? "bg-red-500" : "bg-yellow-400 animate-pulse"}`} />
+              <span className="text-[11px] font-bold tracking-[0.15em] uppercase text-green-400">GPS</span>
+              {accuracy !== null && (
+                <span className={`text-[9px] font-medium ${accuracy <= 10 ? "text-green-500" : accuracy <= 30 ? "text-yellow-500" : "text-red-500"}`}>
+                  ±{Math.round(accuracy)}m
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {battery && (
+                <div className="flex items-center gap-1">
+                  <BatteryIcon size={16} className={batteryColor} />
+                  <span className={`text-[11px] font-bold ${batteryColor}`}>{battery.level}%</span>
+                </div>
+              )}
+              <button onClick={toggleBrightMode} className="p-1 transition active:scale-90" style={{ color: brightMode === "day" ? "#FFB800" : "#64748b" }}>
+                {brightMode === "day" ? <Sun size={14} /> : <Moon size={14} />}
+              </button>
+              <button onClick={toggleFullscreen} className="p-1 text-slate-600 hover:text-green-400 transition">
+                {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+              </button>
+              <button onClick={() => setShowSettings(v => !v)} className="p-1 text-slate-600 hover:text-green-400 transition">
+                <Settings size={14} />
+              </button>
+            </div>
+          </div>
+        )}
 
-          {/* Right: battery + controls */}
-          <div className="flex items-center gap-3">
-            {battery && (
-              <div className="flex items-center gap-1">
-                <BatteryIcon size={16} className={batteryColor} />
-                <span className={`text-[11px] font-bold ${batteryColor}`}>{battery.level}%</span>
+        {/* ═══ MAIN HUD (speed + map) ═══ */}
+        <>
+            {/* Speech feedback toast */}
+            {speechFeedback && (
+              <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 bg-black/90 text-green-300 px-4 py-2 rounded-full border border-green-500/30 text-sm font-bold shadow-lg backdrop-blur-md pointer-events-none">
+                {speechFeedback}
               </div>
             )}
-            <button onClick={toggleFullscreen} className="p-1 text-slate-600 hover:text-green-400 transition">
-              {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
-            </button>
-            <button onClick={() => setShowSettings(v => !v)} className="p-1 text-slate-600 hover:text-green-400 transition">
-              <Settings size={14} />
-            </button>
-          </div>
-        </div>
 
-        {/* ═══ SETTINGS PANEL ═══ */}
-        {showSettings && (
-          <div className="flex-1 overflow-y-auto p-4 pb-20 z-30 bg-black" style={{ overscrollBehavior: "contain" }}>
-            <h2 className="text-lg font-bold mb-4 text-green-400">Cài đặt HUD</h2>
-            <div className="space-y-5 max-w-lg mx-auto">
+            {/* ── SPEED SECTION ── */}
+            <div className="flex-1 flex flex-col min-h-0">
+
+              {/* Top row: next sign (left) + speed limit (right) */}
+              <div className="flex items-center justify-between px-3 pt-2 pb-0 shrink-0">
+                {prediction ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-12 h-12 rounded-full bg-white border-[4px] border-red-600 flex items-center justify-center font-bold text-black text-base tabular-nums shadow-lg">
+                      {prediction.nextMaxSpeed}
+                    </div>
+                    <div className={`text-xs font-bold px-2 py-1 rounded-lg backdrop-blur-sm border tabular-nums ${prediction.distanceMeters <= 100 ? "text-red-400 border-red-500/40 bg-red-950/60 animate-pulse" : prediction.distanceMeters <= 200 ? "text-yellow-400 border-yellow-500/30 bg-yellow-950/60" : "text-green-400 border-green-500/30 bg-black/60"}`}>
+                      {prediction.distanceMeters}m
+                    </div>
+                  </div>
+                ) : (
+                  <div />
+                )}
+
+                <button
+                  onClick={() => setShowQuickMenu(true)}
+                  className="flex flex-col items-center gap-0.5 active:scale-95 transition"
+                >
+                  <div className={`w-16 h-16 rounded-full border-[5px] flex items-center justify-center font-bold text-2xl tabular-nums ${isOverSpeed ? "border-red-500 bg-black text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.6)]" : "border-orange-500 bg-black text-white shadow-[0_0_15px_rgba(249,115,22,0.4)]"}`}>
+                    {currentMaxSpeed}
+                  </div>
+                  <span className="text-[8px] text-slate-500 uppercase tracking-widest">Limit</span>
+                </button>
+              </div>
+
+              {/* Main speed display — swipe up/down to adjust offset */}
+              <div className="flex-1 flex flex-col items-center justify-center" onTouchStart={handleSwipeStart} onTouchMove={handleSwipeMove} onTouchEnd={handleSwipeEnd}>
+                <div
+                  className="font-digital font-black leading-none tabular-nums tracking-tighter select-none"
+                  style={{
+                    fontSize: mode === "car" ? "clamp(160px, 56vw, 380px)" : "clamp(140px, 50vw, 320px)",
+                    color: palette.hex,
+                    textShadow: palette.speedGlow,
+                  }}
+                >
+                  {finalSpeed}
+                </div>
+                <div className="flex items-center gap-3 mt-1">
+                  <div
+                    className="text-xl font-bold tracking-[0.35em]"
+                    style={{ color: palette.hex, textShadow: palette.kmhGlow }}
+                  >
+                    KM/H
+                  </div>
+                  {offset !== 0 && (
+                    <span
+                      className="text-base font-bold tabular-nums"
+                      style={{ color: palette.hex, opacity: 0.55, textShadow: palette.kmhGlow }}
+                    >
+                      {offset > 0 ? `+${offset}` : offset}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ── GLOW DIVIDER ── */}
+            <div
+              className="shrink-0 h-px mx-0 relative"
+              style={{ background: palette.divBg, boxShadow: palette.divGlow }}
+            />
+
+            {/* ── MAP SECTION ── */}
+            <div className="shrink-0 relative overflow-hidden" style={{ height: "30dvh" }}>
+              <HudMiniMap coords={coords} heading={heading} predictions={predictions} carMode={mode === "car"} />
+            </div>
+
+            {/* ── BOTTOM BAR ── */}
+            {coords && (
+              <div className={`shrink-0 flex items-center justify-center px-4 py-2 bg-black border-t border-slate-900 z-20 transition-opacity ${mode === "car" ? "opacity-30" : ""}`}>
+                <button onClick={handleSaveZone} className="w-11 h-11 rounded-full bg-slate-900 border border-slate-800 text-slate-500 hover:text-green-400 flex items-center justify-center active:scale-90 transition">
+                  <MapPin size={16} />
+                </button>
+              </div>
+            )}
+        </>
+      </div>
+
+      {/* ═══ SETTINGS DRAWER ═══ */}
+      {showSettings && (
+        <>
+          <div className="absolute inset-0 bg-black/60 z-40" onClick={() => setShowSettings(false)} />
+          <div className="absolute top-0 right-0 bottom-0 w-[88%] max-w-sm bg-slate-950 border-l border-slate-800 z-50 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 shrink-0">
+              <h2 className="text-base font-bold text-green-400">Cài đặt HUD</h2>
+              <button onClick={() => setShowSettings(false)} className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-900 text-slate-400 active:scale-90 transition">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 pb-8 space-y-5" style={{ overscrollBehavior: "contain" }}>
 
               {compassGranted === false && (
                 <section>
@@ -410,14 +562,6 @@ export default function HUDPage() {
                   </button>
                 </section>
               )}
-
-              <section>
-                <h3 className="text-xs font-semibold mb-2 text-slate-400 uppercase tracking-wider">Giọng nói</h3>
-                <button onClick={toggleListening} className={`w-full py-3 flex items-center justify-center gap-2 rounded-xl border transition text-sm font-bold ${isListening ? "border-red-500 bg-red-900/30 text-white animate-pulse" : "border-slate-700 bg-slate-900 text-slate-400"}`}>
-                  {isListening ? <Mic size={16} /> : <MicOff size={16} />}
-                  {isListening ? "Đang lắng nghe..." : "Bật nhận diện giọng nói"}
-                </button>
-              </section>
 
               <section>
                 <h3 className="text-xs font-semibold mb-2 text-slate-400 uppercase tracking-wider">Phương tiện</h3>
@@ -486,141 +630,27 @@ export default function HUDPage() {
               </section>
             </div>
           </div>
-        )}
+        </>
+      )}
 
-        {/* ═══ MAIN HUD (speed + map) ═══ */}
-        {!showSettings && (
-          <>
-            {/* Speech feedback toast */}
-            {speechFeedback && (
-              <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 bg-black/90 text-green-300 px-4 py-2 rounded-full border border-green-500/30 text-sm font-bold shadow-lg backdrop-blur-md pointer-events-none">
-                {speechFeedback}
-              </div>
-            )}
-
-            {/* ── SPEED SECTION ── */}
-            <div className="flex-1 flex flex-col items-center justify-center relative min-h-0">
-
-              {/* Next Sign — top-left corner */}
-              {prediction && (
-                <div className="absolute top-2 left-3 flex items-center gap-1.5 z-10">
-                  <div className="w-12 h-12 rounded-full bg-white border-[4px] border-red-600 flex items-center justify-center font-bold text-black text-base tabular-nums shadow-lg">
-                    {prediction.nextMaxSpeed}
-                  </div>
-                  <div className={`text-xs font-bold px-2 py-1 rounded-lg backdrop-blur-sm border tabular-nums ${prediction.distanceMeters <= 100 ? "text-red-400 border-red-500/40 bg-red-950/60 animate-pulse" : prediction.distanceMeters <= 200 ? "text-yellow-400 border-yellow-500/30 bg-yellow-950/60" : "text-green-400 border-green-500/30 bg-black/60"}`}>
-                    {prediction.distanceMeters}m
-                  </div>
-                </div>
-              )}
-
-              {/* Speed limit — top-right corner, tap to open quick menu */}
-              <button
-                onClick={() => setShowQuickMenu(true)}
-                className="absolute top-2 right-3 z-10 flex flex-col items-center gap-0.5 active:scale-95 transition"
-              >
-                <div className={`w-14 h-14 rounded-full border-[5px] flex items-center justify-center font-bold text-xl tabular-nums ${isOverSpeed ? "border-red-500 bg-black text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.6)]" : "border-orange-500 bg-black text-white shadow-[0_0_15px_rgba(249,115,22,0.4)]"}`}>
-                  {currentMaxSpeed}
-                </div>
-                <span className="text-[8px] text-slate-500 uppercase tracking-widest">Limit</span>
-              </button>
-
-              {/* Main speed display */}
-              <div className="flex flex-col items-center">
-                <div
-                  className={`font-digital font-black leading-none tabular-nums tracking-tighter select-none ${isOverSpeed ? "text-red-500" : "text-green-400"}`}
-                  style={{
-                    fontSize: "clamp(100px, 38vw, 260px)",
-                    textShadow: isOverSpeed
-                      ? "0 0 30px rgba(239,68,68,0.9), 0 0 60px rgba(239,68,68,0.5), 0 0 100px rgba(239,68,68,0.2)"
-                      : "0 0 30px rgba(74,222,128,0.9), 0 0 60px rgba(74,222,128,0.5), 0 0 100px rgba(74,222,128,0.2)",
-                  }}
-                >
-                  {finalSpeed}
-                </div>
-                <div
-                  className={`text-xl font-bold tracking-[0.35em] mt-1 ${isOverSpeed ? "text-red-400" : "text-green-400"}`}
-                  style={{ textShadow: isOverSpeed ? "0 0 10px rgba(239,68,68,0.6)" : "0 0 10px rgba(74,222,128,0.6)" }}
-                >
-                  KM/H
-                </div>
-              </div>
-            </div>
-
-            {/* ── GLOW DIVIDER ── */}
-            <div
-              className="shrink-0 h-px mx-0 relative"
-              style={{
-                background: isOverSpeed
-                  ? "linear-gradient(to right, transparent 0%, rgba(239,68,68,0.5) 20%, rgba(239,68,68,1) 50%, rgba(239,68,68,0.5) 80%, transparent 100%)"
-                  : "linear-gradient(to right, transparent 0%, rgba(74,222,128,0.5) 20%, rgba(74,222,128,1) 50%, rgba(74,222,128,0.5) 80%, transparent 100%)",
-                boxShadow: isOverSpeed
-                  ? "0 0 8px rgba(239,68,68,0.8), 0 0 20px rgba(239,68,68,0.4)"
-                  : "0 0 8px rgba(74,222,128,0.8), 0 0 20px rgba(74,222,128,0.4)",
-              }}
-            />
-
-            {/* ── MAP SECTION ── */}
-            <div className="shrink-0 relative overflow-hidden" style={{ height: "33dvh" }}>
-              <HudMiniMap coords={coords} heading={heading} predictions={predictions} />
-            </div>
-
-            {/* ── BOTTOM BAR ── */}
-            <div className="shrink-0 flex items-center justify-between px-3 py-2 bg-black border-t border-slate-900 z-20">
-              {/* Battery card */}
-              <div className="flex items-center gap-3 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 min-w-[120px]">
-                {battery ? (
-                  <>
-                    <BatteryIcon size={26} className={batteryColor} />
-                    <div>
-                      <div className={`text-xl font-bold tabular-nums leading-none ${batteryColor}`}>{battery.level}<span className="text-xs">%</span></div>
-                      <div className="text-[9px] text-slate-500 uppercase tracking-widest mt-0.5">PIN</div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <BatteryFull size={26} className="text-slate-700" />
-                    <div>
-                      <div className="text-xl font-bold text-slate-600">--</div>
-                      <div className="text-[9px] text-slate-700 uppercase tracking-widest mt-0.5">PIN</div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Controls */}
-              <div className="flex items-center gap-2">
-                <button onClick={() => hudStore.updateState({ offset: offset - 1 })} className="w-11 h-11 rounded-full bg-slate-900 border border-slate-800 text-slate-400 flex items-center justify-center active:scale-90 transition"><Minus size={16} /></button>
-                <button onClick={() => hudStore.updateState({ offset: offset + 1 })} className="w-11 h-11 rounded-full bg-slate-900 border border-slate-800 text-slate-400 flex items-center justify-center active:scale-90 transition"><Plus size={16} /></button>
-                {offset !== 0 && <span className="text-[10px] font-bold text-green-400 w-5 text-center">{offset > 0 ? `+${offset}` : offset}</span>}
-                <button onClick={toggleListening} className={`w-11 h-11 rounded-full border flex items-center justify-center active:scale-90 transition ${isListening ? "bg-red-600 border-red-500 text-white" : "bg-slate-900 border-slate-800 text-slate-500"}`}>
-                  {isListening ? <Mic size={16} /> : <MicOff size={16} />}
-                </button>
-                {coords && (
-                  <button onClick={handleSaveZone} className="w-11 h-11 rounded-full bg-slate-900 border border-slate-800 text-slate-500 hover:text-green-400 flex items-center justify-center active:scale-90 transition">
-                    <MapPin size={16} />
-                  </button>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* ═══ QUICK MENU OVERLAY ═══ */}
+      {/* ═══ QUICK MENU — BOTTOM SHEET ═══ */}
       {showQuickMenu && (
-        <div className="absolute inset-0 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center z-50 p-4">
-          <button onClick={() => setShowQuickMenu(false)} className="absolute top-4 right-4 w-11 h-11 bg-slate-900 rounded-full text-white flex items-center justify-center"><X size={20} /></button>
-          <h3 className="text-lg font-bold text-green-400 mb-5">Biển Báo Tốc Độ</h3>
-          <div className="grid grid-cols-4 gap-3 max-w-xs w-full mb-4">
-            <button onClick={() => handleQuickSelect("zone", "residential")} className="col-span-2 py-3.5 bg-orange-950/60 border-2 border-orange-500 rounded-xl text-base font-bold text-orange-200">KDC</button>
-            <button onClick={() => handleQuickSelect("zone", "outside")} className="col-span-2 py-3.5 bg-green-950/60 border-2 border-green-500 rounded-xl text-base font-bold text-green-200">Ngoài KDC</button>
+        <>
+          <div className="absolute inset-0 bg-black/60 z-40" onClick={() => setShowQuickMenu(false)} />
+          <div className="absolute bottom-0 left-0 right-0 z-50 bg-slate-950 border-t border-slate-800 rounded-t-3xl px-5 pt-4 pb-8">
+            <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-4" />
+            <h3 className="text-sm font-bold text-green-400 mb-4 text-center uppercase tracking-widest">Biển Báo Tốc Độ</h3>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <button onClick={() => handleQuickSelect("zone", "residential")} className={`py-3.5 rounded-xl border-2 text-base font-bold transition ${zone === "residential" ? "bg-orange-950/60 border-orange-500 text-orange-200" : "bg-slate-900 border-slate-700 text-slate-400"}`}>🏘 KDC</button>
+              <button onClick={() => handleQuickSelect("zone", "outside")} className={`py-3.5 rounded-xl border-2 text-base font-bold transition ${zone === "outside" ? "bg-green-950/60 border-green-500 text-green-200" : "bg-slate-900 border-slate-700 text-slate-400"}`}>🌿 Ngoài KDC</button>
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              {[40, 50, 60, 70, 80, 90, 100, 120].map(s => (
+                <button key={s} onClick={() => handleQuickSelect("manual", s)} className={`aspect-square rounded-full border-[3px] text-xl font-bold flex items-center justify-center transition active:scale-90 ${currentMaxSpeed === s ? "border-green-400 bg-green-900/40 text-green-300 shadow-[0_0_15px_rgba(74,222,128,0.4)]" : "border-slate-600 bg-slate-900 text-white"}`}>{s}</button>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-4 gap-3 max-w-xs w-full">
-            {[40, 50, 60, 70, 80, 90, 100, 120].map(s => (
-              <button key={s} onClick={() => handleQuickSelect("manual", s)} className={`aspect-square rounded-full border-[3px] text-xl font-bold flex items-center justify-center transition active:scale-90 ${currentMaxSpeed === s ? "border-green-400 bg-green-900/40 text-green-300 shadow-[0_0_15px_rgba(74,222,128,0.4)]" : "border-slate-600 bg-slate-900 text-white"}`}>{s}</button>
-            ))}
-          </div>
-        </div>
+        </>
       )}
 
       {/* ═══ SAVE ZONE MODAL ═══ */}

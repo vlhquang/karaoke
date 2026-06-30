@@ -17,6 +17,7 @@ interface HudMiniMapProps {
   coords: { lat: number; lng: number } | null;
   heading: number;
   predictions: SpeedZonePrediction[];
+  carMode?: boolean;
 }
 
 function MapUpdater({ coords }: { coords: { lat: number; lng: number } | null }) {
@@ -42,13 +43,16 @@ function MapUpdater({ coords }: { coords: { lat: number; lng: number } | null })
   return null;
 }
 
-function createSignIcon(speed: number, isNearest: boolean) {
-  const size = isNearest ? 42 : 34;
-  const borderWidth = isNearest ? 5 : 4;
-  const fontSize = isNearest ? 16 : 13;
-  const glow = isNearest ? "rgba(220,38,38,0.6)" : "rgba(220,38,38,0.3)";
+// Car mode: larger icons + white core glow for windshield visibility
+function createSignIcon(speed: number, isNearest: boolean, carMode = false) {
+  const size = carMode ? (isNearest ? 54 : 44) : (isNearest ? 42 : 34);
+  const border = carMode ? (isNearest ? 6 : 5) : (isNearest ? 5 : 4);
+  const fontSize = carMode ? (isNearest ? 21 : 17) : (isNearest ? 16 : 13);
+  const redAlpha = carMode ? (isNearest ? 0.9 : 0.65) : (isNearest ? 0.6 : 0.3);
+  const glowPx = carMode ? (isNearest ? "32px" : "18px") : (isNearest ? "20px" : "8px");
+  const coreShadow = carMode ? `0 0 5px rgba(255,255,255,0.95), ` : "";
   return L.divIcon({
-    html: `<div style="background:white;width:${size}px;height:${size}px;border-radius:50%;border:${borderWidth}px solid #dc2626;display:flex;align-items:center;justify-content:center;color:black;font-family:sans-serif;font-weight:900;font-size:${fontSize}px;box-shadow:0 2px 10px ${glow},0 0 ${isNearest ? "20px" : "8px"} ${glow};">${speed}</div>`,
+    html: `<div style="background:white;width:${size}px;height:${size}px;border-radius:50%;border:${border}px solid #dc2626;display:flex;align-items:center;justify-content:center;color:black;font-family:sans-serif;font-weight:900;font-size:${fontSize}px;box-shadow:${coreShadow}0 2px 10px rgba(220,38,38,${redAlpha}),0 0 ${glowPx} rgba(220,38,38,${redAlpha});">${speed}</div>`,
     className: "",
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
@@ -67,10 +71,20 @@ function createPositionIcon(heading: number) {
   });
 }
 
-export default function HudMiniMap({ coords, heading, predictions }: HudMiniMapProps) {
+// Car/HUD mode: small green dot — clean anchor without directional clutter
+function createPositionIconCar() {
+  return L.divIcon({
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px rgba(74,222,128,1),0 0 18px rgba(74,222,128,0.5);"></div>`,
+    className: "",
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+}
+
+export default function HudMiniMap({ coords, heading, predictions, carMode = false }: HudMiniMapProps) {
   if (!coords) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-[#1a1a2e] text-slate-500 text-xs">
+      <div className="w-full h-full flex items-center justify-center bg-black text-slate-500 text-xs">
         <div className="flex flex-col items-center gap-2">
           <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
           <span className="uppercase tracking-widest text-[10px]">Đang đợi GPS...</span>
@@ -79,10 +93,50 @@ export default function HudMiniMap({ coords, heading, predictions }: HudMiniMapP
     );
   }
 
+  if (carMode) {
+    // ── CAR / HUD MODE ──
+    // Nền đen tuyệt đối = trong suốt hoàn toàn trên kính xe
+    // Chỉ hiển thị biển báo tốc độ (trắng-đỏ, glow mạnh) và dot vị trí
+    return (
+      <div className="w-full h-full relative z-0 overflow-hidden">
+        <MapContainer
+          center={[coords.lat, coords.lng]}
+          zoom={19}
+          className="w-full h-full"
+          zoomControl={false}
+          attributionControl={false}
+          style={{ background: "#000000" }}
+        >
+          <MapUpdater coords={coords} />
+
+          {/* Dot vị trí nhỏ — anchor cho không gian tọa độ */}
+          <Marker
+            position={[coords.lat, coords.lng]}
+            icon={createPositionIconCar()}
+            zIndexOffset={100}
+          />
+
+          {/* Biển báo tốc độ phía trước — to hơn + glow mạnh hơn cho windshield */}
+          {predictions.map((pred, idx) =>
+            pred.lat && pred.lng ? (
+              <Marker
+                key={`pred-${idx}-${pred.lat}-${pred.lng}`}
+                position={[pred.lat, pred.lng]}
+                icon={createSignIcon(pred.nextMaxSpeed, idx === 0, true)}
+                zIndexOffset={90 - idx}
+              />
+            ) : null
+          )}
+        </MapContainer>
+      </div>
+    );
+  }
+
+  // ── NORMAL MODE ──
   return (
     <div className="w-full h-full relative z-0 overflow-hidden">
 
-      {/* Compass rose — góc phải, dưới biển báo limit */}
+      {/* Compass rose */}
       <div className="absolute top-[72px] right-2 z-[1000] pointer-events-none flex flex-col items-center">
         <div style={{
           width: 44, height: 44, borderRadius: "50%",
@@ -103,22 +157,6 @@ export default function HudMiniMap({ coords, heading, predictions }: HudMiniMapP
         <span style={{ fontSize: 9, color: "#94a3b8", marginTop: 2 }}>{Math.round(heading)}°</span>
       </div>
 
-      {/* Mũi tên cố định — dưới giữa màn hình, anchor cho GPS dot */}
-      <div className="absolute z-[1000] pointer-events-none" style={{ bottom: "16%", left: "50%", transform: "translateX(-50%)" }}>
-        <div style={{
-          width: 0, height: 0,
-          borderLeft: "20px solid transparent", borderRight: "20px solid transparent",
-          borderBottom: "44px solid #22d3ee",
-          filter: "drop-shadow(0px 0px 14px rgba(34,211,238,0.9)) drop-shadow(0px 0px 28px rgba(34,211,238,0.5))",
-        }} />
-        <div style={{
-          position: "absolute", bottom: -8, left: "50%", transform: "translateX(-50%)",
-          width: 12, height: 12, borderRadius: "50%",
-          backgroundColor: "#22d3ee", boxShadow: "0 0 10px rgba(34,211,238,0.8)",
-        }} />
-      </div>
-
-      {/* Bản đồ north-up — không rotate DOM */}
       <MapContainer
         center={[coords.lat, coords.lng]}
         zoom={19}
@@ -133,14 +171,12 @@ export default function HudMiniMap({ coords, heading, predictions }: HudMiniMapP
         />
         <MapUpdater coords={coords} />
 
-        {/* Marker vị trí hiện tại — mũi tên xoay theo heading */}
         <Marker
           position={[coords.lat, coords.lng]}
           icon={createPositionIcon(heading)}
           zIndexOffset={100}
         />
 
-        {/* Biển báo tốc độ phía trước */}
         {predictions.map((pred, idx) =>
           pred.lat && pred.lng ? (
             <Marker
