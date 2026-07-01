@@ -5,7 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
 import {
   ArrowLeft, Car, Bike, Settings, Plus, Minus, X,
-  Maximize, Minimize, Radio, QrCode, MapPin, Save, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium,
+  Radio, QrCode, MapPin, Save, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium,
   Sun, Moon,
 } from "lucide-react";
 import { useHudStore } from "../../store/hud-store";
@@ -21,7 +21,6 @@ export default function HUDPage() {
   const [status, setStatus] = useState<"Đang tìm GPS..." | "Đã kết nối GPS" | "Lỗi GPS">("Đang tìm GPS...");
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showQuickMenu, setShowQuickMenu] = useState<boolean>(false);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isHosting, setIsHosting] = useState<boolean>(false);
   const [hostRoomCode, setHostRoomCode] = useState<string>("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -32,6 +31,7 @@ export default function HUDPage() {
   const [speechFeedback, setSpeechFeedback] = useState<string>("");
   const [compassGranted, setCompassGranted] = useState<boolean | null>(null);
   const [brightMode, setBrightMode] = useState<"day" | "night">("night");
+  const [showSelector, setShowSelector] = useState<boolean>(true);
 
   const mainRef = useRef<HTMLElement>(null);
   const prevCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -182,6 +182,8 @@ export default function HUDPage() {
               const freshZone = freshState.zone as "residential" | "outside";
               const freshRoadType = freshState.roadType;
 
+              useHudStore.getState().updateState({ gpsLat: newCoords.lat, gpsLng: newCoords.lng, gpsHeading: h });
+
               const { arrivedZone } = speedZoneStore.updatePrediction(newCoords.lat, newCoords.lng, h, freshMaxSpeed);
               if (arrivedZone) {
                 useHudStore.getState().updateState({ manualMax: arrivedZone.maxSpeed, zone: arrivedZone.zone });
@@ -269,20 +271,6 @@ export default function HUDPage() {
     }
   };
 
-  // ── Fullscreen ──
-  useEffect(() => {
-    const handleFsChange = () => {
-      const doc = document as any;
-      setIsFullscreen(!!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement));
-    };
-    document.addEventListener("fullscreenchange", handleFsChange);
-    document.addEventListener("webkitfullscreenchange", handleFsChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFsChange);
-      document.removeEventListener("webkitfullscreenchange", handleFsChange);
-    };
-  }, []);
-
   // ── Handlers ──
   const autoSaveZone = async (newMaxSpeed: number, newZone: "residential" | "outside") => {
     if (!coords) return;
@@ -300,16 +288,6 @@ export default function HUDPage() {
     else if (type === "manual") { newMaxSpeed = val as number; hudStore.updateState({ manualMax: newMaxSpeed }); }
     setShowQuickMenu(false);
     autoSaveZone(newMaxSpeed, newZone);
-  };
-
-  const toggleFullscreen = () => {
-    const doc = document as any;
-    const de = (mainRef.current || document.documentElement) as any;
-    try {
-      const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
-      if (!isFs) { if (de.requestFullscreen) de.requestFullscreen(); else if (de.webkitRequestFullscreen) de.webkitRequestFullscreen(); setIsFullscreen(true); }
-      else { if (doc.exitFullscreen) doc.exitFullscreen(); else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen(); setIsFullscreen(false); }
-    } catch { setIsFullscreen(v => !v); }
   };
 
   const handleStartHosting = async () => {
@@ -362,6 +340,29 @@ export default function HUDPage() {
   };
   const handleSwipeEnd = () => { swipeStartYRef.current = 0; };
 
+  const handleSelectMode = (selected: "moto" | "car") => {
+    hudStore.updateState({ mode: selected });
+    setShowSelector(false);
+    try {
+      const el = (mainRef.current ?? document.documentElement) as any;
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    } catch { /* ignore */ }
+  };
+
+  const handleExitToSelector = () => {
+    setShowSelector(true);
+    setShowSettings(false);
+    setShowQuickMenu(false);
+    try {
+      const doc = document as any;
+      if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+        if (doc.exitFullscreen) doc.exitFullscreen();
+        else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
+      }
+    } catch { /* ignore */ }
+  };
+
   // Color palette — day (amber) vs night (green) vs overspeed (red)
   // Day amber: high luminance, pierces sunlight reflection on glass
   // Night green: low eye strain, classic HUD color
@@ -402,67 +403,95 @@ export default function HUDPage() {
         body, html { overflow: hidden; overscroll-behavior: none; touch-action: none; background: #000; }
       `}</style>
 
-      <div className={`flex flex-col w-full h-full ${mode === "car" ? "scale-y-[-1]" : ""}`}>
+      {/* ═══ SELECTOR ═══ */}
+      {showSelector && (
+        <div className="absolute inset-0 bg-black z-[100] flex flex-col">
+          <div className="flex items-center justify-between px-5 pt-5 pb-2 shrink-0">
+            <Link href="/" className="flex items-center gap-1.5 text-slate-600 hover:text-white transition">
+              <ArrowLeft size={14} />
+              <span className="text-xs tracking-wide">Trang chủ</span>
+            </Link>
+            <div className={`w-2 h-2 rounded-full ${status === "Đã kết nối GPS" ? "bg-green-400" : status === "Lỗi GPS" ? "bg-red-500" : "bg-yellow-400 animate-pulse"}`} />
+          </div>
+
+          <div className="flex-1 flex flex-col items-center justify-center gap-10 px-8">
+            <div className="text-center">
+              <div className="text-5xl font-black tracking-[0.15em] text-white mb-2">HUD</div>
+              <div className="text-[11px] text-slate-500 tracking-[0.25em] uppercase">Chọn phương tiện</div>
+            </div>
+
+            <div className="flex gap-4 w-full max-w-xs">
+              <button
+                onClick={() => handleSelectMode("moto")}
+                className={`flex-1 flex flex-col items-center gap-4 py-9 rounded-2xl border-2 transition active:scale-95 ${mode === "moto" ? "border-green-500 bg-green-900/20" : "border-slate-700 bg-slate-900/80"}`}
+              >
+                <Bike size={44} className={mode === "moto" ? "text-green-400" : "text-slate-400"} />
+                <span className={`text-sm font-bold tracking-wide ${mode === "moto" ? "text-green-300" : "text-slate-400"}`}>Xe Máy</span>
+              </button>
+
+              <button
+                onClick={() => handleSelectMode("car")}
+                className={`flex-1 flex flex-col items-center gap-4 py-9 rounded-2xl border-2 transition active:scale-95 ${mode === "car" ? "border-green-500 bg-green-900/20" : "border-slate-700 bg-slate-900/80"}`}
+              >
+                <Car size={44} className={mode === "car" ? "text-green-400" : "text-slate-400"} />
+                <div className="flex flex-col items-center gap-1">
+                  <span className={`text-sm font-bold tracking-wide ${mode === "car" ? "text-green-300" : "text-slate-400"}`}>Ô Tô</span>
+                  <span className="text-[10px] text-slate-600 tracking-widest uppercase">HUD</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!showSelector && <>
+      <div className={`relative flex flex-col w-full h-full ${mode === "car" ? "scale-y-[-1]" : ""}`}>
+
+        {/* ── Map background — full screen ── */}
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          <HudMiniMap coords={coords} heading={heading} predictions={predictions} carMode={mode === "car"} />
+          {mode !== "car" && <div className="absolute inset-0 bg-black/50 pointer-events-none" />}
+        </div>
+
+        {/* ── Content overlay ── */}
+        <div className="relative z-10 flex flex-col w-full h-full">
 
         {/* ═══ TOP BAR ═══ */}
-        {mode === "car" ? (
-          // Car/HUD mode: ultra-minimal — low opacity so it barely shows in windshield reflection
-          <div className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 z-20 opacity-40">
+        <div className="flex items-center justify-between px-4 pt-3 pb-1 shrink-0 bg-black/40 backdrop-blur-sm">
+          <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full shrink-0 ${status === "Đã kết nối GPS" ? "bg-green-400" : status === "Lỗi GPS" ? "bg-red-500" : "bg-yellow-400 animate-pulse"}`} />
-            <button onClick={toggleBrightMode} className="p-1.5 transition active:scale-90" style={{ color: palette.hex }}>
-              {brightMode === "day" ? <Sun size={16} /> : <Moon size={16} />}
+            <span className="text-[11px] font-bold tracking-[0.15em] uppercase text-green-400">GPS</span>
+            {accuracy !== null && (
+              <span className={`text-[9px] font-medium ${accuracy <= 10 ? "text-green-500" : accuracy <= 30 ? "text-yellow-500" : "text-red-500"}`}>
+                ±{Math.round(accuracy)}m
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {battery && (
+              <div className="flex items-center gap-1">
+                <BatteryIcon size={16} className={batteryColor} />
+                <span className={`text-[11px] font-bold ${batteryColor}`}>{battery.level}%</span>
+              </div>
+            )}
+            <button onClick={toggleBrightMode} className="p-1 transition active:scale-90" style={{ color: brightMode === "day" ? "#FFB800" : "#64748b" }}>
+              {brightMode === "day" ? <Sun size={14} /> : <Moon size={14} />}
+            </button>
+            <button onClick={() => setShowSettings(v => !v)} className="p-1 text-slate-600 hover:text-green-400 transition">
+              <Settings size={14} />
+            </button>
+            <button onClick={handleExitToSelector} className="p-1 text-slate-600 hover:text-white transition active:scale-90">
+              <X size={14} />
             </button>
           </div>
-        ) : (
-          // Normal mode: full top bar
-          <div className="flex items-center justify-between px-4 pt-3 pb-1 shrink-0 z-20">
-            <div className="flex items-center gap-2">
-              {!isFullscreen && (
-                <Link href="/" className="p-1 text-slate-600 hover:text-white transition">
-                  <ArrowLeft size={16} />
-                </Link>
-              )}
-              <div className={`w-2 h-2 rounded-full shrink-0 ${status === "Đã kết nối GPS" ? "bg-green-400" : status === "Lỗi GPS" ? "bg-red-500" : "bg-yellow-400 animate-pulse"}`} />
-              <span className="text-[11px] font-bold tracking-[0.15em] uppercase text-green-400">GPS</span>
-              {accuracy !== null && (
-                <span className={`text-[9px] font-medium ${accuracy <= 10 ? "text-green-500" : accuracy <= 30 ? "text-yellow-500" : "text-red-500"}`}>
-                  ±{Math.round(accuracy)}m
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              {battery && (
-                <div className="flex items-center gap-1">
-                  <BatteryIcon size={16} className={batteryColor} />
-                  <span className={`text-[11px] font-bold ${batteryColor}`}>{battery.level}%</span>
-                </div>
-              )}
-              <button onClick={toggleBrightMode} className="p-1 transition active:scale-90" style={{ color: brightMode === "day" ? "#FFB800" : "#64748b" }}>
-                {brightMode === "day" ? <Sun size={14} /> : <Moon size={14} />}
-              </button>
-              <button onClick={toggleFullscreen} className="p-1 text-slate-600 hover:text-green-400 transition">
-                {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
-              </button>
-              <button onClick={() => setShowSettings(v => !v)} className="p-1 text-slate-600 hover:text-green-400 transition">
-                <Settings size={14} />
-              </button>
-            </div>
-          </div>
-        )}
+        </div>
 
         {/* ═══ MAIN HUD (speed + map) ═══ */}
         <>
-            {/* Speech feedback toast */}
-            {speechFeedback && (
-              <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 bg-black/90 text-green-300 px-4 py-2 rounded-full border border-green-500/30 text-sm font-bold shadow-lg backdrop-blur-md pointer-events-none">
-                {speechFeedback}
-              </div>
-            )}
-
             {/* ── SPEED SECTION ── */}
             <div className="flex-1 flex flex-col min-h-0">
 
-              {/* Top row: next sign (left) + speed limit (right) */}
+              {/* Top row: prediction badge (left) + tappable limit (right) */}
               <div className="flex items-center justify-between px-3 pt-2 pb-0 shrink-0">
                 {prediction ? (
                   <div className="flex items-center gap-2">
@@ -476,7 +505,6 @@ export default function HUDPage() {
                 ) : (
                   <div />
                 )}
-
                 <button
                   onClick={() => setShowQuickMenu(true)}
                   className="flex flex-col items-center gap-0.5 active:scale-95 transition"
@@ -493,7 +521,7 @@ export default function HUDPage() {
                 <div
                   className="font-digital font-black leading-none tabular-nums tracking-tighter select-none"
                   style={{
-                    fontSize: mode === "car" ? "clamp(160px, 56vw, 380px)" : "clamp(140px, 50vw, 320px)",
+                    fontSize: "clamp(150px, 52vw, 340px)",
                     color: palette.hex,
                     textShadow: palette.speedGlow,
                   }}
@@ -519,27 +547,24 @@ export default function HUDPage() {
               </div>
             </div>
 
-            {/* ── GLOW DIVIDER ── */}
-            <div
-              className="shrink-0 h-px mx-0 relative"
-              style={{ background: palette.divBg, boxShadow: palette.divGlow }}
-            />
-
-            {/* ── MAP SECTION ── */}
-            <div className="shrink-0 relative overflow-hidden" style={{ height: "30dvh" }}>
-              <HudMiniMap coords={coords} heading={heading} predictions={predictions} carMode={mode === "car"} />
-            </div>
-
             {/* ── BOTTOM BAR ── */}
             {coords && (
-              <div className={`shrink-0 flex items-center justify-center px-4 py-2 bg-black border-t border-slate-900 z-20 transition-opacity ${mode === "car" ? "opacity-30" : ""}`}>
+              <div className="shrink-0 flex items-center justify-center px-4 py-2 bg-black/40 backdrop-blur-sm">
                 <button onClick={handleSaveZone} className="w-11 h-11 rounded-full bg-slate-900 border border-slate-800 text-slate-500 hover:text-green-400 flex items-center justify-center active:scale-90 transition">
                   <MapPin size={16} />
                 </button>
               </div>
             )}
         </>
+        </div>
       </div>
+
+      {/* Status toast — outside flip div, không bị lật trong car mode */}
+      {speechFeedback && (
+        <div className={`absolute left-1/2 -translate-x-1/2 z-50 bg-black/90 text-green-300 px-4 py-2 rounded-full border border-green-500/30 text-sm font-bold shadow-lg backdrop-blur-md pointer-events-none ${mode === "car" ? "bottom-16 scale-y-[-1]" : "top-14"}`}>
+          {speechFeedback}
+        </div>
+      )}
 
       {/* ═══ SETTINGS DRAWER ═══ */}
       {showSettings && (
@@ -671,6 +696,7 @@ export default function HUDPage() {
           </div>
         </div>
       )}
+      </>}
     </main>
   );
 }

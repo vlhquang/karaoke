@@ -296,6 +296,9 @@ export interface HudState {
   manualMax: number;
   offset: number;
   mode: HudVehicleMode;
+  gpsLat?: number;
+  gpsLng?: number;
+  gpsHeading?: number;
 }
 
 export interface HudRoom {

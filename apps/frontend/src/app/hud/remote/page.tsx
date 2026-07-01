@@ -64,17 +64,19 @@ function HudRemoteContent() {
   // Lưu biển báo xuống Google Sheet khi chọn tốc độ
   const saveSignToSheet = async (speed: number) => {
     const currentZone = state?.zone || "residential";
+    const hasGps = !!(state?.gpsLat && state?.gpsLng);
     setSaveFeedback("⏳ Đang lưu...");
     const record: SpeedZoneRecord = {
-      lat: 0, lng: 0, // Will be filled by HUD device GPS if synced
-      heading: 0,
+      lat: state?.gpsLat ?? 0,
+      lng: state?.gpsLng ?? 0,
+      heading: state?.gpsHeading ?? 0,
       zone: currentZone,
       roadType: "manual",
       maxSpeed: speed,
       laneCount: laneCount,
       createdAt: new Date().toISOString(),
       status: "active",
-      label: `${laneCount} làn • ${currentZone === "residential" ? "KDC" : "Ngoài KDC"}`,
+      label: `${laneCount} làn • ${currentZone === "residential" ? "KDC" : "Ngoài KDC"}${hasGps ? "" : " • Không có GPS"}`,
     };
     const ok = await speedZoneStore.recordZone(record);
     if (ok) {
@@ -292,7 +294,11 @@ function HudRemoteContent() {
             {/* Biển báo tốc độ — chọn sẽ lưu xuống Google Sheet */}
             <div>
               <div className="text-sm text-slate-400 mb-3 font-semibold uppercase tracking-wide flex items-center gap-2">
-                <Save size={14} /> Biển báo tốc độ <span className="text-[10px] text-slate-500 normal-case">(Chọn = Lưu xuống Sheet)</span>
+                <Save size={14} /> Biển báo tốc độ
+                <span className="text-[10px] text-slate-500 normal-case">(Chọn = Lưu xuống Sheet)</span>
+                <span className={`text-[10px] font-bold ml-auto normal-case px-1.5 py-0.5 rounded ${state.gpsLat ? "bg-green-900/40 text-green-400 border border-green-500/30" : "bg-slate-800 text-slate-500 border border-slate-700"}`}>
+                  {state.gpsLat ? "📍 GPS" : "📍 Không GPS"}
+                </span>
               </div>
               <div className="grid grid-cols-4 gap-3">
                 {[40, 50, 60, 70, 80, 90, 100, 120].map(s => (
