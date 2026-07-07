@@ -4,11 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "next build",
-    "start": "NODE_ENV=production tsx server.ts",
+    "build": "node -e \"(function(){if(process.platform!=='win32'){require('child_process').execSync('npm install @esbuild/'+process.platform+'-x64 --no-save --no-package-lock',{stdio:'inherit'})}})()\" && next build && npm run build:server",
+    "build:server": "tsc -p tsconfig.server.json",
+    "start": "NODE_ENV=production node dist/server.js",
     "lint": "next lint",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "postinstall": "node -e \"(function(){if(process.platform!=='win32'){require('child_process').execSync('npm install @esbuild/'+process.platform+'-x64 --no-save --no-package-lock',{stdio:'inherit'})}})()\""
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@karaoke/shared": "1.0.0",
