@@ -10,7 +10,10 @@ interface NumberPlayerState {
 interface NumberState {
   targetCountToWin: number;
   winCondition: "unique" | "ranking";
+  noiseMimicRate: number;
+  bombMimicRate: number;
   targetNumber: number;
+  roundSeed: number;
   round: number;
   phase: "PREP" | "WAIT" | "HIGHLIGHT" | "PLAYING";
   phaseEndsAt: number;
@@ -25,6 +28,8 @@ export const numberGame: GameEngine = {
     const targetCountToWin = options?.number?.targetCount ?? 10;
     const itemLifetimeMs = options?.number?.itemLifetimeMs ?? 2000;
     const winCondition = options?.number?.winCondition ?? "unique";
+    const noiseMimicRate = Math.max(0, Math.min(100, options?.number?.noiseMimicRate ?? 30));
+    const bombMimicRate = Math.max(0, Math.min(100, options?.number?.bombMimicRate ?? 20));
     const playerStates: Record<string, NumberPlayerState> = {};
     [...room.players.keys()].forEach((pid) => {
       playerStates[pid] = { foundCount: 0, totalTimeMs: 0, roundFinished: false, lastActionAt: 0 };
@@ -33,7 +38,10 @@ export const numberGame: GameEngine = {
     return {
       targetCountToWin,
       winCondition,
+      noiseMimicRate,
+      bombMimicRate,
       targetNumber: Math.floor(Math.random() * 99) + 1,
+      roundSeed: Math.floor(Math.random() * 1_000_000),
       round: 1,
       phase: "PREP",
       phaseEndsAt: Date.now() + 5000, // 5s Prep
@@ -130,6 +138,7 @@ export const numberGame: GameEngine = {
       if (!state.done) {
         // Move to next round
         state.round += 1;
+        state.roundSeed = Math.floor(Math.random() * 1_000_000);
         state.phase = "PREP";
         state.phaseEndsAt = now + 5000;
         Object.values(state.playerStates).forEach((ps) => {

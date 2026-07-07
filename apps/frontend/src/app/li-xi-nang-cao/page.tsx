@@ -43,6 +43,18 @@ type CameraFilter =
 type FaceBox = { x: number; y: number; width: number; height: number };
 
 const LIXI_SESSION_KEY = "lixi_session_v6";
+const DORAEMON_PLAYER_NAMES = [
+  "Nobita",
+  "Shizuka",
+  "Suneo",
+  "Jaian",
+  "Dorami",
+  "Dekisugi",
+  "Sewashi",
+  "Mii-chan",
+  "Tamako",
+  "Nobisuke"
+] as const;
 
 interface LiXiSessionCache {
   roomId: string;
@@ -72,6 +84,11 @@ const clearLiXiSession = (): void => {
   localStorage.removeItem(LIXI_SESSION_KEY);
 };
 
+const randomDoraemonName = (): string => {
+  const idx = Math.floor(Math.random() * DORAEMON_PLAYER_NAMES.length);
+  return DORAEMON_PLAYER_NAMES[idx] ?? "Nobita";
+};
+
 type BrowserFaceDetector = {
   detect: (input: HTMLVideoElement) => Promise<Array<{ boundingBox: DOMRectReadOnly }>>;
 };
@@ -87,9 +104,9 @@ const games: Array<{ type: LiXiGameType; title: string; desc: string; color: str
   { type: "memory", title: "Ghi nhớ", desc: "Hoàn thành bàn nhanh nhất.", color: "bg-emerald-500/20 border-emerald-400/50" },
   { type: "rps", title: "Kéo búa bao", desc: "Đấu BO1 ngay lập tức.", color: "bg-amber-500/20 border-amber-400/50" },
   { type: "number", title: "Săn số", desc: "Chạm đúng số mục tiêu trước.", color: "bg-violet-500/20 border-violet-400/50" },
+  { type: "mathking", title: "Vua toán học", desc: "Trắc nghiệm toán nhanh.", color: "bg-indigo-500/20 border-indigo-400/50" },
   { type: "shake", title: "Lắc máy", desc: "Lắc mạnh trong 5 giây.", color: "bg-fuchsia-500/20 border-fuchsia-400/50" },
   { type: "color", title: "Chạm màu", desc: "Chạm đúng màu mục tiêu.", color: "bg-rose-500/20 border-rose-400/50" },
-  { type: "racing", title: "Đua xe", desc: "Bấm nhanh để xe về đích.", color: "bg-cyan-500/20 border-cyan-400/50" }
 ];
 
 const pretty = (value: unknown): string => {
@@ -384,6 +401,11 @@ export default function LiXiNangCaoPage() {
   const [numberTargetCount, setNumberTargetCount] = useState(10);
   const [numberItemLifetimeMs, setNumberItemLifetimeMs] = useState(2000);
   const [numberWinCondition, setNumberWinCondition] = useState<"unique" | "ranking">("unique");
+  const [numberNoiseMimicRate, setNumberNoiseMimicRate] = useState(30);
+  const [numberBombMimicRate, setNumberBombMimicRate] = useState(20);
+  const [mathGrade, setMathGrade] = useState<"1" | "2" | "3" | "4" | "5">("1");
+  const [mathTargetScore, setMathTargetScore] = useState<5 | 10 | 15 | 20>(10);
+  const [mathAnswerTimeSec, setMathAnswerTimeSec] = useState(15);
 
   const [gameState, setGameState] = useState<unknown>(null);
   const [resultState, setResultState] = useState<unknown>(null);
@@ -497,6 +519,7 @@ export default function LiXiNangCaoPage() {
     if (roomParam && roomParam !== roomIdInput) {
       setRoomIdInput(roomParam);
       setRole("player");
+      setName(randomDoraemonName());
     }
   }, [roomIdInput]);
 
@@ -514,8 +537,31 @@ export default function LiXiNangCaoPage() {
       if (room.selectedGameOptions.number.itemLifetimeMs) {
         setNumberItemLifetimeMs(room.selectedGameOptions.number.itemLifetimeMs);
       }
+      if (room.selectedGameOptions.number.winCondition) {
+        setNumberWinCondition(room.selectedGameOptions.number.winCondition);
+      }
+      if (typeof room.selectedGameOptions.number.noiseMimicRate === "number") {
+        setNumberNoiseMimicRate(room.selectedGameOptions.number.noiseMimicRate);
+      }
+      if (typeof room.selectedGameOptions.number.bombMimicRate === "number") {
+        setNumberBombMimicRate(room.selectedGameOptions.number.bombMimicRate);
+      }
     }
   }, [room?.selectedGameOptions?.number]);
+
+  useEffect(() => {
+    if (room?.selectedGameOptions?.mathking) {
+      if (room.selectedGameOptions.mathking.grade) {
+        setMathGrade(room.selectedGameOptions.mathking.grade);
+      }
+      if (room.selectedGameOptions.mathking.targetScore) {
+        setMathTargetScore(room.selectedGameOptions.mathking.targetScore);
+      }
+      if (room.selectedGameOptions.mathking.answerTimeSec) {
+        setMathAnswerTimeSec(room.selectedGameOptions.mathking.answerTimeSec);
+      }
+    }
+  }, [room?.selectedGameOptions?.mathking]);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -801,6 +847,16 @@ export default function LiXiNangCaoPage() {
     }
   };
 
+  const chooseRole = (nextRole: "host" | "player"): void => {
+    setRole(nextRole);
+    setErrorText("");
+    if (nextRole === "host") {
+      setName("Chủ phòng");
+      return;
+    }
+    setName(randomDoraemonName());
+  };
+
   const selectGame = async (gameType: LiXiGameType, forceOptions?: any): Promise<void> => {
     if (!roomId || !isHost) return;
     if (myReady) {
@@ -813,7 +869,17 @@ export default function LiXiNangCaoPage() {
       : gameType === "rps"
         ? { rps: { mode: rpsMode } }
         : gameType === "number"
-          ? { number: { targetCount: numberTargetCount } }
+          ? {
+            number: {
+              targetCount: numberTargetCount,
+              itemLifetimeMs: numberItemLifetimeMs,
+              winCondition: numberWinCondition,
+              noiseMimicRate: numberNoiseMimicRate,
+              bombMimicRate: numberBombMimicRate
+            }
+          }
+          : gameType === "mathking"
+            ? { mathking: { grade: mathGrade, targetScore: mathTargetScore, answerTimeSec: mathAnswerTimeSec } }
           : undefined);
     const res = await emitWithAck("host:selectGame", { roomId, gameType, options });
     if (!res.ok) setErrorText(res.message ?? "Không thể chọn trò chơi");
@@ -827,7 +893,17 @@ export default function LiXiNangCaoPage() {
       : selectedGame === "rps"
         ? { rps: { mode: rpsMode } }
         : selectedGame === "number"
-          ? { number: { targetCount: numberTargetCount } }
+          ? {
+            number: {
+              targetCount: numberTargetCount,
+              itemLifetimeMs: numberItemLifetimeMs,
+              winCondition: numberWinCondition,
+              noiseMimicRate: numberNoiseMimicRate,
+              bombMimicRate: numberBombMimicRate
+            }
+          }
+          : selectedGame === "mathking"
+            ? { mathking: { grade: mathGrade, targetScore: mathTargetScore, answerTimeSec: mathAnswerTimeSec } }
           : undefined;
     const res = await emitWithAck("host:startGame", { roomId, options });
     if (!res.ok) setErrorText(res.message ?? "Không thể bắt đầu trò chơi");
@@ -963,7 +1039,13 @@ export default function LiXiNangCaoPage() {
               <span className="text-9xl font-black text-white italic drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">{countdownLeft}</span>
             </div>
             <p className="mt-8 text-xl font-black text-white uppercase italic tracking-wider">
-              {room?.selectedGame === "number" ? "Săn Số V6" : room?.selectedGame === "memory" ? "Board Nhớ" : "Bắt Đầu"}
+              {room?.selectedGame === "number"
+                ? "Săn Số V6"
+                : room?.selectedGame === "memory"
+                  ? "Board Nhớ"
+                  : room?.selectedGame === "mathking"
+                    ? "Vua Toán Học"
+                    : "Bắt Đầu"}
             </p>
           </div>
         </div>
@@ -1002,13 +1084,50 @@ export default function LiXiNangCaoPage() {
   );
 
   if (!roomId) {
+    if (!role) {
+      return (
+        <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-4 py-8 overflow-x-hidden">
+          {renderPopups()}
+          <section className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="text-center">
+              <h1 className="text-4xl font-black bg-gradient-to-br from-cyan-300 to-violet-400 bg-clip-text text-transparent">THƯ VIỆN TRÒ CHƠI</h1>
+              <p className="mt-2 text-slate-400 font-medium">Chọn vai trò để tiếp tục</p>
+            </div>
+
+            <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 backdrop-blur-xl shadow-2xl">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => chooseRole("host")}
+                  className="h-20 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 font-bold text-slate-950 shadow-lg shadow-cyan-950/20 hover:scale-[1.02] active:scale-95 transition-all text-sm sm:text-base"
+                >
+                  CHỦ PHÒNG
+                </button>
+                <button
+                  onClick={() => chooseRole("player")}
+                  className="h-20 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 font-bold text-emerald-300 hover:scale-[1.02] active:scale-95 transition-all text-sm sm:text-base"
+                >
+                  NGƯỜI CHƠI
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-center">
+              <Link href="/" className="text-sm font-semibold text-slate-500 hover:text-slate-300 transition-colors">
+                ← Quay lại Portal
+              </Link>
+            </div>
+          </section>
+        </main>
+      );
+    }
+
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-4 py-8 overflow-x-hidden">
         {renderPopups()}
         <section className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="text-center">
-            <h1 className="text-4xl font-black bg-gradient-to-br from-cyan-300 to-violet-400 bg-clip-text text-transparent">LÌ XÌ NÂNG CAO</h1>
-            <p className="mt-2 text-slate-400 font-medium">Phiên bản V6 • Trò chơi tương tác nhóm</p>
+            <h1 className="text-4xl font-black bg-gradient-to-br from-cyan-300 to-violet-400 bg-clip-text text-transparent">THƯ VIỆN TRÒ CHƠI</h1>
+            <p className="mt-2 text-slate-400 font-medium">Phiên bản V6 • Vai trò: {role === "host" ? "Chủ phòng" : "Người chơi"}</p>
           </div>
 
           <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 backdrop-blur-xl shadow-2xl">
@@ -1045,32 +1164,45 @@ export default function LiXiNangCaoPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2">
-                <button
-                  onClick={() => void createRoom()}
-                  className="h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 font-bold text-slate-950 shadow-lg shadow-cyan-950/20 hover:scale-[1.02] active:scale-95 transition-all text-sm sm:text-base"
-                >
-                  TẠO PHÒNG
-                </button>
-                <div className="relative group">
-                  <input
-                    className="h-14 w-full rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 font-bold text-emerald-300 uppercase placeholder:text-emerald-900 group-hover:border-emerald-500/50 transition-all focus:outline-none"
-                    value={roomIdInput}
-                    onChange={(e) => setRoomIdInput(e.target.value.toUpperCase())}
-                    placeholder="MÃ PHÒNG"
-                  />
-                  <button
-                    onClick={() => void joinRoom()}
-                    disabled={!roomIdInput.trim()}
-                    className="absolute right-2 top-2 h-10 px-4 rounded-xl bg-emerald-500 font-bold text-slate-950 disabled:hidden transition-all"
-                  >
-                    VÀO
-                  </button>
-                </div>
+                {role === "host" ? (
+                  <>
+                    <button
+                      onClick={() => void createRoom()}
+                      className="col-span-2 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 font-bold text-slate-950 shadow-lg shadow-cyan-950/20 hover:scale-[1.02] active:scale-95 transition-all text-sm sm:text-base"
+                    >
+                      TẠO PHÒNG
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="relative col-span-2 group">
+                      <input
+                        className="h-14 w-full rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 font-bold text-emerald-300 uppercase placeholder:text-emerald-900 group-hover:border-emerald-500/50 transition-all focus:outline-none"
+                        value={roomIdInput}
+                        onChange={(e) => setRoomIdInput(e.target.value.toUpperCase())}
+                        placeholder="MÃ PHÒNG"
+                      />
+                      <button
+                        onClick={() => void joinRoom()}
+                        disabled={!roomIdInput.trim()}
+                        className="absolute right-2 top-2 h-10 px-4 rounded-xl bg-emerald-500 font-bold text-slate-950 disabled:hidden transition-all"
+                      >
+                        VÀO
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="flex justify-center">
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => setRole(null)}
+              className="text-sm font-semibold text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              Đổi vai trò
+            </button>
             <Link href="/" className="text-sm font-semibold text-slate-500 hover:text-slate-300 transition-colors">
               ← Quay lại Portal
             </Link>
@@ -1085,7 +1217,7 @@ export default function LiXiNangCaoPage() {
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-cyan-500 font-black text-slate-900 shadow-lg shadow-cyan-500/20">L6</div>
-          <h1 className="text-2xl font-black tracking-tight text-white uppercase italic">Lì Xì V6</h1>
+          <h1 className="text-2xl font-black tracking-tight text-white uppercase italic">Thư viện trò chơi</h1>
         </div>
         <Link href="/" className="rounded-xl border border-slate-700 bg-slate-900/50 px-4 py-2 text-sm font-bold text-slate-300 hover:bg-slate-800 transition-all">
           ← Thoát
@@ -1198,6 +1330,14 @@ export default function LiXiNangCaoPage() {
                         <p className={`text-xs font-bold leading-tight ${selectedGame === g.type ? "text-cyan-300" : "text-slate-400"}`}>{g.title}</p>
                       </button>
                     ))}
+                    <a
+                      href="/racing-game/index.html"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-3 rounded-2xl border border-amber-700/40 bg-amber-500/10 hover:bg-amber-500/20 transition-all"
+                    >
+                      <p className="text-xs font-bold leading-tight text-amber-300">Đua xe (module riêng)</p>
+                    </a>
                   </div>
                 </div>
 
@@ -1225,23 +1365,49 @@ export default function LiXiNangCaoPage() {
 
                   {selectedGame === "memory" && (
                     <div className="space-y-4">
-                      <p className="text-xs text-slate-400">Chọn chủ đề hình ảnh:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { id: "animals", label: "Động vật" },
-                          { id: "fruits", label: "Hoa quả" },
-                          { id: "sports", label: "Thể thao" },
-                          { id: "vehicles", label: "Xe cộ" }
-                        ].map((t) => (
-                          <button
-                            key={t.id}
-                            onClick={() => { setMemoryTheme(t.id as any); void selectGame("memory", { memory: { boardLength: memoryBoardLength, theme: t.id } }); }}
-                            disabled={myReady}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${memoryTheme === t.id ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
-                          >
-                            {t.label}
-                          </button>
-                        ))}
+                      <div className="space-y-2">
+                        <p className="text-xs text-slate-400">Số cặp cần tìm (độ khó):</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { pairs: 4, label: "4 cặp", hint: "Dễ" },
+                            { pairs: 6, label: "6 cặp", hint: "" },
+                            { pairs: 8, label: "8 cặp", hint: "" },
+                            { pairs: 10, label: "10 cặp", hint: "Trung bình" },
+                            { pairs: 12, label: "12 cặp", hint: "" },
+                            { pairs: 16, label: "16 cặp", hint: "Khó" },
+                            { pairs: 20, label: "20 cặp", hint: "" },
+                            { pairs: 24, label: "24 cặp", hint: "Rất khó" },
+                          ].map((opt) => (
+                            <button
+                              key={opt.pairs}
+                              onClick={() => { setMemoryBoardLength(opt.pairs * 2); void selectGame("memory", { memory: { boardLength: opt.pairs * 2, theme: memoryTheme } }); }}
+                              disabled={myReady}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${memoryBoardLength === opt.pairs * 2 ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                            >
+                              {opt.label}{opt.hint ? <span className="ml-1 opacity-60">({opt.hint})</span> : null}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs text-slate-400">Chọn chủ đề hình ảnh:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { id: "animals", label: "Động vật" },
+                            { id: "fruits", label: "Hoa quả" },
+                            { id: "sports", label: "Thể thao" },
+                            { id: "vehicles", label: "Xe cộ" }
+                          ].map((t) => (
+                            <button
+                              key={t.id}
+                              onClick={() => { setMemoryTheme(t.id as any); void selectGame("memory", { memory: { boardLength: memoryBoardLength, theme: t.id } }); }}
+                              disabled={myReady}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${memoryTheme === t.id ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                            >
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1259,7 +1425,15 @@ export default function LiXiNangCaoPage() {
                             onChange={(e) => {
                               const val = Number(e.target.value);
                               setNumberTargetCount(val);
-                              void selectGame("number", { number: { targetCount: val, itemLifetimeMs: numberItemLifetimeMs, winCondition: numberWinCondition } });
+                              void selectGame("number", {
+                                number: {
+                                  targetCount: val,
+                                  itemLifetimeMs: numberItemLifetimeMs,
+                                  winCondition: numberWinCondition,
+                                  noiseMimicRate: numberNoiseMimicRate,
+                                  bombMimicRate: numberBombMimicRate
+                                }
+                              });
                             }}
                             disabled={myReady}
                             className="flex-1 accent-cyan-500"
@@ -1280,7 +1454,15 @@ export default function LiXiNangCaoPage() {
                             onChange={(e) => {
                               const val = Number(e.target.value);
                               setNumberItemLifetimeMs(val);
-                              void selectGame("number", { number: { targetCount: numberTargetCount, itemLifetimeMs: val, winCondition: numberWinCondition } });
+                              void selectGame("number", {
+                                number: {
+                                  targetCount: numberTargetCount,
+                                  itemLifetimeMs: val,
+                                  winCondition: numberWinCondition,
+                                  noiseMimicRate: numberNoiseMimicRate,
+                                  bombMimicRate: numberBombMimicRate
+                                }
+                              });
                             }}
                             disabled={myReady}
                             className="flex-1 accent-violet-500"
@@ -1300,7 +1482,15 @@ export default function LiXiNangCaoPage() {
                               key={c.id}
                               onClick={() => {
                                 setNumberWinCondition(c.id as any);
-                                void selectGame("number", { number: { targetCount: numberTargetCount, itemLifetimeMs: numberItemLifetimeMs, winCondition: c.id as any } });
+                                void selectGame("number", {
+                                  number: {
+                                    targetCount: numberTargetCount,
+                                    itemLifetimeMs: numberItemLifetimeMs,
+                                    winCondition: c.id as any,
+                                    noiseMimicRate: numberNoiseMimicRate,
+                                    bombMimicRate: numberBombMimicRate
+                                  }
+                                });
                               }}
                               disabled={myReady}
                               className={`flex-1 px-4 py-2.5 rounded-xl text-[10px] font-bold transition-all ${numberWinCondition === c.id ? "bg-violet-500 text-white" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
@@ -1310,10 +1500,132 @@ export default function LiXiNangCaoPage() {
                           ))}
                         </div>
                       </div>
+
+                      <div className="space-y-4">
+                        <p className="text-xs text-slate-400">Tỉ lệ số gây nhiễu giả dạng mục tiêu (%):</p>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={5}
+                            value={numberNoiseMimicRate}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setNumberNoiseMimicRate(val);
+                              void selectGame("number", {
+                                number: {
+                                  targetCount: numberTargetCount,
+                                  itemLifetimeMs: numberItemLifetimeMs,
+                                  winCondition: numberWinCondition,
+                                  noiseMimicRate: val,
+                                  bombMimicRate: numberBombMimicRate
+                                }
+                              });
+                            }}
+                            disabled={myReady}
+                            className="flex-1 accent-amber-500"
+                          />
+                          <span className="w-12 h-10 flex items-center justify-center rounded-xl bg-slate-800 font-bold text-amber-300 border border-slate-700">{numberNoiseMimicRate}%</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <p className="text-xs text-slate-400">Tỉ lệ bom giả dạng mục tiêu (%):</p>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={5}
+                            value={numberBombMimicRate}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setNumberBombMimicRate(val);
+                              void selectGame("number", {
+                                number: {
+                                  targetCount: numberTargetCount,
+                                  itemLifetimeMs: numberItemLifetimeMs,
+                                  winCondition: numberWinCondition,
+                                  noiseMimicRate: numberNoiseMimicRate,
+                                  bombMimicRate: val
+                                }
+                              });
+                            }}
+                            disabled={myReady}
+                            className="flex-1 accent-red-500"
+                          />
+                          <span className="w-12 h-10 flex items-center justify-center rounded-xl bg-slate-800 font-bold text-rose-300 border border-slate-700">{numberBombMimicRate}%</span>
+                        </div>
+                      </div>
                     </div>
                   )}
 
-                  {selectedGame !== "rps" && selectedGame !== "memory" && selectedGame !== "number" && (
+                  {selectedGame === "mathking" && (
+                    <div className="space-y-6">
+                      <div className="space-y-3">
+                        <p className="text-xs text-slate-400">Cấp độ lớp:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {["1", "2", "3", "4", "5"].map((grade) => (
+                            <button
+                              key={grade}
+                              onClick={() => {
+                                const next = grade as "1" | "2" | "3" | "4" | "5";
+                                setMathGrade(next);
+                                void selectGame("mathking", { mathking: { grade: next, targetScore: mathTargetScore, answerTimeSec: mathAnswerTimeSec } });
+                              }}
+                              disabled={myReady}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${mathGrade === grade ? "bg-indigo-500 text-white" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                            >
+                              Lớp {grade}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-amber-300/90">Ưu tiên nội dung lớp 1, các lớp cao hơn đang mở rộng dần.</p>
+                      </div>
+
+                      <div className="space-y-3">
+                        <p className="text-xs text-slate-400">Điểm chiến thắng:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[5, 10, 15, 20].map((target) => (
+                            <button
+                              key={target}
+                              onClick={() => {
+                                const next = target as 5 | 10 | 15 | 20;
+                                setMathTargetScore(next);
+                                void selectGame("mathking", { mathking: { grade: mathGrade, targetScore: next, answerTimeSec: mathAnswerTimeSec } });
+                              }}
+                              disabled={myReady}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${mathTargetScore === target ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                            >
+                              {target} điểm
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <p className="text-xs text-slate-400">Thời gian trả lời mỗi câu (giây):</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[10, 15, 20, 30].map((sec) => (
+                            <button
+                              key={sec}
+                              onClick={() => {
+                                setMathAnswerTimeSec(sec);
+                                void selectGame("mathking", { mathking: { grade: mathGrade, targetScore: mathTargetScore, answerTimeSec: sec } });
+                              }}
+                              disabled={myReady}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${mathAnswerTimeSec === sec ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                            >
+                              {sec}s
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedGame !== "rps" && selectedGame !== "memory" && selectedGame !== "number" && selectedGame !== "mathking" && (
                     <p className="text-xs text-slate-500 italic">Trò chơi này không cần cấu hình thêm.</p>
                   )}
                 </div>

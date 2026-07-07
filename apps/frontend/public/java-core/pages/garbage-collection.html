@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garbage Collection - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; Garbage
+                    Collection
+                </div>
+                <h1>Garbage Collection (Thu gom rác)</h1>
+
+                <section id="what-is">
+                    <h2>Garbage Collection là gì?</h2>
+                    <p><strong>Garbage Collection (GC)</strong> là tiến trình tự động thu hồi bộ nhớ Heap mà các đối
+                        tượng không còn được tham chiếu đến đang chiếm giữ. Đây là một trong những tính năng quan trọng
+                        nhất của JVM, giúp lập trình viên không phải quản lý bộ nhớ thủ công (như trong C/C++).</p>
+                </section>
+
+                <section id="generations">
+                    <h2>Bộ nhớ Heap và Các thế hệ</h2>
+                    <p>JVM chia bộ nhớ Heap thành các khu vực (thế hệ):</p>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>Young Generation (Thế hệ trẻ):</strong> Nơi các đối tượng mới được tạo. GC ở đây
+                            (Minor GC) xảy ra thường xuyên và nhanh.</li>
+                        <li><strong>Old Generation (Thế hệ già / Tenured):</strong> Chứa các đối tượng "sống sót" qua
+                            nhiều lần Minor GC. GC ở đây (Major/Full GC) ít xảy ra nhưng mất nhiều thời gian hơn.</li>
+                    </ul>
+                </section>
+
+                <section id="collectors">
+                    <h2>Các loại Garbage Collector trong JDK</h2>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>Serial GC:</strong> Đơn giản, dùng một luồng đơn. Phù hợp ứng dụng nhỏ.</li>
+                        <li><strong>Parallel GC:</strong> Dùng nhiều luồng cho Young GC. Mặc định trong Java 8.</li>
+                        <li><strong>G1 GC (Garbage First):</strong> Cân bằng giữa throughput và độ trễ. Mặc định từ Java
+                            9+.</li>
+                        <li><strong>ZGC &amp; Shenandoah:</strong> GC hiện đại với độ trễ cực thấp (submillisecond), phù
+                            hợp cho ứng dụng lớn.</li>
+                    </ul>
+                </section>
+
+                <section id="tips">
+                    <h2>Mẹo tối ưu GC</h2>
+                    <ul style="margin-left: 20px;">
+                        <li>Tránh tạo quá nhiều đối tượng tạm thời không cần thiết trong vòng lặp.</li>
+                        <li>Tránh memory leak bằng cách đóng resource đúng cách (dùng <code>try-with-resources</code>).
+                        </li>
+                        <li>Thiết lập kích thước Heap phù hợp: <code>-Xms</code> (min), <code>-Xmx</code> (max).</li>
+                    </ul>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="modules.html">&lt; Modules</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="virtual-threads.html">Virtual Threads &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#what-is">GC là gì?</a></li>
+                    <li><a href="#generations">Heap và thế hệ</a></li>
+                    <li><a href="#collectors">Loại GC</a></li>
+                    <li><a href="#tips">Mẹo tối ưu</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

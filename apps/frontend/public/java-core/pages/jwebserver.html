@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWebserver - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; JWebserver</div>
+                <h1>JWebserver - Java Simple Web Server</h1>
+                <section id="intro">
+                    <h2>JWebserver là gì?</h2>
+                    <p>Được giới thiệu trong Java 18, <code>jwebserver</code> là một web server HTTP đơn giản tích hợp
+                        trong JDK, được thiết kế cho mục đích <strong>prototype, testing và debugging</strong>. Nó phục
+                        vụ các tệp tĩnh (static files) từ thư mục hiện tại.</p>
+                </section>
+                <section id="usage">
+                    <h2>Cách sử dụng</h2>
+                    <div class="code-block">
+                        <pre><code># Chạy web server trên cổng 8000 (mặc định)
+jwebserver
+
+# Chỉ định cổng và thư mục
+jwebserver -p 9090 -d /path/to/directory
+
+# Truy cập: http://localhost:8000</code></pre>
+                    </div>
+                    <p>Server sẽ phục vụ tất cả các tệp trong thư mục được chỉ định và ghi lại mỗi request vào console.
+                    </p>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="jfr.html">&lt; JDK Flight
+                            Recorder</a></div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="complementary-tools.html">Công cụ bổ sung &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">JWebserver là gì?</a></li>
+                    <li><a href="#usage">Cách dùng</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

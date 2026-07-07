@@ -1,8 +1,11 @@
+// @ts-nocheck
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import next from "next";
+import express from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
@@ -11,6 +14,10 @@ import { createLiXiExpressApp } from "./src/li-xi-nang-cao/app";
 import { RoomService as LiXiRoomService } from "./src/li-xi-nang-cao/services/room.service";
 import { registerLiXiNamespace } from "./src/li-xi-nang-cao/socket";
 import { startKeepAlive } from "./src/lib/keep-alive";
+import { getStockAutoRefreshStatus, startStockAutoRefreshWorker } from "./src/lib/stock-auto-refresh";
+import { registerGpsTracker } from "./src/gps-tracker";
+import { registerCoTyPhuNamespace } from "./src/co-ty-phu/socket/register-co-ty-phu";
+import { registerFitnessGameNamespace } from "./src/fitness-game/socket";
 import type {
   AddSongPayload,
   ClientToServerEvents,
@@ -41,6 +48,18 @@ import type {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const require = createRequire(import.meta.url);
+const RacingGameRoom = require(resolve(__dirname, "../../racing-game/server/GameRoom.js"));
+const racingConfigCache = require(resolve(__dirname, "../../racing-game/server/configCache.js"));
+
+const resolveExistingPath = (candidates: string[]): string | null => {
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+};
 const envCandidates = [
   resolve(__dirname, ".env"),
   resolve(__dirname, ".env.local"),
@@ -107,6 +126,7 @@ type KaraokeSocket = Parameters<Server<ClientToServerEvents, ServerToClientEvent
   : never;
 
 const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const racingChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 const generateRoomCode = (): string => {
   let code = "";
@@ -114,6 +134,14 @@ const generateRoomCode = (): string => {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
+};
+
+const generateRacingRoomCode = (): string => {
+  let code = "";
+  for (let i = 0; i < 4; i += 1) {
+    code += racingChars.charAt(Math.floor(Math.random() * racingChars.length));
+  }
+  return racingRooms.has(code) ? generateRacingRoomCode() : code;
 };
 
 interface InternalRoom {
@@ -127,6 +155,48 @@ interface InternalRoom {
 }
 
 const rooms = new Map<string, InternalRoom>();
+const racingRooms = new Map<string, any>();
+const racingPlayerSessionByRoom = new Map<string, Map<string, string>>();
+const racingSocketToSession = new Map<string, { roomCode: string; sessionToken: string }>();
+const racingDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const RACING_RECONNECT_GRACE_MS = 60_000;
+
+const getRacingSessionMap = (roomCode: string): Map<string, string> => {
+  const code = roomCode.toUpperCase();
+  const existing = racingPlayerSessionByRoom.get(code);
+  if (existing) return existing;
+  const next = new Map<string, string>();
+  racingPlayerSessionByRoom.set(code, next);
+  return next;
+};
+
+const racingTimerKey = (roomCode: string, sessionToken: string): string => `${roomCode.toUpperCase()}:${sessionToken}`;
+
+const clearRacingDisconnectTimer = (roomCode: string, sessionToken: string): void => {
+  const key = racingTimerKey(roomCode, sessionToken);
+  const timer = racingDisconnectTimers.get(key);
+  if (timer) {
+    clearTimeout(timer);
+    racingDisconnectTimers.delete(key);
+  }
+};
+
+const cleanupRacingRoomSessionRefs = (roomCode: string): void => {
+  const code = roomCode.toUpperCase();
+  racingPlayerSessionByRoom.delete(code);
+  for (const [socketId, ref] of racingSocketToSession.entries()) {
+    if (ref.roomCode === code) {
+      racingSocketToSession.delete(socketId);
+    }
+  }
+  for (const key of racingDisconnectTimers.keys()) {
+    if (key.startsWith(`${code}:`)) {
+      const timer = racingDisconnectTimers.get(key);
+      if (timer) clearTimeout(timer);
+      racingDisconnectTimers.delete(key);
+    }
+  }
+};
 
 const roomState = (room: InternalRoom): RoomState => ({
   roomCode: room.roomCode,
@@ -170,6 +240,31 @@ interface LotoInternalRoom {
 }
 
 const lotoRooms = new Map<string, LotoInternalRoom>();
+
+// ── HUD Remote Control room data ──
+
+interface HudInternalRoom {
+  roomCode: string;
+  state: {
+    roadType: "manual";
+    zone: "residential" | "outside";
+    manualMax: number;
+    offset: number;
+    mode: "car" | "moto";
+  };
+  createdAt: string;
+}
+
+const hudRooms = new Map<string, HudInternalRoom>();
+
+const generateHudRoomCode = (): string => {
+  const hudChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 4; i++) {
+    code += hudChars.charAt(Math.floor(Math.random() * hudChars.length));
+  }
+  return hudRooms.has(code) ? generateHudRoomCode() : code;
+};
 
 const computeNearWin = (member: LotoMember, calledNumbers: number[]): { waitingNumber: number }[] => {
   if (!member.board || !member.ready) return [];
@@ -234,19 +329,83 @@ const liXiRoomService = new LiXiRoomService();
 
 app.prepare().then(() => {
   const expressApp = createLiXiExpressApp(liXiRoomService);
+  const racingPublicPath =
+    resolveExistingPath([
+      resolve(__dirname, "../../racing-game/public"),
+      resolve(process.cwd(), "racing-game/public")
+    ]) ?? resolve(__dirname, "../../racing-game/public");
+  const phaserDistPath =
+    resolveExistingPath([
+      resolve(__dirname, "node_modules/phaser/dist"),
+      resolve(__dirname, "../../node_modules/phaser/dist"),
+      resolve(process.cwd(), "node_modules/phaser/dist"),
+      resolve(process.cwd(), "apps/frontend/node_modules/phaser/dist")
+    ]) ?? resolve(__dirname, "../../node_modules/phaser/dist");
+
   expressApp.get("/health", (req, res) => res.send("OK"));
+  expressApp.get("/api/racing/config", (req, res) => {
+    res.json({ config: racingConfigCache.getConfig() });
+  });
+  expressApp.get("/api/config", (req, res, next) => {
+    if (!String(req.headers.referer ?? "").includes("/racing-game")) {
+      next();
+      return;
+    }
+    res.json({ config: racingConfigCache.getConfig() });
+  });
+  expressApp.post("/api/racing/config", (req, res) => {
+    try {
+      const patch = req.body && req.body.config;
+      const nextConfig = racingConfigCache.updateConfig(patch || {});
+      res.json({ ok: true, config: nextConfig });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Invalid config payload" });
+    }
+  });
+  expressApp.post("/api/config", (req, res, next) => {
+    if (!String(req.headers.referer ?? "").includes("/racing-game")) {
+      next();
+      return;
+    }
+    try {
+      const patch = req.body && req.body.config;
+      const nextConfig = racingConfigCache.updateConfig(patch || {});
+      res.json({ ok: true, config: nextConfig });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Invalid config payload" });
+    }
+  });
+  expressApp.get("/racing-game", (_req, res) => {
+    res.redirect("/racing-game/index.html");
+  });
+  expressApp.use("/racing-game", express.static(racingPublicPath));
+  expressApp.use("/vendor/phaser", express.static(phaserDistPath));
+  expressApp.use("/racing-game/vendor/phaser", express.static(phaserDistPath));
+  expressApp.get("/api/stocks/worker-status", (_req, res) => {
+    res.json({
+      ok: true,
+      data: getStockAutoRefreshStatus()
+    });
+  });
+
+  registerGpsTracker(null as any, expressApp);
+
   expressApp.all("*", (req, res) => handle(req, res));
   const httpServer = createServer(expressApp);
 
   // Start Render Keep-Alive cron (14 mins)
   startKeepAlive();
+  startStockAutoRefreshWorker();
 
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     cors: { origin: true, methods: ["GET", "POST"] },
-    transports: ["websocket", "polling"],
+    transports: ["polling", "websocket"],
     maxHttpBufferSize: Number(process.env.SOCKET_MAX_HTTP_BUFFER_SIZE ?? 20 * 1024 * 1024)
   });
   registerLiXiNamespace(io.of("/lixi"), liXiRoomService);
+  registerCoTyPhuNamespace(io.of("/co-ty-phu"));
+  registerFitnessGameNamespace(io.of("/fitness-game"));
+  registerGpsTracker(io as any, null as any); // Bind socket ONLY after HTTP server starts
   setInterval(() => liXiRoomService.cleanupExpiredRooms(Date.now()), 5 * 60 * 1000);
 
   const emitRoomState = (roomCode: string): void => {
@@ -260,6 +419,7 @@ app.prepare().then(() => {
   };
 
   io.on("connection", (socket: KaraokeSocket) => {
+    const anySocket = socket as any;
     socket.on("create_room", (payload, ack) => {
       try {
         const parsed = createRoomSchema.parse(payload);
@@ -944,6 +1104,237 @@ app.prepare().then(() => {
       }
     });
 
+    // Racing game (integrated from /racing-game module)
+    anySocket.on("create-room", ({ playerName, vehicleType, sessionToken }: { playerName: string; vehicleType: string; sessionToken?: string }) => {
+      const roomCode = generateRacingRoomCode();
+      const room = new RacingGameRoom(roomCode, io as any);
+      racingRooms.set(roomCode, room);
+      room.addPlayer(anySocket, playerName, vehicleType);
+      anySocket.join(roomCode);
+      const token = String(sessionToken || randomUUID());
+      const sessions = getRacingSessionMap(roomCode);
+      sessions.set(token, anySocket.id);
+      racingSocketToSession.set(anySocket.id, { roomCode, sessionToken: token });
+      clearRacingDisconnectTimer(roomCode, token);
+      anySocket.emit("room-created", {
+        roomCode,
+        playerId: anySocket.id,
+        players: room.getPlayersInfo(),
+        role: "host",
+        sessionToken: token
+      });
+    });
+
+    anySocket.on("join-room", ({ roomCode, playerName, vehicleType, sessionToken }: { roomCode: string; playerName: string; vehicleType: string; sessionToken?: string }) => {
+      const code = String(roomCode ?? "").trim().toUpperCase();
+      const room = racingRooms.get(code);
+      if (!room) {
+        anySocket.emit("error-msg", { message: "Phòng không tồn tại!" });
+        return;
+      }
+      const token = String(sessionToken || randomUUID());
+      const sessions = getRacingSessionMap(code);
+      const existingPlayerId = sessions.get(token);
+      if (existingPlayerId && room.players?.has(existingPlayerId)) {
+        clearRacingDisconnectTimer(code, token);
+        const existingPlayer = room.players.get(existingPlayerId);
+        room.players.delete(existingPlayerId);
+        existingPlayer.id = anySocket.id;
+        if (playerName && String(playerName).trim()) {
+          existingPlayer.name = String(playerName).trim();
+        }
+        if (vehicleType) {
+          existingPlayer.vehicleType = vehicleType;
+        }
+        room.players.set(anySocket.id, existingPlayer);
+        if (room.hostId === existingPlayerId) {
+          room.hostId = anySocket.id;
+        }
+        sessions.set(token, anySocket.id);
+        racingSocketToSession.set(anySocket.id, { roomCode: code, sessionToken: token });
+        anySocket.join(code);
+        const role = room.hostId === anySocket.id ? "host" : "guest";
+        anySocket.emit("room-joined", {
+          roomCode: code,
+          playerId: anySocket.id,
+          players: room.getPlayersInfo(),
+          role,
+          sessionToken: token
+        });
+        io.to(code).emit("player-updated", { players: room.getPlayersInfo() });
+        return;
+      }
+      if (room.state !== "WAITING" && room.state !== "FINISHED") {
+        anySocket.emit("error-msg", { message: "Trận đấu đã bắt đầu!" });
+        return;
+      }
+      if (room.getPlayerCount() >= room.config.maxPlayers) {
+        anySocket.emit("error-msg", { message: "Phòng đã đầy!" });
+        return;
+      }
+      room.addPlayer(anySocket, playerName, vehicleType);
+      anySocket.join(code);
+      sessions.set(token, anySocket.id);
+      racingSocketToSession.set(anySocket.id, { roomCode: code, sessionToken: token });
+      clearRacingDisconnectTimer(code, token);
+      anySocket.emit("room-joined", {
+        roomCode: code,
+        playerId: anySocket.id,
+        players: room.getPlayersInfo(),
+        role: room.hostId === anySocket.id ? "host" : "guest",
+        sessionToken: token
+      });
+      anySocket.to(code).emit("player-joined", {
+        players: room.getPlayersInfo()
+      });
+    });
+
+    anySocket.on("set-vehicle", ({ roomCode, vehicleType }: { roomCode: string; vehicleType: string }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      if (room.state === "RACING" || room.state === "QUESTION" || room.state === "COUNTDOWN") return;
+      room.setPlayerVehicle(anySocket.id, vehicleType);
+      io.to(room.roomCode).emit("player-updated", { players: room.getPlayersInfo() });
+    });
+
+    anySocket.on("start-game", ({ roomCode }: { roomCode: string }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      if (room.getPlayerCount() < 1) return;
+      if (room.hostId !== anySocket.id) return;
+      room.startGame();
+    });
+
+    anySocket.on("restart-game", ({ roomCode, vehicleType }: { roomCode: string; vehicleType?: string }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      if (room.hostId !== anySocket.id) return;
+      if (vehicleType) {
+        room.setPlayerVehicle(anySocket.id, vehicleType);
+      }
+      room.startGame();
+    });
+
+    anySocket.on("player-input", ({ roomCode, direction }: { roomCode: string; direction: "left" | "right" }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      room.handleInput(anySocket.id, direction);
+    });
+
+    anySocket.on("obstacle-hit", ({ roomCode, obstacle }: { roomCode: string; obstacle: any }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      room.onObstacleHit(anySocket.id, obstacle);
+    });
+
+    anySocket.on("answer-question", ({ roomCode, answerIndex }: { roomCode: string; answerIndex: number }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      room.handleAnswer(anySocket.id, answerIndex);
+    });
+
+    anySocket.on("question-ready", ({ roomCode, questionId }: { roomCode: string; questionId: string }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      room.handleQuestionReady(anySocket.id, questionId);
+    });
+
+    anySocket.on("leave-room", ({ roomCode }: { roomCode: string }) => {
+      const code = String(roomCode ?? "").trim().toUpperCase();
+      const room = racingRooms.get(code);
+      if (!room) return;
+      const sessionRef = racingSocketToSession.get(anySocket.id);
+      if (sessionRef) {
+        clearRacingDisconnectTimer(sessionRef.roomCode, sessionRef.sessionToken);
+        const sessionMap = getRacingSessionMap(sessionRef.roomCode);
+        sessionMap.delete(sessionRef.sessionToken);
+        racingSocketToSession.delete(anySocket.id);
+      }
+      if (!room.hasPlayer(anySocket.id)) return;
+      room.removePlayer(anySocket.id);
+      anySocket.leave(code);
+      if (room.getPlayerCount() === 0) {
+        room.stop();
+        racingRooms.delete(code);
+        cleanupRacingRoomSessionRefs(code);
+      } else {
+        io.to(code).emit("player-left", { players: room.getPlayersInfo() });
+      }
+      anySocket.emit("left-room", { roomCode: code });
+    });
+
+    anySocket.on("close-room", ({ roomCode }: { roomCode: string }) => {
+      const code = String(roomCode ?? "").trim().toUpperCase();
+      const room = racingRooms.get(code);
+      if (!room) return;
+      if (room.hostId !== anySocket.id) {
+        anySocket.emit("error-msg", { message: "Chỉ chủ phòng mới có thể đóng phòng." });
+        return;
+      }
+      room.stop();
+      io.to(code).emit("room-closed", { roomCode: code, message: "Chủ phòng đã đóng phòng." });
+      racingRooms.delete(code);
+      cleanupRacingRoomSessionRefs(code);
+    });
+
+    // ── HUD Remote Control socket handlers ──
+
+    anySocket.on("hud_create_room", (ack: any) => {
+      try {
+        const roomCode = generateHudRoomCode();
+        const room: HudInternalRoom = {
+          roomCode,
+          state: { roadType: "manual", zone: "residential", manualMax: 60, offset: 0, mode: "moto" },
+          createdAt: new Date().toISOString(),
+        };
+        hudRooms.set(roomCode, room);
+        anySocket.join(`hud:${roomCode}`);
+        // Auto-cleanup 12h
+        setTimeout(() => hudRooms.delete(roomCode), 12 * 60 * 60 * 1000);
+        if (typeof ack === "function") ack({ ok: true, roomCode, state: room.state });
+      } catch (err) {
+        if (typeof ack === "function") ack({ ok: false, message: err instanceof Error ? err.message : "Error" });
+      }
+    });
+
+    anySocket.on("hud_join_room", (payload: { roomCode: string }, ack: any) => {
+      try {
+        const roomCode = String(payload?.roomCode ?? "").toUpperCase().trim();
+        const room = hudRooms.get(roomCode);
+        if (!room) {
+          if (typeof ack === "function") ack({ ok: false, message: "Không tìm thấy phòng HUD. Kiểm tra lại mã phòng." });
+          return;
+        }
+        anySocket.join(`hud:${roomCode}`);
+        if (typeof ack === "function") ack({ ok: true, state: room.state });
+      } catch (err) {
+        if (typeof ack === "function") ack({ ok: false, message: err instanceof Error ? err.message : "Error" });
+      }
+    });
+
+    anySocket.on("hud_update_state", (payload: { roomCode: string; state: Partial<HudInternalRoom["state"]> }, ack: any) => {
+      try {
+        const roomCode = String(payload?.roomCode ?? "").toUpperCase().trim();
+        const room = hudRooms.get(roomCode);
+        if (!room) {
+          if (typeof ack === "function") ack({ ok: false, message: "Phòng HUD không tồn tại." });
+          return;
+        }
+        room.state = { ...room.state, ...payload.state };
+        // Broadcast đến các thiết bị KHÁC trong phòng (loại trừ sender để tránh loop)
+        anySocket.to(`hud:${roomCode}`).emit("hud_state_updated" as any, { state: room.state });
+        if (typeof ack === "function") ack({ ok: true });
+      } catch (err) {
+        if (typeof ack === "function") ack({ ok: false, message: err instanceof Error ? err.message : "Error" });
+      }
+    });
+
+    anySocket.on("hud_leave_room", (payload: { roomCode: string }, ack: any) => {
+      const roomCode = String(payload?.roomCode ?? "").toUpperCase().trim();
+      anySocket.leave(`hud:${roomCode}`);
+      if (typeof ack === "function") ack({ ok: true });
+    });
+
     socket.on("disconnect", () => {
       const user = socket.data.user;
       if (user && (user.role === "host" || user.role === "guest")) {
@@ -957,6 +1348,57 @@ app.prepare().then(() => {
             emitLotoState(roomCode);
           }
         }
+      }
+    });
+
+    anySocket.on("disconnect", () => {
+      const sessionRef = racingSocketToSession.get(anySocket.id);
+      if (sessionRef) {
+        racingSocketToSession.delete(anySocket.id);
+        const { roomCode, sessionToken } = sessionRef;
+        const key = racingTimerKey(roomCode, sessionToken);
+        clearRacingDisconnectTimer(roomCode, sessionToken);
+        const timer = setTimeout(() => {
+          const room = racingRooms.get(roomCode);
+          if (!room) {
+            cleanupRacingRoomSessionRefs(roomCode);
+            return;
+          }
+          const sessionMap = getRacingSessionMap(roomCode);
+          const playerId = sessionMap.get(sessionToken);
+          if (!playerId || !room.hasPlayer(playerId)) {
+            return;
+          }
+          room.removePlayer(playerId);
+          sessionMap.delete(sessionToken);
+          if (room.getPlayerCount() === 0) {
+            room.stop();
+            racingRooms.delete(roomCode);
+            cleanupRacingRoomSessionRefs(roomCode);
+          } else {
+            io.to(roomCode).emit("player-left", {
+              players: room.getPlayersInfo()
+            });
+          }
+          racingDisconnectTimers.delete(key);
+        }, RACING_RECONNECT_GRACE_MS);
+        racingDisconnectTimers.set(key, timer);
+        return;
+      }
+
+      for (const [code, room] of racingRooms.entries()) {
+        if (!room.hasPlayer(anySocket.id)) continue;
+        room.removePlayer(anySocket.id);
+        if (room.getPlayerCount() === 0) {
+          room.stop();
+          racingRooms.delete(code);
+          cleanupRacingRoomSessionRefs(code);
+        } else {
+          io.to(code).emit("player-left", {
+            players: room.getPlayersInfo()
+          });
+        }
+        break;
       }
     });
   });

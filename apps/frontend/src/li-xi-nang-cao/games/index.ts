@@ -5,7 +5,7 @@ import { rpsGame } from "./rps.game";
 import { numberGame } from "./number.game";
 import { shakeGame } from "./shake.game";
 import { colorGame } from "./color.game";
-import { racingGame } from "./racing.game";
+import { mathKingGame } from "./mathking.game";
 
 export const gameEngines: Record<GameType, GameEngine> = {
   reaction: reactionGame,
@@ -14,5 +14,5 @@ export const gameEngines: Record<GameType, GameEngine> = {
   number: numberGame,
   shake: shakeGame,
   color: colorGame,
-  racing: racingGame
+  mathking: mathKingGame,
 };

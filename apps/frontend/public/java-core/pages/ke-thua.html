@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kế thừa - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; Kế thừa
+                </div>
+                <h1>Kế thừa trong Java</h1>
+                <p>Kế thừa cho phép bạn xây dựng các lớp mới dựa trên các lớp hiện có, tái sử dụng và mở rộng hành vi
+                    của chúng.</p>
+
+                <section id="intro">
+                    <h2>Kế thừa là gì?</h2>
+                    <p>Trong Java, mỗi lớp đều được phép có một <strong>lớp cha (superclass)</strong>. Lớp con
+                        <strong>kế thừa (inherit)</strong> tất cả các trường và phương thức không có phạm vi truy cập
+                        <code>private</code> từ lớp cha. Để kế thừa từ một lớp, ta dùng từ khóa <code>extends</code>:
+                    </p>
+                    <div class="code-block">
+                        <pre><code>class MountainBike extends Bicycle {
+    // MountainBike có thêm các trường và phương thức của riêng nó
+    public int seatHeight;
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="override">
+                    <h2>Ghi đè phương thức (@Override)</h2>
+                    <p>Lớp con có thể <strong>ghi đè (override)</strong> một phương thức được kế thừa từ lớp cha, cung
+                        cấp một triển khai mới. Nên dùng annotation <code>@Override</code> để trình biên dịch kiểm tra.
+                    </p>
+                    <div class="code-block">
+                        <pre><code>public class Animal {
+    public String makeSound() {
+        return "Some sound";
+    }
+}
+
+public class Dog extends Animal {
+    @Override
+    public String makeSound() {
+        return "Woof!";
+    }
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="super">
+                    <h2>Từ khóa super</h2>
+                    <p>Từ khóa <code>super</code> cho phép lớp con:</p>
+                    <ul style="margin-left: 20px;">
+                        <li>Gọi constructor của lớp cha: <code>super()</code></li>
+                        <li>Truy cập phương thức của lớp cha: <code>super.methodName()</code></li>
+                    </ul>
+                </section>
+
+                <section id="final">
+                    <h2>Từ khóa final</h2>
+                    <p>Bạn có thể khai báo một lớp là <code>final</code> để ngăn không cho lớp đó bị kế thừa. Điều này
+                        thường được dùng để bảo vệ tính bất biến của một lớp (ví dụ: lớp <code>String</code>).</p>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="lop-va-doi-tuong.html">&lt; Lớp và Đối tượng</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="interface.html">Interface &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Kế thừa là gì?</a></li>
+                    <li><a href="#override">Ghi đè phương thức</a></li>
+                    <li><a href="#super">Từ khóa super</a></li>
+                    <li><a href="#final">Từ khóa final</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

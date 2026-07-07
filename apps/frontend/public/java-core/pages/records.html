@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Records - Mô hình dữ liệu bất biến - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; Records
+                </div>
+                <h1>Records - Mô hình hóa dữ liệu bất biến</h1>
+
+                <section id="intro">
+                    <h2>Vấn đề với lớp dữ liệu thông thường</h2>
+                    <p>Khi tạo một lớp chỉ để lưu dữ liệu (ví dụ: <code>Point</code> với tọa độ x, y), bạn phải viết rất
+                        nhiều mã boilerplate: constructor, getters, <code>equals()</code>, <code>hashCode()</code>,
+                        <code>toString()</code>. <strong>Records</strong>, ra đời từ Java SE 16, giải quyết vấn đề này.
+                    </p>
+                </section>
+
+                <section id="syntax">
+                    <h2>Cú pháp của Record</h2>
+                    <p>Bạn chỉ cần khai báo tên record và các <strong>thành phần (components)</strong> của nó. Java sẽ
+                        tự động tạo ra tất cả constructor, accessor, <code>equals()</code>, <code>hashCode()</code>, và
+                        <code>toString()</code>.</p>
+                    <div class="code-block">
+                        <pre><code>// Thay vì một lớp dài dòng, giờ chỉ cần:
+public record Point(double x, double y) {}</code></pre>
+                    </div>
+                    <p>Sử dụng record:</p>
+                    <div class="code-block">
+                        <pre><code>Point p = new Point(3.0, 4.0);
+IO.println(p.x()); // 3.0
+IO.println(p);     // Point[x=3.0, y=4.0]</code></pre>
+                    </div>
+                </section>
+
+                <section id="immutable">
+                    <h2>Tính bất biến (Immutability)</h2>
+                    <p>Tất cả các trường trong record đều là <code>private final</code> — nghĩa là chúng không thể thay
+                        đổi sau khi được tạo (bất biến). Đây là thiết kế có chủ đích để đảm bảo an toàn dữ liệu.</p>
+                </section>
+
+                <section id="restrictions">
+                    <h2>Những điều không thể làm với Record</h2>
+                    <ul style="margin-left: 20px;">
+                        <li>Không thể khai báo trường instance thêm.</li>
+                        <li>Không thể mở rộng (extend) lớp khác (records ngầm extend <code>java.lang.Record</code>).
+                        </li>
+                        <li>Không thể bị kế thừa (records là <code>final</code>).</li>
+                    </ul>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="lop-va-doi-tuong.html">&lt; Lớp và Đối tượng</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="ke-thua.html">Kế thừa &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Vấn đề cần giải quyết</a></li>
+                    <li><a href="#syntax">Cú pháp</a></li>
+                    <li><a href="#immutable">Tính bất biến</a></li>
+                    <li><a href="#restrictions">Hạn chế</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

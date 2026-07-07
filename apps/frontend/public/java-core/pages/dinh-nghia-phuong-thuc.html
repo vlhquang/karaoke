@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Định nghĩa phương thức - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; <a
+                        href="lop-va-doi-tuong.html">Lớp và Đối tượng</a> &gt; Định nghĩa phương thức
+                </div>
+                <h1>Định nghĩa phương thức (Defining Methods)</h1>
+
+                <section id="anatomy">
+                    <h2>Cấu trúc của một phương thức</h2>
+                    <p>Một phương thức (method) trong Java có các thành phần:</p>
+                    <div class="code-block">
+                        <pre><code>// [phạm vi truy cập] [kiểu trả về] [tên phương thức]([tham số])
+public double calculateAnswer(double wingSpan, int numberOfEngines) {
+    // thân phương thức
+    return wingSpan * numberOfEngines;
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="naming">
+                    <h2>Quy ước đặt tên phương thức</h2>
+                    <ul style="margin-left: 20px;">
+                        <li>Bắt đầu bằng chữ thường, dùng camelCase.</li>
+                        <li>Để dễ đọc, nên dùng động từ ở đầu: <code>run()</code>, <code>getColor()</code>,
+                            <code>setName(name)</code>.</li>
+                    </ul>
+                </section>
+
+                <section id="overloading">
+                    <h2>Nạp chồng phương thức (Overloading)</h2>
+                    <p>Java cho phép bạn có nhiều phương thức trùng tên trong cùng một lớp, miễn là chúng có tham số
+                        khác nhau. Trình biên dịch sẽ phân biệt chúng dựa trên chữ ký (signature).</p>
+                    <div class="code-block">
+                        <pre><code>public class DataProcessor {
+    public void process(String s) { /* ... */ }
+    public void process(int i) { /* ... */ }
+    public void process(String s, int i) { /* ... */ }
+}</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="tao-lop.html">&lt; Tạo lớp</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="constructor.html">Constructor &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#anatomy">Cấu trúc phương thức</a></li>
+                    <li><a href="#naming">Quy ước đặt tên</a></li>
+                    <li><a href="#overloading">Nạp chồng phương thức</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

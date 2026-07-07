@@ -4,6 +4,9 @@ const config: Config = {
   content: ["./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        digital: ["var(--font-orbitron)", "monospace"],
+      },
       colors: {
         brand: {
           bg: "#0b1220",

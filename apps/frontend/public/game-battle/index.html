@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quiz Survival: Highway Defense</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <script type="module" crossorigin src="./assets/index-B8VliqFn.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-9gIbqcGC.css">
+  </head>
+  <body>
+    <div id="game-container">
+      <canvas id="gameCanvas"></canvas>
+      
+      <!-- HUD -->
+      <div id="hud">
+        <div class="stats">
+          <div class="health-bar-container">
+            <div id="health-bar"></div>
+            <span id="health-text">100/100 HP</span>
+          </div>
+          <div class="money-container">
+            💰 <span id="money">0</span>
+          </div>
+          <div class="wave-container">
+            Wave: <span id="wave">1</span>
+          </div>
+        </div>
+        
+        <button id="btn-open-shop-icon" class="shop-icon-btn">🛒</button>
+      </div>
+
+      <!-- Quiz Popup -->
+      <div id="quiz-overlay" class="overlay hidden">
+        <div class="popup-box quiz-box">
+          <h2>Trả lời câu hỏi để nhận thưởng!</h2>
+          <p id="quiz-question" class="question-text">Câu hỏi sẽ hiện ở đây?</p>
+          <div id="quiz-answers" class="answers-grid">
+            <!-- Answers will be injected here -->
+          </div>
+          <div id="quiz-timer" class="timer-bar">
+            <div id="quiz-timer-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Result Popup -->
+      <div id="result-overlay" class="overlay hidden">
+        <div class="popup-box result-box" id="result-box">
+          <h2 id="result-title">Chính xác!</h2>
+          <p id="result-desc">Bạn nhận được 100$</p>
+          <button id="btn-continue" class="btn primary">Tiếp tục</button>
+        </div>
+      </div>
+
+      <!-- Upgrade Shop Popup -->
+      <div id="shop-overlay" class="overlay hidden">
+        <div class="popup-box shop-box">
+          <h2>Cửa Hàng Nâng Cấp</h2>
+          <p class="shop-balance">Tiền của bạn: <span id="shop-money">0</span>$</p>
+          <div class="upgrades-grid">
+            <div class="upgrade-item" data-id="dmg">
+              <h3>Tăng Sát Thương</h3>
+              <p>Level: <span id="lvl-dmg">1</span></p>
+              <button class="btn buy-btn" id="buy-dmg">Mua (100$)</button>
+            </div>
+            <div class="upgrade-item" data-id="rate">
+              <h3>Tốc độ bắn</h3>
+              <p>Level: <span id="lvl-rate">1</span></p>
+              <button class="btn buy-btn" id="buy-rate">Mua (150$)</button>
+            </div>
+            <div class="upgrade-item" data-id="hp">
+              <h3>Hồi Máu</h3>
+              <p>+50 HP</p>
+              <button class="btn buy-btn" id="buy-hp">Mua (50$)</button>
+            </div>
+            <div class="upgrade-item" data-id="shotgun">
+              <h3>Súng Shotgun</h3>
+              <p>Bắn chùm</p>
+              <button class="btn buy-btn" id="buy-shotgun">Mua (500$)</button>
+            </div>
+            <div class="upgrade-item" data-id="smg">
+              <h3>Súng SMG</h3>
+              <p>Bắn siêu nhanh</p>
+              <button class="btn buy-btn" id="buy-smg">Mua (800$)</button>
+            </div>
+            <div class="upgrade-item" data-id="wall">
+              <h3>Tường Gai</h3>
+              <p>Chặn quái vật (Wall)</p>
+              <button class="btn buy-btn" id="buy-wall">Mua (150$)</button>
+            </div>
+            <div class="upgrade-item" data-id="turret">
+              <h3>Súng Phụ</h3>
+              <p>Tự động bắn (Turret)</p>
+              <button class="btn buy-btn" id="buy-turret">Mua (300$)</button>
+            </div>
+          </div>
+          <button id="btn-close-shop" class="btn secondary">Đóng</button>
+        </div>
+      </div>
+
+      <!-- Game Over Popup -->
+      <div id="gameover-overlay" class="overlay hidden">
+        <div class="popup-box gameover-box">
+          <h1 class="gameover-text">TRÒ CHƠI KẾT THÚC</h1>
+          <p>Bạn đã sóng sót đến Wave: <span id="final-wave">1</span></p>
+          <button id="btn-restart" class="btn primary">Chơi lại</button>
+        </div>
+      </div>
+
+    </div>
+    
+  </body>
+</html>

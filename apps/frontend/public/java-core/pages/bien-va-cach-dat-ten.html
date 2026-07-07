@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tạo biến và Cách đặt tên - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem & Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> > <a href="../index.html">Hướng dẫn</a> > <a
+                        href="ngon-ngu-co-ban.html">Cơ bản về ngôn ngữ Java</a> > Tạo biến và Cách đặt tên
+                </div>
+
+                <h1>Tạo biến và Cách đặt tên</h1>
+
+                <section id="variables">
+                    <h2>Biên (Variables)</h2>
+                    <p>Như bạn đã học ở phần trước, một đối tượng lưu trữ trạng thái của nó trong các <strong>Trường
+                            (fields)</strong>.</p>
+                    <div class="code-block">
+                        <pre><code>int cadence = 0;
+int speed = 0;
+int gear = 1;</code></pre>
+                    </div>
+                    <p>Ngôn ngữ lập trình Java định nghĩa các loại biến sau:</p>
+                    <ul style="margin-left: 20px; margin-bottom: 20px;">
+                        <li><strong>Biến thực thể (Instance Variables - Trường không tĩnh):</strong> Các đối tượng lưu
+                            trữ trạng thái riêng lẻ của chúng trong các "trường không tĩnh" (non-static fields). Giá trị
+                            của chúng là duy nhất cho mỗi thực thể của một lớp (mỗi đối tượng).</li>
+                        <li><strong>Biến lớp (Class Variables - Trường tĩnh):</strong> Là bất kỳ trường nào được khai
+                            báo với từ khóa <code>static</code>. Chỉ có duy nhất một bản sao của biến này tồn tại, bất
+                            kể lớp đó được khởi tạo bao nhiêu lần. Thêm từ khóa <code>final</code> để chỉ thị rằng giá
+                            trị này sẽ không bao giờ thay đổi.</li>
+                        <li><strong>Biến cục bộ (Local Variables):</strong> Một phương thức thường lưu trữ trạng thái
+                            tạm thời của nó trong các biến cục bộ. Chúng chỉ được nhìn thấy bên trong phương thức mà
+                            chúng được khai báo.</li>
+                        <li><strong>Tham số (Parameters):</strong> Ví dụ trong phương thức <code>main</code>:
+                            <code>public static void main(String[] args)</code>. Ở đây, biến <code>args</code> là tham
+                            số của phương thức này. Tham số luôn được phân loại là "biến" chứ không phải "trường".
+                        </li>
+                    </ul>
+                </section>
+
+                <section id="naming">
+                    <h2>Quy tắc đặt tên biến</h2>
+                    <p>Mỗi ngôn ngữ lập trình đều có bộ quy tắc và quy ước riêng để đặt tên, và Java cũng không ngoại
+                        lệ:</p>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>Phân biệt chữ hoa chữ thường:</strong> Tên biến có thể là bất kỳ định danh hợp lệ
+                            nào — một chuỗi ký tự Unicode và chữ số không giới hạn độ dài, bắt đầu bằng một chữ cái, dấu
+                            đô la <code>$</code>, hoặc ký tự gạch dưới <code>_</code>.</li>
+                        <li><strong>Quy ước bắt đầu:</strong> Theo quy ước, bạn nên luôn bắt đầu tên biến bằng một chữ
+                            cái, không phải <code>$</code> hay <code>_</code>. Đặc biệt, dấu đô la thường chỉ xuất hiện
+                            trong mã được tạo tự động.</li>
+                        <li><strong>Không dùng từ khóa:</strong> Tên bạn chọn không được trùng với các từ khóa hoặc từ
+                            dành riêng của Java.</li>
+                        <li><strong>Quy tắc CamelCase:</strong> Nếu tên chỉ gồm một từ, hãy viết thường toàn bộ. Nếu gồm
+                            nhiều từ, hãy viết hoa chữ cái đầu tiên của mỗi từ tiếp theo. Ví dụ: <code>gearRatio</code>,
+                            <code>currentGear</code>.
+                        </li>
+                        <li><strong>Hằng số:</strong> Nếu biến lưu trữ một giá trị không đổi (constant), hãy viết hoa
+                            toàn bộ và phân cách các từ bằng dấu gạch dưới. Ví dụ:
+                            <code>static final int NUM_GEARS = 6</code>.
+                        </li>
+                    </ul>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="ngon-ngu-co-ban.html">
+                            < Cơ bản về ngôn ngữ Java</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="kieu-du-lieu-nguyen-thuy.html">Kiểu dữ liệu nguyên thủy ></a>
+                    </div>
+                </div>
+            </article>
+
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#variables">Các loại biến</a></li>
+                    <li><a href="#naming">Quy tắc đặt tên</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

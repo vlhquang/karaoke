@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream API - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; Stream API
+                </div>
+                <h1>Stream API</h1>
+
+                <section id="intro">
+                    <h2>Stream là gì?</h2>
+                    <p>Một <strong>Stream</strong> đại diện cho một chuỗi các phần tử hỗ trợ các thao tác tổng hợp tuần
+                        tự và song song. Stream API (giới thiệu trong Java 8) giúp xử lý dữ liệu theo phong cách hàm
+                        (functional) một cách ngắn gọn.</p>
+                    <p><strong>Lưu ý:</strong> Stream không phải là cấu trúc dữ liệu; nó không lưu trữ phần tử mà chỉ xử
+                        lý chúng.</p>
+                </section>
+
+                <section id="pipeline">
+                    <h2>Pipeline của Stream</h2>
+                    <p>Một pipeline stream bao gồm 3 phần:</p>
+                    <ol style="margin-left: 20px;">
+                        <li><strong>Nguồn (Source):</strong> Collection, mảng, hàm tạo (generator).</li>
+                        <li><strong>Thao tác trung gian (Intermediate operations):</strong> <code>filter()</code>,
+                            <code>map()</code>, <code>sorted()</code>... Trả về một Stream mới. Chúng là "lazy" (chỉ
+                            thực thi khi cần).</li>
+                        <li><strong>Thao tác kết thúc (Terminal operations):</strong> <code>forEach()</code>,
+                            <code>collect()</code>, <code>count()</code>, <code>findFirst()</code>... Kích hoạt thực thi
+                            pipeline.</li>
+                    </ol>
+                </section>
+
+                <section id="examples">
+                    <h2>Ví dụ thực tế</h2>
+                    <div class="code-block">
+                        <pre><code>List&lt;String&gt; names = List.of("Alice", "Bob", "Charlie", "David", "Anna");
+
+// Lọc, chuyển đổi và thu thập
+List&lt;String&gt; result = names.stream()
+    .filter(name -> name.startsWith("A")) // ["Alice", "Anna"]
+    .map(String::toUpperCase)             // ["ALICE", "ANNA"]
+    .sorted()                              // ["ALICE", "ANNA"]
+    .collect(Collectors.toList());
+
+// Đếm
+long count = names.stream()
+    .filter(name -> name.length() &gt; 4)
+    .count(); // 3 (Alice, Charlie, David)
+
+// Tổng hợp
+int totalLength = names.stream()
+    .mapToInt(String::length)
+    .sum();</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="collections.html">&lt; Collections</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="java-io.html">Java I/O API &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Stream là gì?</a></li>
+                    <li><a href="#pipeline">Pipeline</a></li>
+                    <li><a href="#examples">Ví dụ thực tế</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

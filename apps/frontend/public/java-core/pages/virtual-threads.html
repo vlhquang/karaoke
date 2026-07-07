@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Threads - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; Virtual
+                    Threads
+                </div>
+                <h1>Virtual Threads (Luồng ảo)</h1>
+
+                <section id="what-is">
+                    <h2>Virtual Threads là gì?</h2>
+                    <p>Được giới thiệu chính thức trong Java 21 (Project Loom), <strong>Virtual Threads</strong> là
+                        luồng nhẹ (lightweight threads) được quản lý bởi JVM thay vì hệ điều hành. Chúng cho phép viết
+                        mã đồng thời (concurrent) với số lượng luồng hàng trăm nghìn mà không gây cạn kiệt tài nguyên.
+                    </p>
+                </section>
+
+                <section id="problem">
+                    <h2>Vấn đề với Platform Threads</h2>
+                    <p>Mỗi platform thread (luồng OS truyền thống) tiêu tốn ít nhất vài MB bộ nhớ. Khi một luồng chờ I/O
+                        (như gọi API, truy vấn database), nó bị block và tốn tài nguyên. Điều này giới hạn khả năng mở
+                        rộng (scalability) của ứng dụng.</p>
+                </section>
+
+                <section id="how-to-use">
+                    <h2>Cách sử dụng Virtual Threads</h2>
+                    <div class="code-block">
+                        <pre><code>// Tạo và chạy một virtual thread
+Thread.ofVirtual().start(() -> {
+    IO.println("Chào từ Virtual Thread!");
+});
+
+// Dùng Executor cho nhiều virtual threads
+try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    for (int i = 0; i &lt; 100_000; i++) {
+        int taskId = i;
+        executor.submit(() -> {
+            // Tác vụ I/O - sẽ không block
+            IO.println("Task " + taskId);
+        });
+    }
+}
+// Executor tự đóng khi ra khỏi try block</code></pre>
+                    </div>
+                </section>
+
+                <section id="when">
+                    <h2>Khi nào nên dùng?</h2>
+                    <p>Virtual threads phù hợp nhất cho các tác vụ <strong>I/O-bound</strong> (nhiều thời gian chờ mạng,
+                        database, file). Chúng <em>không</em> cải thiện các tác vụ <strong>CPU-bound</strong> (tác vụ
+                        tính toán nặng).</p>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="garbage-collection.html">&lt; Garbage Collection</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="../index.html">Quay lại trang chủ &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#what-is">Virtual Threads là gì?</a></li>
+                    <li><a href="#problem">Vấn đề cần giải quyết</a></li>
+                    <li><a href="#how-to-use">Cách sử dụng</a></li>
+                    <li><a href="#when">Khi nào nên dùng?</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

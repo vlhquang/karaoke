@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JLink - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; JLink</div>
+                <h1>Tạo Runtime và Application Images với JLink</h1>
+                <section id="intro">
+                    <h2>JLink là gì?</h2>
+                    <p><code>jlink</code> là công cụ dòng lệnh cho phép bạn tạo một <strong>custom runtime
+                            image</strong> chỉ chứa các module JDK mà ứng dụng của bạn thực sự cần. Kết quả là một
+                        runtime nhỏ gọn có thể phân phối cùng ứng dụng.</p>
+                </section>
+                <section id="usage">
+                    <h2>Cách dùng jlink</h2>
+                    <div class="code-block">
+                        <pre><code># Tạo runtime image chỉ với các module cần thiết
+jlink \
+  --module-path $JAVA_HOME/jmods \
+  --add-modules java.base,java.sql \
+  --output my-runtime
+
+# Chạy ứng dụng với runtime tùy chỉnh
+my-runtime/bin/java -m com.example.myapp/com.example.Main</code></pre>
+                    </div>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="modules.html">&lt; Modules</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="jdk-core-tools.html">JDK Tools &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">JLink là gì?</a></li>
+                    <li><a href="#usage">Cách dùng</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

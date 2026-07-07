@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tạo lớp Java - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; <a
+                        href="lop-va-doi-tuong.html">Lớp và Đối tượng</a> &gt; Tạo lớp
+                </div>
+                <h1>Tạo lớp (Creating Classes)</h1>
+
+                <section id="anatomy">
+                    <h2>Cấu trúc của một lớp</h2>
+                    <p>Đây là cú pháp tổng quát để định nghĩa một lớp trong Java:</p>
+                    <div class="code-block">
+                        <pre><code>class MyClass {
+    // Các trường (fields/variables)
+    int x = 5;
+    
+    // Phương thức (methods)
+    void print() {
+        System.out.println("x = " + x);
+    }
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="fields">
+                    <h2>Khai báo trường thành viên (Member Variables)</h2>
+                    <p>Các biến bên trong một lớp gọi là <strong>trường (fields)</strong>. Mỗi trường có:</p>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>Phạm vi truy cập:</strong> <code>public</code>, <code>private</code>,
+                            <code>protected</code></li>
+                        <li><strong>Kiểu dữ liệu:</strong> <code>int</code>, <code>String</code>, ...</li>
+                        <li><strong>Tên trường</strong></li>
+                    </ul>
+                    <div class="code-block">
+                        <pre><code>public class Bicycle {
+    // Trường static (biến lớp)
+    public static int numberOfBicycles = 0;
+    
+    // Trường instance (biến đối tượng)
+    public int cadence;
+    public int speed;
+    private int gear; // phạm vi private
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="access">
+                    <h2>Kiểm soát truy cập</h2>
+                    <ul style="margin-left: 20px;">
+                        <li><code>public</code>: Có thể truy cập từ bất kỳ đâu.</li>
+                        <li><code>private</code>: Chỉ có thể truy cập trong cùng lớp.</li>
+                        <li><code>protected</code>: Truy cập được trong cùng package và lớp con.</li>
+                        <li>(Không khai báo - package-private): Truy cập được trong cùng package.</li>
+                    </ul>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="lop-va-doi-tuong.html">&lt; Lớp và Đối tượng</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="dinh-nghia-phuong-thuc.html">Định nghĩa phương thức &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#anatomy">Cấu trúc lớp</a></li>
+                    <li><a href="#fields">Trường thành viên</a></li>
+                    <li><a href="#access">Kiểm soát truy cập</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

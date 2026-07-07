@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pattern Matching - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; Pattern Matching</div>
+                <h1>Sử dụng Pattern Matching</h1>
+                <section id="intro">
+                    <h2>Pattern Matching là gì?</h2>
+                    <p>Pattern matching là sự tiến hóa lớn tiếp theo của ngôn ngữ Java. Nó cho phép bạn kiểm tra, hủy
+                        cấu trúc (deconstruct) và trích xuất dữ liệu từ đối tượng một cách gọn gàng hơn.</p>
+                </section>
+                <section id="instanceof">
+                    <h2>Pattern Matching cho instanceof</h2>
+                    <div class="code-block">
+                        <pre><code>// Cách cũ (verbose)
+if (obj instanceof String) {
+    String s = (String) obj;
+    IO.println(s.length());
+}
+
+// Pattern Matching (Java 16+)
+if (obj instanceof String s) {
+    IO.println(s.length()); // s tự động được ép kiểu
+}</code></pre>
+                    </div>
+                </section>
+                <section id="switch">
+                    <h2>Pattern Matching cho switch</h2>
+                    <div class="code-block">
+                        <pre><code>// Java 21+
+Object shape = new Circle(5.0);
+
+String result = switch (shape) {
+    case Circle c -> "Hình tròn bán kính " + c.radius();
+    case Rectangle r -> "Hình chữ nhật " + r.width() + "x" + r.height();
+    case null -> "Không có hình dạng";
+    default -> "Hình khác";
+};</code></pre>
+                    </div>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="packages.html">&lt; Packages</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="ngoai-le.html">Ngoại lệ &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Giới thiệu</a></li>
+                    <li><a href="#instanceof">instanceof</a></li>
+                    <li><a href="#switch">switch</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

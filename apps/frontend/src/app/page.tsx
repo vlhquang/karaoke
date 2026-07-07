@@ -27,9 +27,58 @@ export default function HomePage() {
       badge: "New"
     },
     {
-      href: "/li-xi-nang-cao",
-      title: "Lì Xì Nâng Cao",
-      description: "Bộ mini game realtime (reaction, memory, rps, number, shake, color).",
+      title: "Thư viện trò chơi",
+      description: "Tập hợp các mini game giải trí đa dạng.",
+      badge: "New",
+      subItems: [
+        { href: "/fitness-game", title: "Fitness Game TV" },
+        { href: "/camera-dodge", title: "Né vật rơi bằng camera" },
+        { href: "/li-xi-nang-cao", title: "Mini game realtime (Lì xì)" },
+        { href: "/co-ty-phu", title: "Cờ tỷ phú Việt Nam" },
+        { href: "/game-hub", title: "Game Hub 3D 2 người" },
+        { href: "/game-battle/index.html", title: "Thủ thành (Quiz Survival)" }
+      ]
+    },
+    {
+      href: "/hoc-tap",
+      title: "Học tập",
+      description: "Tài liệu học tập, Java core và các kiến thức lập trình khác.",
+      badge: "New"
+    },
+    {
+      href: "/tao-video",
+      title: "Tạo video",
+      description: "AI tạo nội dung Shorts: kịch bản, prompt video, tiêu đề, mô tả, caption, hashtag.",
+      badge: "New"
+    },
+    {
+      href: "/gps-tracker/sender.html",
+      title: "Chia sẻ hành trình",
+      description: "Trình theo dõi GPS realtime, ứng dụng web chuyên dụng chia sẻ vị trí xe.",
+      badge: "New"
+    },
+    {
+      href: "/hud",
+      title: "HUD Tốc độ",
+      description: "Đồng hồ đo tốc độ GPS cảnh báo giới hạn, hỗ trợ hắt kính lái ô tô.",
+      badge: "New"
+    },
+    {
+      href: "/mo-phong",
+      title: "Mô phỏng",
+      description: "Bàn mô phỏng 3D với thư viện vật thể, Trái đất cầu/phẳng, tàu chở hàng, đường di chuyển, camera và ống nhòm.",
+      badge: "New"
+    },
+    {
+      href: "/hien-tuong-khoa-hoc",
+      title: "Hiện tượng khoa học",
+      description: "Phòng Thí Nghiệm Vũ Trụ Của Bé - Mô phỏng 3D hiện tượng thiên văn (Ngày/đêm, Các mùa, Thủy triều).",
+      badge: "New"
+    },
+    {
+      href: "/chi-tieu",
+      title: "Chi tieu",
+      description: "Quan ly thu/chi ca nhan voi Google Sheets.",
       badge: "New"
     }
   ];
@@ -47,20 +96,48 @@ export default function HomePage() {
       <section className="mt-5">
         <h2 className="mb-3 text-lg font-semibold md:text-xl">Danh sách ứng dụng</h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {appMenus.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="group rounded-2xl border border-slate-700 bg-slate-900/60 p-4 transition hover:border-cyan-300/50 hover:bg-slate-900"
-            >
-              <div className="mb-2 inline-flex rounded-full border border-cyan-300/40 px-2 py-1 text-xs text-cyan-200">
-                {item.badge}
-              </div>
-              <p className="text-lg font-semibold text-slate-100 group-hover:text-cyan-100">{item.title}</p>
-              <p className="mt-1 text-sm text-slate-400">{item.description}</p>
-              <p className="mt-3 text-xs text-cyan-300">{item.href}</p>
-            </Link>
-          ))}
+          {appMenus.map((item) => {
+            if (item.subItems) {
+              return (
+                <div
+                  key={item.title}
+                  className="group rounded-2xl border border-slate-700 bg-slate-900/60 p-4 transition hover:border-cyan-300/50 hover:bg-slate-900 flex flex-col"
+                >
+                  <div className="mb-2 self-start inline-flex rounded-full border border-cyan-300/40 px-2 py-1 text-xs text-cyan-200">
+                    {item.badge}
+                  </div>
+                  <p className="text-lg font-semibold text-slate-100 group-hover:text-cyan-100">{item.title}</p>
+                  <p className="mt-1 mb-3 text-sm text-slate-400">{item.description}</p>
+                  <div className="flex flex-col gap-2 mt-auto">
+                    {item.subItems.map((sub) => (
+                      <Link
+                        key={sub.href}
+                        href={sub.href}
+                        className="text-sm text-cyan-300 hover:text-cyan-100 transition-colors flex items-center gap-2"
+                      >
+                        <span className="text-cyan-500/50">→</span> {sub.title}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href!}
+                className="group rounded-2xl border border-slate-700 bg-slate-900/60 p-4 transition hover:border-cyan-300/50 hover:bg-slate-900 flex flex-col"
+              >
+                <div className="mb-2 self-start inline-flex rounded-full border border-cyan-300/40 px-2 py-1 text-xs text-cyan-200">
+                  {item.badge}
+                </div>
+                <p className="text-lg font-semibold text-slate-100 group-hover:text-cyan-100">{item.title}</p>
+                <p className="mt-1 text-sm text-slate-400">{item.description}</p>
+                <p className="mt-auto pt-3 text-xs text-cyan-300">{item.href}</p>
+              </Link>
+            );
+          })}
         </div>
       </section>
     </main>
