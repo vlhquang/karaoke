@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JavaFX Animations - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; JavaFX Animations</div>
+                <h1>Giới thiệu về JavaFX Animations</h1>
+                <section id="transitions">
+                    <h2>Transitions</h2>
+                    <p>JavaFX cung cấp các lớp <code>Transition</code> sẵn có để tạo animation đơn giản:</p>
+                    <div class="code-block">
+                        <pre><code>// Di chuyển một node từ A đến B
+TranslateTransition tt = new TranslateTransition(Duration.millis(1000), myNode);
+tt.setFromX(0);
+tt.setToX(200);
+tt.setCycleCount(Animation.INDEFINITE);
+tt.setAutoReverse(true);
+tt.play();
+
+// Xoay node
+RotateTransition rt = new RotateTransition(Duration.millis(500), myNode);
+rt.setByAngle(360);
+rt.play();
+
+// Fade in/out
+FadeTransition ft = new FadeTransition(Duration.millis(1000), myNode);
+ft.setFromValue(1.0);
+ft.setToValue(0.0);
+ft.play();</code></pre>
+                    </div>
+                </section>
+                <section id="timeline">
+                    <h2>Timeline - Animation tùy chỉnh</h2>
+                    <div class="code-block">
+                        <pre><code>Timeline timeline = new Timeline(
+    new KeyFrame(Duration.ZERO, new KeyValue(node.opacityProperty(), 0)),
+    new KeyFrame(Duration.millis(1000), new KeyValue(node.opacityProperty(), 1))
+);
+timeline.setCycleCount(Animation.INDEFINITE);
+timeline.setAutoReverse(true);
+timeline.play();</code></pre>
+                    </div>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="javafx.html">&lt; JavaFX Cơ bản</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="chung-chi-java.html">Chứng chỉ Java &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#transitions">Transitions</a></li>
+                    <li><a href="#timeline">Timeline</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

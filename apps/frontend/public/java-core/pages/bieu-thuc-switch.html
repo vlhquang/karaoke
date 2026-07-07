@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rẽ nhánh với Switch Expression - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem & Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> > <a href="../index.html">Hướng dẫn</a> > <a
+                        href="ngon-ngu-co-ban.html">Cơ bản về ngôn ngữ Java</a> > Rẽ nhánh với Switch Expression
+                </div>
+
+                <h1>Rẽ nhánh với Switch Expression</h1>
+
+                <section id="intro">
+                    <h2>Switch Expression là gì?</h2>
+                    <p>Giống như câu lệnh <code>switch</code> truyền thống, <code>switch expression</code> có thể có
+                        nhiều đường dẫn thực thi. Tuy nhiên, thay vì chỉ thực hiện các câu lệnh, nó có thể <strong>trả
+                            về một giá trị</strong>.</p>
+                </section>
+
+                <section id="arrow-syntax">
+                    <h2>Cú pháp mũi tên (Arrow Syntax)</h2>
+                    <p>Switch expression giới thiệu cú pháp <code>L -></code>. Với cú pháp này, chỉ khối mã ở phía bên
+                        phải mũi tên được thực thi nếu nhãn khớp. Không có cơ chế <strong>fall-through</strong>, vì vậy
+                        bạn không cần từ khóa <code>break</code>.</p>
+                    <div class="code-block">
+                        <button class="copy-btn">Copy</button>
+                        <pre><code>int quarter = 1;
+String quarterLabel = switch (quarter) {
+    case 0 -> "Q1 - Mùa Đông";
+    case 1 -> "Q2 - Mùa Xuân";
+    case 2 -> "Q3 - Mùa Hạ";
+    case 3 -> "Q4 - Mùa Thu";
+    default -> "Quý không hợp lệ";
+};</code></pre>
+                    </div>
+                </section>
+
+                <section id="yield">
+                    <h2>Từ khóa yield</h2>
+                    <p>Nếu bạn sử dụng cú pháp <code>case L:</code> truyền thống bên trong một switch expression, bạn
+                        phải sử dụng từ khóa <code>yield</code> để trả về giá trị từ khối đó.</p>
+                    <div class="code-block">
+                        <pre><code>int quarterLabel = switch (quarter) {
+    case 0:
+        yield "Q1 - Mùa Đông";
+    case 1:
+        yield "Q2 - Mùa Xuân";
+    default:
+        yield "Unknown";
+};</code></pre>
+                    </div>
+                </section>
+
+                <section id="exhaustiveness">
+                    <h2>Tính toàn vẹn (Exhaustiveness)</h2>
+                    <p>Khác với câu lệnh switch thông thường, switch expression phải xử lý <strong>tất cả</strong> các
+                        giá trị có thể có của biến lựa chọn. Thông thường, điều này có nghĩa là bạn bắt buộc phải có một
+                        nhánh <code>default</code>.</p>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="cau-lenh-switch.html">
+                            < Rẽ nhánh với câu lệnh Switch</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="../index.html">Quay lại danh sách bài học ></a>
+                    </div>
+                </div>
+            </article>
+
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Giới thiệu</a></li>
+                    <li><a href="#arrow-syntax">Cú pháp mũi tên</a></li>
+                    <li><a href="#yield">Từ khóa yield</a></li>
+                    <li><a href="#exhaustiveness">Tính toàn vẹn</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

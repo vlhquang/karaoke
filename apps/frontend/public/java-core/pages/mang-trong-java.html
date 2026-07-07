@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mảng trong Java - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem & Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> > <a href="../index.html">Hướng dẫn</a> > <a
+                        href="ngon-ngu-co-ban.html">Cơ bản về ngôn ngữ Java</a> > Mảng trong Java
+                </div>
+
+                <h1>Mảng trong Java</h1>
+
+                <section id="intro">
+                    <h2>Mảng là gì?</h2>
+                    <p>Một <strong>mảng (array)</strong> là một đối tượng container giữ một số lượng cố định các giá trị
+                        có cùng một kiểu dữ liệu. Độ dài của mảng được thiết lập khi mảng được tạo ra. Sau khi tạo, độ
+                        dài của nó là cố định.</p>
+                    <p>Mỗi mục trong mảng được gọi là một <strong>phần tử (element)</strong>, và mỗi phần tử được truy
+                        cập thông qua <strong>chỉ số (index)</strong> bằng số của nó. Chỉ số bắt đầu từ 0.</p>
+                </section>
+
+                <section id="declaration">
+                    <h2>Khai báo biến mảng</h2>
+                    <p>Việc khai báo mảng bao gồm hai thành phần: kiểu của mảng và tên của mảng. Kiểu mảng được viết là
+                        <code>type[]</code>, trong đó <code>type</code> là kiểu dữ liệu của các phần tử bên trong.
+                    </p>
+                    <div class="code-block">
+                        <pre><code>// khai báo một mảng số nguyên
+int[] anArray;
+
+// các kiểu mảng khác
+byte[] anArrayOfBytes;
+String[] anArrayOfStrings;</code></pre>
+                    </div>
+                </section>
+
+                <section id="creation">
+                    <h2>Tạo, Khởi tạo và Truy cập Mảng</h2>
+                    <p>Bạn có thể tạo mảng bằng toán tử <code>new</code>:</p>
+                    <div class="code-block">
+                        <pre><code>// tạo một mảng gồm 10 số nguyên
+anArray = new int[10];
+
+// khởi tạo phần tử đầu tiên (chỉ số 0)
+anArray[0] = 100;
+// khởi tạo phần tử thứ hai (chỉ số 1)
+anArray[1] = 200;</code></pre>
+                    </div>
+                    <p>Ngoài ra, bạn có thể sử dụng cú pháp rút gọn để vừa tạo vừa khởi tạo mảng:</p>
+                    <div class="code-block">
+                        <pre><code>int[] anArray = { 100, 200, 300, 400, 500 };</code></pre>
+                    </div>
+                </section>
+
+                <section id="multidimensional">
+                    <h2>Mảng đa chiều</h2>
+                    <p>Trong Java, một mảng đa chiều là một mảng mà các thành phần của nó chính là các mảng khác. Chúng
+                        còn được gọi là mảng lồng nhau hoặc "jagged arrays" vì các hàng có thể có độ dài khác nhau.</p>
+                    <div class="code-block">
+                        <button class="copy-btn">Copy</button>
+                        <pre><code>String[][] names = {
+    {"Mr. ", "Mrs. ", "Ms. "},
+    {"Smith", "Jones"}
+};
+// In ra "Mr. Smith"
+IO.println(names[0][0] + names[1][0]);</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="kieu-du-lieu-nguyen-thuy.html">
+                            < Kiểu dữ liệu nguyên thủy</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="su-dung-var.html">Sử dụng định danh kiểu var ></a>
+                    </div>
+                </div>
+            </article>
+
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Mảng là gì?</a></li>
+                    <li><a href="#declaration">Khai báo mảng</a></li>
+                    <li><a href="#creation">Tạo và khởi tạo</a></li>
+                    <li><a href="#multidimensional">Mảng đa chiều</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

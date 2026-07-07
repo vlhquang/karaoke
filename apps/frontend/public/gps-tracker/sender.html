@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GPS Sender - Chia Sẻ Hành Trình</title>
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --primary: #0ea5e9;
+            --primary-hover: #38bdf8;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #22d3ee;
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            background-image:
+                radial-gradient(circle at 15% 50%, rgba(14, 165, 233, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(34, 211, 238, 0.15) 0%, transparent 50%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px 30px;
+            width: 100%;
+            max-width: 480px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: fadeUp 0.6s ease-out;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #38bdf8, #22d3ee);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 15px;
+            margin-bottom: 40px;
+            line-height: 1.5;
+        }
+
+        .status-ring {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: rgba(14, 165, 233, 0.1);
+            box-shadow: inset 0 0 20px rgba(14, 165, 233, 0.2);
+            transition: all 0.5s ease;
+        }
+
+        .status-ring::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px dashed rgba(14, 165, 233, 0.3);
+            animation: spin 15s linear infinite;
+        }
+
+        .status-ring.active {
+            background: rgba(16, 185, 129, 0.1);
+            box-shadow: inset 0 0 30px rgba(16, 185, 129, 0.3);
+        }
+
+        .status-ring.active::before {
+            border-color: rgba(16, 185, 129, 0.8);
+            animation: spin 5s linear infinite;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .icon {
+            font-size: 48px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+            opacity: 0.5;
+            transition: opacity 0.3s;
+        }
+
+        .info-grid.active {
+            opacity: 1;
+        }
+
+        .info-card {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        button {
+            outline: none;
+            border: none;
+            border-radius: 100px;
+            font-size: 16px;
+            font-weight: 600;
+            padding: 18px 32px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, var(--primary), #0284c7);
+            color: white;
+            box-shadow: 0 10px 20px -10px var(--primary);
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px -10px var(--primary);
+            background: linear-gradient(135deg, var(--primary-hover), var(--primary));
+        }
+
+        .btn-start:active {
+            transform: translateY(1px);
+        }
+
+        .btn-share {
+            background: #0068FF;
+            color: white;
+            margin-top: 15px;
+            display: none;
+            box-shadow: 0 10px 20px -10px #0068FF;
+        }
+
+        .btn-share:hover {
+            background: #0056d6;
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px -10px #0068FF;
+        }
+
+        .pulse {
+            display: none;
+            width: 10px;
+            height: 10px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: pulsing 2s infinite;
+        }
+
+        .active .pulse {
+            display: inline-block;
+        }
+
+        @keyframes pulsing {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+
+        #trackIdDisplay {
+            margin-top: 25px;
+            font-size: 13px;
+            color: var(--text-muted);
+            font-family: monospace;
+            opacity: 0.7;
+        }
+
+        #minimap-container {
+            width: 100%;
+            height: 200px;
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.3);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #minimap {
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .my-marker {
+            background: transparent;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .car-marker-icon {
+            filter: drop-shadow(0 0 5px var(--primary));
+            transition: transform 0.3s ease-out;
+            width: 24px;
+            height: 24px;
+        }
+        
+        .viewer-marker {
+            background: var(--success);
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--success);
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .fullscreen-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: white;
+            padding: 0;
+        }
+        
+        .fullscreen-btn:hover {
+            background: rgba(0,0,0,0.8);
+            transform: none;
+        }
+
+        #minimap-container.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            margin: 0;
+            border-radius: 0;
+        }
+
+        /* Custom Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.1);
+            transition: .4s;
+            border-radius: 20px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--primary);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Cảm biến GPS</h1>
+        <p class="subtitle">Liên tục phát trực tiếp vị trí của bạn với một đường link duy nhất</p>
+
+        <div class="status-ring" id="statusRing">
+            <div class="icon" id="carIcon">🚙</div>
+        </div>
+
+        <div class="info-grid" id="infoGrid">
+            <div class="info-card">
+                <div class="info-label">Tốc độ</div>
+                <div class="info-value"><span id="speedVal">0.0</span> km/h</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">Trạng thái</div>
+                <div class="info-value" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <span class="pulse"></span>
+                    <span id="statusTxt">Đang chờ</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="minimap-container">
+            <button class="fullscreen-btn" id="fsBtn" title="Phóng to bản đồ">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                </svg>
+            </button>
+            <div id="minimap" style="width: 100%; height: 100%; position: absolute; z-index: 1;"></div>
+            <span style="font-size: 13px; color: var(--text-muted); z-index: 0;">Đang tải bản đồ...</span>
+        </div>
+
+        <button class="btn-start" id="startBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+            Bắt đầu chia sẻ hành trình
+        </button>
+
+        <button class="btn-share" id="shareBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+            Chia sẻ hành trình
+        </button>
+
+        <div id="trackIdDisplay"></div>
+
+        <!-- Configuration Settings -->
+        <div id="settingsArea"
+            style="margin-top: 25px; text-align: left; background: rgba(0,0,0,0.2); border-radius: 20px; padding: 20px; border: 1px solid rgba(255,255,255,0.05);">
+            <div class="info-label" style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z">
+                    </path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                Cài đặt cập nhật
+            </div>
+
+            <div
+                style="display: flex; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 4px; margin-bottom: 15px;">
+                <button id="modeTimeBtn"
+                    style="padding: 8px; font-size: 13px; border-radius: 10px; background: var(--primary); color: white; flex: 1; min-width: 0;">Theo
+                    thời gian</button>
+                <button id="modeDistBtn"
+                    style="padding: 8px; font-size: 13px; border-radius: 10px; background: transparent; color: var(--text-muted); flex: 1; min-width: 0;">Theo
+                    khoảng cách</button>
+            </div>
+
+            <div id="timeOptions">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 13px; color: var(--text-muted);">Chu kỳ cập nhật</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="number" id="timePeriod" value="30" min="5"
+                            style="width: 60px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white; padding: 4px 8px; font-size: 13px; outline: none;">
+                        <span style="font-size: 13px; color: var(--text-muted);">giây</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="distOptions" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <span style="font-size: 13px; color: var(--text-muted);">Khoảng cách tối thiểu</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="number" id="distThreshold" value="50" min="5"
+                            style="width: 60px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white; padding: 4px 8px; font-size: 13px; outline: none;">
+                        <span style="font-size: 13px; color: var(--text-muted);">mét</span>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 13px; color: var(--text-muted);">Tần suất kiểm tra</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="number" id="distCheckInterval" value="10" min="2"
+                            style="width: 60px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white; padding: 4px 8px; font-size: 13px; outline: none;">
+                        <span style="font-size: 13px; color: var(--text-muted);">giây</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                            <circle cx="12" cy="10" r="3" />
+                        </svg>
+                        <span style="font-size: 13px; color: var(--text-muted);">Bám sát mặt đường</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="snapToRoadToggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                            <circle cx="12" cy="12" r="4" />
+                        </svg>
+                        <span style="font-size: 13px; color: var(--text-muted);">Luôn sáng màn hình</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="keepScreenOnToggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div id="logArea" style="margin-top: 30px; text-align: left; display: none;">
+            <div class="info-label" style="display: flex; justify-content: space-between; align-items: center;">
+                Nhật ký hoạt động
+                <span id="nextUpdateTxt" style="text-transform: none; color: var(--accent); font-weight: 800;"></span>
+            </div>
+            <div id="logContainer"
+                style="background: rgba(0,0,0,0.3); border-radius: 12px; height: 120px; overflow-y: auto; padding: 10px; font-size: 11px; font-family: monospace; border: 1px solid rgba(255,255,255,0.05); margin-top: 5px;">
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW failed: ', err));
+            });
+        }
+
+        const startBtn = document.getElementById('startBtn');
+        const shareBtn = document.getElementById('shareBtn');
+        const statusRing = document.getElementById('statusRing');
+        const infoGrid = document.getElementById('infoGrid');
+        const speedVal = document.getElementById('speedVal');
+        const statusTxt = document.getElementById('statusTxt');
+        const trackIdDisplay = document.getElementById('trackIdDisplay');
+        const logArea = document.getElementById('logArea');
+        const logContainer = document.getElementById('logContainer');
+        const nextUpdateTxt = document.getElementById('nextUpdateTxt');
+
+        const modeTimeBtn = document.getElementById('modeTimeBtn');
+        const modeDistBtn = document.getElementById('modeDistBtn');
+        const timeOptions = document.getElementById('timeOptions');
+        const distOptions = document.getElementById('distOptions');
+        const timePeriodInput = document.getElementById('timePeriod');
+        const distThresholdInput = document.getElementById('distThreshold');
+        const distCheckInput = document.getElementById('distCheckInterval');
+        const settingsArea = document.getElementById('settingsArea');
+        const snapToRoadToggle = document.getElementById('snapToRoadToggle');
+        const keepScreenOnToggle = document.getElementById('keepScreenOnToggle');
+
+        let watchId = null;
+        let socket = null;
+        let isTracking = false;
+        let trackingId = localStorage.getItem('trackingId');
+        let countdownInterval = null;
+        let nextUpdateTime = 0;
+        let activeMode = 'time';
+        let lastSentLocation = null;
+        
+        // Viewers Tracking
+        const viewersMap = new Map(); // id -> marker
+
+        // Fullscreen map logic
+        const fsBtn = document.getElementById('fsBtn');
+        const minimapContainer = document.getElementById('minimap-container');
+        let isMapFullscreen = false;
+        
+        fsBtn.addEventListener('click', () => {
+            isMapFullscreen = !isMapFullscreen;
+            if (isMapFullscreen) {
+                minimapContainer.classList.add('fullscreen');
+                fsBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>`;
+            } else {
+                minimapContainer.classList.remove('fullscreen');
+                fsBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>`;
+            }
+            if (map) setTimeout(() => map.invalidateSize(), 300);
+        });
+
+        if (!trackingId) {
+            trackingId = crypto.randomUUID();
+            localStorage.setItem('trackingId', trackingId);
+        }
+        trackIdDisplay.textContent = `ID: ${trackingId.split('-')[0]}`;
+
+        // Settings
+        modeTimeBtn.addEventListener('click', () => {
+            if (isTracking) return;
+            activeMode = 'time';
+            modeTimeBtn.style.background = 'var(--primary)';
+            modeTimeBtn.style.color = 'white';
+            modeDistBtn.style.background = 'transparent';
+            modeDistBtn.style.color = 'var(--text-muted)';
+            timeOptions.style.display = 'block';
+            distOptions.style.display = 'none';
+        });
+
+        modeDistBtn.addEventListener('click', () => {
+            if (isTracking) return;
+            activeMode = 'distance';
+            modeDistBtn.style.background = 'var(--primary)';
+            modeDistBtn.style.color = 'white';
+            modeTimeBtn.style.background = 'transparent';
+            modeTimeBtn.style.color = 'var(--text-muted)';
+            timeOptions.style.display = 'none';
+            distOptions.style.display = 'block';
+        });
+
+        function addLog(msg, type = 'info') {
+            const time = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+            const logEntry = document.createElement('div');
+            logEntry.style.marginBottom = '4px';
+            logEntry.style.borderLeft = `2px solid ${type === 'success' ? '#10b981' : (type === 'error' ? '#ef4444' : '#0ea5e9')}`;
+            logEntry.style.paddingLeft = '8px';
+
+            let color = 'var(--text-muted)';
+            if (type === 'success') color = '#10b981';
+            if (type === 'error') color = '#ef4444';
+            if (type === 'process') color = '#38bdf8';
+
+            logEntry.innerHTML = `<span style="color: #64748b;">[${time}]</span> <span style="color: ${color}">${msg}</span>`;
+            logContainer.prepend(logEntry);
+        }
+
+        async function snapToRoad(lat, lng) {
+            try {
+                addLog("Khớp nối mặt đường...", "process");
+                const res = await fetch(`https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}?number=1`);
+                const data = await res.json();
+                if (data.code === 'Ok' && data.waypoints && data.waypoints.length > 0) {
+                    const snapped = data.waypoints[0].location;
+                    const name = data.waypoints[0].name || "tuyến đường";
+                    addLog(`Đã khớp: ${name}`, "success");
+                    return { lat: snapped[1], lng: snapped[0] };
+                }
+                return { lat, lng };
+            } catch (e) {
+                addLog("Lỗi khớp đường, dùng GPS thô", "error");
+                return { lat, lng };
+            }
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        let wakeLock = null;
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    addLog("Screen Wake Lock: Active", "success");
+                    wakeLock.addEventListener('release', () => {
+                        addLog("Wake Lock released", "info");
+                    });
+                } catch (err) {
+                    addLog("Wake Lock failed", "error");
+                }
+            }
+        }
+
+        // --- Keep-Alive / Background logic ---
+        let audioCtx = null;
+        let oscillator = null;
+        let gainNode = null;
+
+        function startSilentAudio() {
+            if (audioCtx) return;
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Cần tạo oscillator tạo âm thanh siêu việt/vô hình dải tần thấp để browser giữ process
+                oscillator = audioCtx.createOscillator();
+                gainNode = audioCtx.createGain();
+                
+                // Mute hoàn toàn âm thanh
+                gainNode.gain.value = 0; 
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.start();
+                
+                // Resume audio context which might be suspended by default
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                
+                addLog("Web Audio Keep-Alive: ON", "success");
+            } catch(e) {
+                console.log("Audio Context failed:", e);
+                addLog("Lỗi kích hoạt chạy ngầm", "error");
+            }
+        }
+
+        function stopSilentAudio() {
+            if (oscillator) {
+                try {
+                    oscillator.stop();
+                    oscillator.disconnect();
+                } catch(e) {}
+            }
+            if (audioCtx) {
+                try {
+                    audioCtx.close();
+                } catch(e) {}
+            }
+            oscillator = null;
+            audioCtx = null;
+            addLog("Web Audio Keep-Alive: OFF", "info");
+        }
+
+        // Re-request wake lock and resume audio when page becomes visible again
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible') {
+                if (isTracking) {
+                    if (wakeLock === null) await requestWakeLock();
+                    if (audioCtx && audioCtx.state === 'suspended') {
+                        audioCtx.resume();
+                    }
+                    // Bắn ngay 1 location update khi user vừa mở lại app
+                    addLog("Ứng dụng hoạt động lại -> Ép cập nhật", "process");
+                    executeLocationUpdate();
+                }
+            }
+        });
+
+        keepScreenOnToggle.addEventListener('change', async () => {
+            if (keepScreenOnToggle.checked) {
+                if (isTracking) await requestWakeLock();
+            } else {
+                if (wakeLock) {
+                    await wakeLock.release();
+                    wakeLock = null;
+                }
+            }
+        });
+
+        startBtn.addEventListener('click', () => {
+            if (!isTracking) startTracking();
+            else stopTracking();
+        });
+
+        function initSocket() {
+            if (!socket) {
+                socket = io('/gps', { transports: ['polling', 'websocket'] });
+                socket.on('connect', () => {
+                    addLog("Realtime OK", "success");
+                    if (isTracking) socket.emit('join_tracking', trackingId);
+                });
+                socket.on('disconnect', () => addLog("Mất kết nối", "error"));
+                
+                socket.on('viewer_location_update', (data) => {
+                    if (data.trackingId === trackingId && map) {
+                        const { viewerId, latitude, longitude } = data;
+                        if (!viewersMap.has(viewerId)) {
+                            const icon = L.divIcon({ className: 'viewer-marker', html: 'V', iconSize: [16,16] });
+                            const m = L.marker([latitude, longitude], { icon }).addTo(map);
+                            viewersMap.set(viewerId, m);
+                            addLog("Có người theo dõi mới", "info");
+                        } else {
+                            viewersMap.get(viewerId).setLatLng([latitude, longitude]);
+                        }
+                    }
+                });
+            }
+        }
+
+        async function sendLocationUpdate() {
+            if (!isTracking) return;
+            addLog(activeMode === 'time' ? "Chu kỳ mới..." : "Kiểm tra vị trí...", "process");
+
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                let lat = pos.coords.latitude;
+                let lng = pos.coords.longitude;
+                const accuracy = pos.coords.accuracy;
+
+                const processedPos = await processPosition(pos);
+                lat = processedPos.lat;
+                lng = processedPos.lng;
+
+                if (activeMode === 'distance' && lastSentLocation) {
+                    const dist = calculateDistance(lat, lng, lastSentLocation.lat, lastSentLocation.lng);
+                    const threshold = parseInt(distThresholdInput.value) || 50;
+                    if (dist < threshold) {
+                        addLog(`Di chuyển ${dist.toFixed(1)}m < ${threshold}m. Bỏ qua.`, "info");
+                        resetTimer();
+                        return;
+                    }
+                }
+
+                addLog("Gửi vị trí...", "process");
+                const payload = {
+                    trackingId,
+                    latitude: lat,
+                    longitude: lng,
+                    speed: pos.coords.speed ? pos.coords.speed * 3.6 : 0,
+                    heading: pos.coords.heading || 0,
+                    accuracy: accuracy || 0,
+                    timestamp: new Date().toISOString()
+                };
+
+                updateMinimap(lat, lng, accuracy, pos.coords.heading);
+
+                try {
+                    let result;
+                    if (socket && socket.connected) {
+                        result = await new Promise(r => {
+                            socket.emit("send_location", payload, res => r(res));
+                            setTimeout(() => r({ ok: false }), 10000);
+                        });
+                    } else {
+                        const res = await fetch('/api/gps/location', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await res.json();
+                        result = { ok: data.success, status: data.status };
+                    }
+
+                    if (result.ok) {
+                        addLog(result.status === 'synced' ? "Đồng bộ Sheet OK" : "Đã lưu memory", "success");
+                        lastSentLocation = { lat, lng };
+                        resetTimer();
+                    } else {
+                        addLog("Gửi lỗi, thử lại...", "error");
+                        setTimeout(sendLocationUpdate, 5000);
+                    }
+                } catch (e) {
+                    addLog("Lỗi mạng", "error");
+                    setTimeout(sendLocationUpdate, 5000);
+                }
+            }, (err) => {
+                addLog(`GPS Lỗi: ${err.message}`, "error");
+                setTimeout(sendLocationUpdate, 10000);
+            }, { enableHighAccuracy: true, timeout: 15000 });
+        }
+
+        shareBtn.addEventListener('click', async () => {
+            const viewerUrl = `${window.location.origin}/gps-tracker/viewer.html?id=${trackingId}`;
+            const shareData = {
+                title: 'Chia sẻ hành trình GPS',
+                text: 'Theo dõi vị trí hiện tại của tôi qua bản đồ trực tiếp.',
+                url: viewerUrl
+            };
+
+            try {
+                if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+                    await navigator.share(shareData);
+                    addLog("Đã mở menu chia sẻ", "success");
+                } else {
+                    throw new Error("Sharing not supported");
+                }
+            } catch (err) {
+                // Fallback to clipboard
+                try {
+                    await navigator.clipboard.writeText(viewerUrl);
+                    addLog("Đã copy link vào bộ nhớ tạm", "success");
+                    alert("Đã copy link hành trình vào bộ nhớ tạm!");
+                } catch (clipErr) {
+                    addLog("Lỗi chia sẻ", "error");
+                    alert(`Link hành trình: ${viewerUrl}`);
+                }
+            }
+        });
+
+        let trackingTimeout = null;
+
+        function resetTimer() {
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (trackingTimeout) clearTimeout(trackingTimeout);
+            
+            const period = activeMode === 'time' ? (parseInt(timePeriodInput.value) || 30) : (parseInt(distCheckInput.value) || 10);
+            nextUpdateTime = Date.now() + (period * 1000);
+            
+            // UI Countdown Update
+            countdownInterval = setInterval(() => {
+                if (!isTracking) return clearInterval(countdownInterval);
+                const rem = Math.max(0, Math.round((nextUpdateTime - Date.now()) / 1000));
+                nextUpdateTxt.textContent = `${activeMode === 'time' ? 'Cập nhật' : 'Kiểm tra'}: ${rem}s`;
+            }, 1000);
+            
+            // Recursive Background-safe Execute
+            trackingTimeout = setTimeout(() => {
+                if (isTracking) executeLocationUpdate();
+            }, period * 1000);
+        }
+        
+        // This is a wrapper to call sendLocationUpdate properly from setTimeout
+        function executeLocationUpdate() {
+            if (trackingTimeout) clearTimeout(trackingTimeout);
+            sendLocationUpdate();
+        }
+
+        function startTracking() {
+            if (!navigator.geolocation) return alert("Không hỗ trợ GPS");
+            requestWakeLock();
+            initSocket();
+            isTracking = true;
+            lastSentLocation = null;
+            if (socket && socket.connected) {
+                socket.emit('join_tracking', trackingId); // Join room so sender can receive viewer_location
+            }
+
+            startBtn.innerHTML = `Dừng chia sẻ`;
+            startBtn.style.background = 'linear-gradient(135deg, #ef4444, #b91c1c)';
+            shareBtn.style.display = 'flex';
+            logArea.style.display = 'block';
+            settingsArea.style.opacity = '0.5';
+            settingsArea.style.pointerEvents = 'none';
+
+            statusRing.classList.add('active');
+            infoGrid.classList.add('active');
+            statusTxt.textContent = "Đang phát";
+            addLog(`Khởi chạy: ${activeMode === 'time' ? 'Thời gian' : 'Khoảng cách'}`, "info");
+
+            if (keepScreenOnToggle.checked) requestWakeLock();
+            startSilentAudio();
+            executeLocationUpdate();
+            
+            // Vẫn giữ watchPosition để OS push liên tục lên, nhưng processPosition ko tự gửi API mà chỉ hiển thị minimap
+            watchId = navigator.geolocation.watchPosition(pos => {
+                processPosition(pos, true); // Real-time update map
+                if (pos.coords.speed !== null) speedVal.textContent = (pos.coords.speed * 3.6).toFixed(1);
+            }, null, { enableHighAccuracy: true });
+        }
+
+        function stopTracking() {
+            if (watchId) navigator.geolocation.clearWatch(watchId);
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (trackingTimeout) clearTimeout(trackingTimeout);
+            isTracking = false;
+            startBtn.innerHTML = `Bắt đầu chia sẻ hành trình`;
+            startBtn.style.background = '';
+            shareBtn.style.display = 'none';
+            logArea.style.display = 'none';
+            settingsArea.style.opacity = '1';
+            settingsArea.style.pointerEvents = 'auto';
+            statusRing.classList.remove('active');
+            infoGrid.classList.remove('active');
+            statusTxt.textContent = "Đã dừng";
+            speedVal.textContent = "0.0";
+            nextUpdateTxt.textContent = "";
+            stopSilentAudio();
+            if (wakeLock) {
+                wakeLock.release();
+                wakeLock = null;
+            }
+            updateMinimap(16.4637, 107.5909, 0, 0, true);
+        }
+
+        let map = null, mMarker = null, mAcc = null;
+
+        function updateMinimap(lat, lng, acc, heading, isDefault = false) {
+            const container = document.getElementById('minimap-container');
+            const loadingText = container.querySelector('span');
+            if (loadingText) loadingText.style.display = 'none';
+
+            if (!map) {
+                map = L.map('minimap', {
+                    zoomControl: false,
+                    attributionControl: false,
+                    dragging: true,
+                    touchZoom: true,
+                    doubleClickZoom: true,
+                    scrollWheelZoom: true,
+                    boxZoom: false,
+                    keyboard: false
+                }).setView([lat, lng], isDefault ? 5 : 16);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
+                setTimeout(() => map.invalidateSize(), 300);
+            } else if (!isDefault && !isMapFullscreen) {
+                // Chỉ auto center nếu không ở chế độ fullscreen (vì fullscreen người ta có thể đang pan map)
+                map.setView([lat, lng], map.getZoom() < 10 ? 16 : map.getZoom());
+                map.invalidateSize();
+            }
+
+            if (!isDefault) {
+                const rotation = heading || 0;
+                const carHtml = `
+                    <svg class="car-marker-icon" style="transform: rotate(${rotation}deg)" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5H6.5C5.84 5 5.28 5.42 5.08 6.01L3 12V20C3 20.55 3.45 21 4 21H5C5.55 21 6 20.55 6 20V19H18V20C18 20.55 18.45 21 19 21H20C20.55 21 21 20.55 21 20V12L18.92 6.01ZM6.5 16C5.67 16 5 15.33 5 14.5C5 13.67 5.67 13 6.5 13C7.33 13 8 13.67 8 14.5C8 15.33 7.33 16 6.5 16ZM17.5 16C16.67 16 16 15.33 16 14.5C16 13.67 16.67 13 17.5 13C18.33 13 19 13.67 19 14.5C19 15.33 18.33 16 17.5 16ZM5 11L6.5 6.5H17.5L19 11H5Z" fill="#0ea5e9"/>
+                    </svg>
+                `;
+
+                if (!mMarker) {
+                    const carIcon = L.divIcon({
+                        className: 'my-marker',
+                        html: carHtml,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    });
+                    mMarker = L.marker([lat, lng], { icon: carIcon }).addTo(map);
+                    mAcc = L.circle([lat, lng], { radius: acc || 10, color: 'var(--primary)', fillOpacity: 0.1 }).addTo(map);
+                } else {
+                    mMarker.setLatLng([lat, lng]);
+                    mMarker.setIcon(L.divIcon({
+                        className: 'my-marker',
+                        html: carHtml,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    }));
+                    mAcc.setLatLng([lat, lng]).setRadius(acc || 10);
+                }
+            }
+        }
+
+        // Initialize Map with a default Vietnam center immediately
+        updateMinimap(16.4637, 107.5909, 0, 0, true);
+
+        let lastSnapTime = 0;
+        async function processPosition(pos, isRealtime = false) {
+            let lat = pos.coords.latitude;
+            let lng = pos.coords.longitude;
+            const accuracy = pos.coords.accuracy;
+
+            if (snapToRoadToggle.checked) {
+                const now = Date.now();
+                if (!isRealtime || (now - lastSnapTime > 3000)) {
+                    if (isRealtime) lastSnapTime = now;
+                    const snapped = await snapToRoad(lat, lng);
+                    lat = snapped.lat;
+                    lng = snapped.lng;
+                    updateMinimap(lat, lng, accuracy, pos.coords.heading);
+                    return { lat, lng };
+                }
+            }
+            
+            updateMinimap(lat, lng, accuracy, pos.coords.heading);
+            return { lat, lng };
+        }
+
+        // Try to get precise location
+        if (navigator.geolocation) {
+            statusTxt.textContent = "Chờ GPS...";
+            navigator.geolocation.getCurrentPosition(pos => {
+                statusTxt.textContent = "Đã tìm thấy";
+                processPosition(pos);
+            }, (err) => {
+                console.log("Initial GPS failed:", err);
+                let errMsg = "Lỗi GPS chung";
+                if (err.code === 1) errMsg = "Bị chặn quyền GPS";
+                else if (err.code === 2) errMsg = "Vị trí không khả dụng";
+                else if (err.code === 3) errMsg = "Hết thời gian chờ GPS";
+
+                statusTxt.textContent = "Lỗi GPS";
+                statusTxt.style.color = "#ef4444";
+                statusRing.style.background = "rgba(239, 68, 68, 0.1)";
+                statusRing.style.boxShadow = "inset 0 0 20px rgba(239, 68, 68, 0.2)";
+
+                addLog(errMsg, "error");
+                alert(`${errMsg}. Vui lòng cấp quyền hoặc bật GPS của thiết bị.`);
+            }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+        }
+    </script>
+</body>
+
+</html>

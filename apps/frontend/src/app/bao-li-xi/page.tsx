@@ -1,15 +1,23 @@
+"use client";
+
 import Link from "next/link";
 
 export default function BaoLiXiPage() {
   return (
-    <main className="mx-auto min-h-screen max-w-3xl px-4 py-8 md:px-8">
-      <section className="rounded-3xl border border-slate-700 bg-slate-900/60 p-6">
-        <h1 className="text-2xl font-bold">Bao li xi</h1>
-        <p className="mt-2 text-slate-300">Tinh nang dang phat trien. Ban co the quay lai portal de chon ung dung khac.</p>
-        <Link href="/" className="mt-5 inline-block rounded-lg border border-cyan-300/50 px-4 py-2 text-cyan-100">
-          Quay lai Portal
+    <main className="mx-auto min-h-screen max-w-6xl px-4 py-6 md:px-8">
+      <div className="mb-3 flex items-center justify-between">
+        <h1 className="text-xl font-bold md:text-2xl">Bao Lì Xì</h1>
+        <Link href="/" className="text-xs text-slate-400 hover:text-cyan-300">
+          ← Quay lại Portal
         </Link>
-      </section>
+      </div>
+      <div className="overflow-hidden rounded-2xl border border-slate-700">
+        <iframe
+          src="/lixi/index.html"
+          className="h-[calc(100vh-120px)] w-full border-0"
+          title="Bao Lì Xì"
+        />
+      </div>
     </main>
   );
 }

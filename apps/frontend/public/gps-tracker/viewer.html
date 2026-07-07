@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bản đồ Theo dõi Hành trình</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+
+    <style>
+        :root {
+            --primary: #0ea5e9;
+            --bg-panel: rgba(15, 23, 42, 0.85);
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --offline: #64748b;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body,
+        html {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+
+        /* Floating UI Panel */
+        #ui-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: var(--bg-panel);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 15px;
+            color: var(--text);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+
+        @media (min-width: 768px) {
+            #ui-panel {
+                width: 350px;
+                top: 20px;
+                bottom: auto;
+                right: auto;
+                margin: 0;
+            }
+        }
+
+        .vehicle-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .vehicle-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .v-id {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .v-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .v-speed {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .v-status.online {
+            color: var(--success);
+        }
+
+        .v-status.offline {
+            color: var(--offline);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        button,
+        select,
+        input[type="date"] {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            outline: none;
+            transition: background 0.2s;
+        }
+
+        button:hover,
+        select:hover,
+        input[type="date"] {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        option {
+            background: #1e293b;
+        }
+
+        .header-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-panel h2 {
+            font-size: 16px;
+            margin: 0;
+        }
+
+        .toast {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--success);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        /* Custom markers */
+        .viewer-marker {
+            background: var(--primary);
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .car-marker {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            border: 3px solid var(--success);
+            transition: all 0.3s ease;
+        }
+
+        .car-marker.offline {
+            border-color: var(--offline);
+            opacity: 0.7;
+        }
+
+        .stop-marker {
+            background: var(--warning);
+            border: 2px solid white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+        }
+
+        #distanceNotice {
+            margin-top: 5px;
+            font-size: 12px;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .direction-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="map"></div>
+
+    <div class="toast" id="toastMsg">Thông báo</div>
+
+    <div id="ui-panel">
+        <div class="header-panel">
+            <h2>Danh sách xe</h2>
+            <select id="historySelect">
+                <option value="none">Xem lịch sử</option>
+                <option value="10">10 điểm mới nhất</option>
+                <option value="50">50 điểm</option>
+                <option value="100">100 điểm</option>
+            </select>
+        </div>
+        <div class="controls">
+            <input type="date" id="datePicker" />
+            <button id="btnZoomMe">Vị trí của tôi</button>
+            <button id="btnZoomAll">Xem toàn bộ</button>
+            <button id="btnReplay" style="display:none; background: #8b5cf6;">Replay</button>
+        </div>
+
+        <div id="distanceNotice"></div>
+        <div id="vehiclesList">
+            <!-- Cards rendered here -->
+        </div>
+    </div>
+
+    <script>
+        // URL Params
+        const urlParams = new URLSearchParams(window.location.search);
+        const rawIds = urlParams.get('ids') || urlParams.get('id');
+        const targetIds = rawIds ? rawIds.split(',') : [];
+
+        // State
+        const myPos = { lat: 10.762622, lng: 106.660172 }; // Default HCMC
+        const vehiclesInfo = new Map(); // id -> { marker, data, history, isOffline, stopTimer, lastPos }
+        let viewerMarker, accuracyCircle, dashedLine;
+        let selectedVehicleId = targetIds.length > 0 ? targetIds[0] : null;
+
+        // Leaflet Init
+        const map = L.map('map', { zoomControl: false }).setView([myPos.lat, myPos.lng], 13);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Socket.io
+        const socket = io('/gps', { transports: ['websocket', 'polling'] });
+
+        socket.on('connect', () => {
+            targetIds.forEach(id => socket.emit('join_tracking', id));
+        });
+
+        // Helper Toast
+        function showToast(msg) {
+            const el = document.getElementById('toastMsg');
+            el.textContent = msg;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 3000);
+        }
+
+        // Distance Calculation (Haversine)
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // Update Distance UI & Line
+        function updateConnection() {
+            if (!selectedVehicleId) return;
+            const v = vehiclesInfo.get(selectedVehicleId);
+            if (!v || !v.data || !myPos.lat) return;
+
+            const dist = getDistance(myPos.lat, myPos.lng, v.data.latitude, v.data.longitude);
+            document.getElementById('distanceNotice').textContent = `Cách bạn: ${dist.toFixed(2)} km`;
+
+            const latlngs = [[myPos.lat, myPos.lng], [v.data.latitude, v.data.longitude]];
+            if (dashedLine) {
+                dashedLine.setLatLngs(latlngs);
+            } else {
+                dashedLine = L.polyline(latlngs, { color: 'var(--primary)', dashArray: '5, 10', weight: 2 }).addTo(map);
+            }
+        }
+
+        // Update List UI
+        function renderVehiclesList() {
+            const list = document.getElementById('vehiclesList');
+            list.innerHTML = '';
+
+            vehiclesInfo.forEach((v, id) => {
+                const rxDiff = Math.floor((Date.now() - v.localReceivedTime) / 1000);
+                let timeStr = `Vừa xong (${rxDiff}s)`;
+                if (v.isOffline) {
+                    const dt = new Date(v.data.timestamp);
+                    timeStr = `lúc ${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')}`;
+                }
+
+                const statusStr = v.isOffline ? 'Offline' : 'Online';
+                const card = document.createElement('div');
+                card.className = 'vehicle-card';
+                card.innerHTML = `
+          <div>
+            <div class="v-id">Xe ${id.substring(0, 6)}</div>
+            <div class="v-meta">
+              <span class="v-status ${v.isOffline ? 'offline' : 'online'}">• ${statusStr}</span>
+              <span>Cập nhật: ${timeStr}</span>
+            </div>
+          </div>
+          <div class="v-speed">${parseFloat(v.data.speed).toFixed(1)} <span style="font-size:10px">km/h</span></div>
+        `;
+                card.onclick = () => {
+                    selectedVehicleId = id;
+                    map.setView([v.data.latitude, v.data.longitude], 16);
+                    updateConnection();
+                };
+                list.appendChild(card);
+            });
+        }
+
+        // Process Vehicle Status Loops
+        setInterval(() => {
+            const now = Date.now();
+            vehiclesInfo.forEach((v, id) => {
+                const timeDiff = (now - v.localReceivedTime) / 1000;
+                const wasOffline = v.isOffline;
+
+                // Track online/offline strictly by local package receipt interval, immune to device clock drift
+                v.isOffline = timeDiff > 60;
+
+                if (!wasOffline && v.isOffline) {
+                    showToast(`Xe ${id.substring(0, 4)} đã ngắt kết nối (hoặc vào khuất sóng)`);
+                    updateVehicleMarker(v);
+                } else if (wasOffline && !v.isOffline) {
+                    showToast(`Xe ${id.substring(0, 4)} đã truyền tín hiệu trở lại`);
+                    updateVehicleMarker(v);
+                }
+            });
+            renderVehiclesList();
+        }, 5000);
+
+        // Create/Update marker
+        function updateVehicleMarker(v) {
+            if (!v.marker) {
+                const iconHtml = `<div class="car-marker ${v.isOffline ? 'offline' : ''}">🚙</div>`;
+                const icon = L.divIcon({ html: iconHtml, className: '', iconSize: [40, 40], iconAnchor: [20, 20] });
+                v.marker = L.marker([v.data.latitude, v.data.longitude], { icon }).addTo(map);
+            } else {
+                v.marker.setLatLng([v.data.latitude, v.data.longitude]);
+                const iconHtml = `<div class="car-marker ${v.isOffline ? 'offline' : ''}">🚙</div>`;
+                v.marker.setIcon(L.divIcon({ html: iconHtml, className: '', iconSize: [40, 40], iconAnchor: [20, 20] }));
+            }
+        }
+
+        // Receive data
+        socket.on('location_update', (data) => {
+            if (!targetIds.includes(data.trackingId) && targetIds.length > 0) return;
+
+            const isNew = !vehiclesInfo.has(data.trackingId);
+            let v = vehiclesInfo.get(data.trackingId);
+            if (!v) {
+                // Initialize timestamp. Backdate if data is very old (initial sheet load to prevent false online)
+                const timestampDiff = (Date.now() - new Date(data.timestamp).getTime()) / 1000;
+                let initialRecv = Date.now();
+                if (timestampDiff > 120) {
+                    initialRecv = Date.now() - (timestampDiff * 1000);
+                }
+                v = { isOffline: (timestampDiff > 120), data: null, polyline: null, stops: [], localReceivedTime: initialRecv };
+                vehiclesInfo.set(data.trackingId, v);
+            }
+
+            if (isNew) showToast(`Xe mới tham gia: ${data.trackingId.substring(0, 4)}`);
+
+            // Detect Stop logic (Speed < 2km/h for > 3 minutes => stop)
+            if (v.data && data.speed < 2) {
+                if (!v.stopStart) v.stopStart = new Date();
+                const diffMs = new Date() - v.stopStart;
+                if (diffMs > 3 * 60 * 1000 && !v.stopMarked) {
+                    v.stopMarked = true;
+                    // Add stop marker
+                    L.marker([data.latitude, data.longitude], {
+                        icon: L.divIcon({ className: 'stop-marker', iconSize: [20, 20] })
+                    }).addTo(map).bindPopup(`Đã dừng lúc: ${new Date().toLocaleTimeString()}`);
+                }
+            } else {
+                v.stopStart = null;
+                v.stopMarked = false;
+            }
+
+            v.data = data;
+            // Only update local rx if this is a live fresh packet (prevent historic packets from marking online)
+            if (!isNew || (Date.now() - v.localReceivedTime) < 1000) {
+                v.localReceivedTime = Date.now();
+                v.isOffline = false;
+            }
+
+            updateVehicleMarker(v);
+
+            if (selectedVehicleId === data.trackingId) {
+                updateConnection();
+            }
+
+            renderVehiclesList();
+
+            if (isNew && vehiclesInfo.size === 1) {
+                map.setView([data.latitude, data.longitude], 15);
+            }
+        });
+
+        // Device location 
+        navigator.geolocation.watchPosition(
+            pos => {
+                myPos.lat = pos.coords.latitude;
+                myPos.lng = pos.coords.longitude;
+                if (!viewerMarker) {
+                    viewerMarker = L.marker([myPos.lat, myPos.lng], {
+                        icon: L.divIcon({ className: 'viewer-marker', iconSize: [16, 16] })
+                    }).addTo(map);
+                    accuracyCircle = L.circle([myPos.lat, myPos.lng], { radius: pos.coords.accuracy, color: 'var(--primary)', fillOpacity: 0.1 }).addTo(map);
+                } else {
+                    viewerMarker.setLatLng([myPos.lat, myPos.lng]);
+                    accuracyCircle.setLatLng([myPos.lat, myPos.lng]).setRadius(pos.coords.accuracy);
+                }
+                updateConnection();
+                
+                // Emit viewer location if watching a specific track
+                if (targetIds.length > 0 && selectedVehicleId && socket.connected) {
+                    if (!window.viewerId) window.viewerId = crypto.randomUUID();
+                    socket.emit('viewer_location', {
+                        trackingId: selectedVehicleId,
+                        viewerId: window.viewerId,
+                        latitude: myPos.lat,
+                        longitude: myPos.lng
+                    });
+                }
+            },
+            err => console.log('Viewer GPS error', err),
+            { enableHighAccuracy: true }
+        );
+
+        // Controls
+        document.getElementById('btnZoomMe').onclick = () => {
+            if (myPos.lat) map.setView([myPos.lat, myPos.lng], 16);
+        };
+
+        document.getElementById('btnZoomAll').onclick = () => {
+            const bounds = [];
+            if (myPos.lat) bounds.push([myPos.lat, myPos.lng]);
+            vehiclesInfo.forEach(v => bounds.push([v.data.latitude, v.data.longitude]));
+            if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50] });
+        };
+
+        // HISTORY LOGIC
+        let currentHistoryLine = null;
+        let replayInterval = null;
+        const btnReplay = document.getElementById('btnReplay');
+
+        document.getElementById('historySelect').onchange = (e) => loadHistory(e.target.value);
+        document.getElementById('datePicker').onchange = (e) => loadHistoryByDate(e.target.value);
+
+        async function fetchPoints(url) {
+            if (!selectedVehicleId) return alert('Chọn xe trước');
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                if (data.length === 0) return alert('Không có dữ liệu lịch sử');
+                drawRoute(data);
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        function loadHistory(limitStr) {
+            if (limitStr === 'none') {
+                if (currentHistoryLine) map.removeLayer(currentHistoryLine);
+                btnReplay.style.display = 'none';
+                return;
+            }
+            fetchPoints(`/api/gps/history?id=${selectedVehicleId}&limit=${limitStr}`);
+        }
+
+        function loadHistoryByDate(date) {
+            if (!date) return;
+            fetchPoints(`/api/gps/historyByDate?id=${selectedVehicleId}&date=${date}`);
+        }
+
+        let directionMarkers = [];
+
+        function drawRoute(points) {
+            if (currentHistoryLine) map.removeLayer(currentHistoryLine);
+            directionMarkers.forEach(m => map.removeLayer(m));
+            directionMarkers = [];
+
+            // Clean/parse data from sheets 
+            const latlngs = [];
+            points.forEach(p => {
+                const latStr = String(p.latitude).replace(/,/g, '.');
+                const lngStr = String(p.longitude).replace(/,/g, '.');
+                const lat = parseFloat(latStr);
+                const lng = parseFloat(lngStr);
+
+                // Strict bounds checking to prevent Leaflet projection from generating NaN and SVG crashing
+                if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                    latlngs.push([lat, lng]);
+                }
+            });
+
+            if (latlngs.length === 0) return alert('Không thể trích xuất toạ độ hợp lệ từ lịch sử.');
+
+            currentHistoryLine = L.polyline(latlngs, { color: '#8b5cf6', weight: 4, opacity: 0.7 }).addTo(map);
+            
+            // Draw direction arrows on the path
+            for (let i = 0; i < latlngs.length - 1; i++) {
+                const p1 = latlngs[i];
+                const p2 = latlngs[i+1];
+                // Calculate bearing/heading
+                const y = Math.sin((p2[1] - p1[1]) * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180);
+                const x = Math.cos(p1[0] * Math.PI / 180) * Math.sin(p2[0] * Math.PI / 180) -
+                          Math.sin(p1[0] * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180) * Math.cos((p2[1] - p1[1]) * Math.PI / 180);
+                let bearing = Math.atan2(y, x) * 180 / Math.PI;
+                if (bearing < 0) bearing += 360;
+                
+                // Only place arrow if distance is large enough
+                const dist = getDistance(p1[0], p1[1], p2[0], p2[1]) * 1000; // in meters
+                if (dist > 10) { // minimum 10 meters spacing between arrows
+                    const arrowHtml = `<div class="direction-arrow" style="transform: rotate(${bearing}deg);"><svg width="12" height="12" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L22 20L12 17L2 20L12 2Z"/></svg></div>`;
+                    const arrowIcon = L.divIcon({ html: arrowHtml, className: '', iconSize: [12, 12], iconAnchor: [6, 6] });
+                    const marker = L.marker(p2, { icon: arrowIcon, interactive: false }).addTo(map);
+                    directionMarkers.push(marker);
+                }
+            }
+
+            map.fitBounds(currentHistoryLine.getBounds());
+
+            btnReplay.style.display = 'inline-block';
+            btnReplay.onclick = () => doReplay(latlngs);
+        }
+
+        function doReplay(latlngs) {
+            if (replayInterval) clearInterval(replayInterval);
+            let idx = 0;
+            const v = vehiclesInfo.get(selectedVehicleId);
+            if (!v || !v.marker) return;
+
+            btnReplay.textContent = "Đang Replay...";
+            btnReplay.style.background = '#0ea5e9';
+
+            replayInterval = setInterval(() => {
+                if (idx >= latlngs.length) {
+                    clearInterval(replayInterval);
+                    btnReplay.textContent = "Replay";
+                    btnReplay.style.background = '#8b5cf6';
+                    return;
+                }
+                const p = latlngs[idx];
+                v.marker.setLatLng([p[0], p[1]]);
+                map.setView([p[0], p[1]], map.getZoom(), { animate: false });
+                idx++;
+            }, 500); // 0.5s per point
+        }
+
+        // Initial map fallback load
+        fetch(`/api/gps/locations?ids=${targetIds.join(',')}`).then(r => r.json()).then(data => {
+            Object.values(data).forEach(loc => {
+                // mock socket event to reuse logic
+                socket.emit('location_update', loc);
+            });
+        }).catch(e => { });
+    </script>
+</body>
+
+</html>

@@ -142,6 +142,7 @@ export class InMemoryRoomStore {
       hostSessionId: room.hostSessionId,
       nowPlaying: room.nowPlaying,
       queueLength: room.queue.length,
+      maxQueueSize: 50,
       createdAt: room.createdAt
     };
   }

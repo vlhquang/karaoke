@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autoboxing và Unboxing - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; <a
+                        href="so-va-chuoi.html">Số và Chuỗi</a> &gt; Autoboxing
+                </div>
+                <h1>Autoboxing và Unboxing</h1>
+
+                <section id="autoboxing">
+                    <h2>Autoboxing</h2>
+                    <p><strong>Autoboxing</strong> là quá trình chuyển đổi tự động mà trình biên dịch Java thực hiện
+                        giữa kiểu nguyên thủy và lớp bao bọc tương ứng của nó. Ví dụ, chuyển <code>int</code> sang
+                        <code>Integer</code>.</p>
+                    <div class="code-block">
+                        <pre><code>// Thay vì phải viết:
+Character ch = Character.valueOf('a');
+// Trình biên dịch sẽ tự động chuyển:
+Character ch = 'a'; // Autoboxing</code></pre>
+                    </div>
+                </section>
+
+                <section id="unboxing">
+                    <h2>Unboxing</h2>
+                    <p><strong>Unboxing</strong> là quá trình ngược lại: chuyển từ lớp bao bọc sang kiểu nguyên thủy.
+                    </p>
+                    <div class="code-block">
+                        <pre><code>Integer i = 42;   // Autoboxing
+int j = i;        // Unboxing: Integer -> int
+int k = i + 5;    // Unboxing ngầm trước khi cộng</code></pre>
+                    </div>
+                </section>
+
+                <section id="when">
+                    <h2>Khi nào xảy ra?</h2>
+                    <p>Autoboxing/Unboxing xảy ra tự động khi trình biên dịch phát hiện sự không khớp về kiểu:</p>
+                    <ul style="margin-left: 20px;">
+                        <li>Khi gán giá trị nguyên thủy vào một biến kiểu bao bọc (và ngược lại).</li>
+                        <li>Khi truyền tham số nguyên thủy vào phương thức yêu cầu kiểu bao bọc (và ngược lại).</li>
+                        <li>Khi sử dụng các <code>Collection</code> (ví dụ: <code>List&lt;Integer&gt;</code>).</li>
+                    </ul>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="string-builder.html">&lt; String Builders</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="generics.html">Generics &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#autoboxing">Autoboxing</a></li>
+                    <li><a href="#unboxing">Unboxing</a></li>
+                    <li><a href="#when">Khi nào xảy ra?</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

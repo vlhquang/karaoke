@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chuỗi (Strings) trong Java - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; <a
+                        href="so-va-chuoi.html">Số và Chuỗi</a> &gt; Chuỗi
+                </div>
+                <h1>Chuỗi (Strings)</h1>
+
+                <section id="create">
+                    <h2>Tạo chuỗi</h2>
+                    <p>Lớp <code>String</code> trong Java được sử dụng để tạo và thao tác chuỗi ký tự. Chuỗi là bất biến
+                        (<strong>immutable</strong>).</p>
+                    <div class="code-block">
+                        <pre><code>// Cách thông thường
+String greeting = "Hello world!";
+
+// Dùng constructor
+char[] helloArray = {'h', 'e', 'l', 'l', 'o'};
+String helloString = new String(helloArray);</code></pre>
+                    </div>
+                </section>
+
+                <section id="methods">
+                    <h2>Các phương thức thông dụng của String</h2>
+                    <div class="code-block">
+                        <pre><code>String s = "Hello World";
+IO.println(s.length());        // 11
+IO.println(s.charAt(0));       // 'H'
+IO.println(s.indexOf("World")); // 6
+IO.println(s.toLowerCase());   // "hello world"
+IO.println(s.toUpperCase());   // "HELLO WORLD"
+IO.println(s.trim());          // Xóa khoảng trắng đầu/cuối
+IO.println(s.replace("World", "Java")); // "Hello Java"
+IO.println(s.substring(6));    // "World"
+IO.println(s.contains("World")); // true</code></pre>
+                    </div>
+                </section>
+
+                <section id="concat">
+                    <h2>Nối chuỗi</h2>
+                    <p>Có thể nối chuỗi bằng toán tử <code>+</code> hoặc phương thức <code>concat()</code>.</p>
+                    <div class="code-block">
+                        <pre><code>String first = "Hello";
+String second = " World";
+String joined = first + second; // "Hello World"
+// Hoặc
+String joined2 = first.concat(second);</code></pre>
+                    </div>
+                </section>
+
+                <section id="format">
+                    <h2>Định dạng chuỗi</h2>
+                    <p>Sử dụng <code>String.format()</code> hoặc <code>formatted()</code> để tạo chuỗi có định dạng:</p>
+                    <div class="code-block">
+                        <pre><code>String formatted = String.format("Name: %s, Age: %d", "Java", 30);
+// Hoặc (Java 15+)
+String formatted2 = "Name: %s, Age: %d".formatted("Java", 30);</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="ky-tu.html">&lt; Ký tự</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="string-builder.html">String Builders &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#create">Tạo chuỗi</a></li>
+                    <li><a href="#methods">Phương thức thông dụng</a></li>
+                    <li><a href="#concat">Nối chuỗi</a></li>
+                    <li><a href="#format">Định dạng chuỗi</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

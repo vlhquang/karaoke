@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collections Framework - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; Collections
+                    Framework
+                </div>
+                <h1>Collections Framework</h1>
+
+                <section id="intro">
+                    <h2>Collections Framework là gì?</h2>
+                    <p>Java Collections Framework (JCF) là một kiến trúc hợp nhất để lưu trữ và xử lý các nhóm đối
+                        tượng. Nó cung cấp các giao diện, triển khai và thuật toán.</p>
+                </section>
+
+                <section id="core-interfaces">
+                    <h2>Các giao diện cốt lõi</h2>
+                    <div class="code-block">
+                        <pre><code>// List - Danh sách có thứ tự, cho phép trùng lặp
+List&lt;String&gt; list = new ArrayList&lt;&gt;();
+list.add("Apple"); list.add("Banana"); list.add("Apple");
+
+// Set - Tập hợp không trùng lặp
+Set&lt;String&gt; set = new HashSet&lt;&gt;();
+set.add("Apple"); set.add("Apple"); // Chỉ có 1 "Apple"
+
+// Map - Ánh xạ khóa-giá trị
+Map&lt;String, Integer&gt; map = new HashMap&lt;&gt;();
+map.put("Alice", 30);
+map.put("Bob", 25);
+IO.println(map.get("Alice")); // 30</code></pre>
+                    </div>
+                </section>
+
+                <section id="implementations">
+                    <h2>Các lớp triển khai thông dụng</h2>
+                    <ul style="margin-left: 20px;">
+                        <li><code>ArrayList</code>: List dựa trên mảng động, truy cập nhanh.</li>
+                        <li><code>LinkedList</code>: List dựa trên danh sách liên kết, thêm/xóa nhanh hơn.</li>
+                        <li><code>HashSet</code>: Set không có thứ tự, hiệu suất cao nhất.</li>
+                        <li><code>TreeSet</code>: Set được sắp xếp.</li>
+                        <li><code>HashMap</code>: Map không có thứ tự, hiệu suất cao nhất.</li>
+                        <li><code>LinkedHashMap</code>: Map giữ thứ tự thêm vào.</li>
+                    </ul>
+                </section>
+
+                <section id="iteration">
+                    <h2>Duyệt qua Collection</h2>
+                    <div class="code-block">
+                        <pre><code>List&lt;String&gt; fruits = List.of("Apple", "Banana", "Cherry");
+
+// Dùng for-each
+for (String fruit : fruits) {
+    IO.println(fruit);
+}
+
+// Dùng forEach + Lambda
+fruits.forEach(fruit -> IO.println(fruit));
+
+// Dùng Iterator
+Iterator&lt;String&gt; it = fruits.iterator();
+while (it.hasNext()) {
+    IO.println(it.next());
+}</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="ngoai-le.html">&lt; Xử lý ngoại lệ</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="stream-api.html">Stream API &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Giới thiệu</a></li>
+                    <li><a href="#core-interfaces">Giao diện cốt lõi</a></li>
+                    <li><a href="#implementations">Lớp triển khai</a></li>
+                    <li><a href="#iteration">Duyệt Collection</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

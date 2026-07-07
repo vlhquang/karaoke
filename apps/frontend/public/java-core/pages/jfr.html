@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JDK Flight Recorder - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; JDK Flight Recorder</div>
+                <h1>JDK Flight Recorder (JFR)</h1>
+                <section id="intro">
+                    <h2>JFR là gì?</h2>
+                    <p>JDK Flight Recorder (JFR) là một công cụ profiling và event recording được tích hợp trong JVM từ
+                        Java 11+. Nó ghi lại các sự kiện với <strong>overhead rất thấp</strong> (thường &lt;1%), cho
+                        phép chạy trong môi trường sản xuất.</p>
+                </section>
+                <section id="usage">
+                    <h2>Cách sử dụng</h2>
+                    <div class="code-block">
+                        <pre><code># Bật JFR khi khởi chạy ứng dụng
+java -XX:StartFlightRecording=duration=60s,filename=recording.jfr Main
+
+# Bật JFR liên tục (không giới hạn thời gian)
+java -XX:StartFlightRecording MyApp
+
+# Dump recording từ tiến trình đang chạy
+jcmd &lt;pid&gt; JFR.dump filename=recording.jfr</code></pre>
+                    </div>
+                </section>
+                <section id="jmc">
+                    <h2>Phân tích với JDK Mission Control</h2>
+                    <p>Tệp <code>.jfr</code> có thể được mở và phân tích bằng <strong>JDK Mission Control (jmc)</strong>
+                        - một công cụ GUI miễn phí từ Oracle và Oracle Labs.</p>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="garbage-collection.html">&lt;
+                            Garbage Collection</a></div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="jwebserver.html">JWebserver &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">JFR là gì?</a></li>
+                    <li><a href="#usage">Cách dùng</a></li>
+                    <li><a href="#jmc">Phân tích</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

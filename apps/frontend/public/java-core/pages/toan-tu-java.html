@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sử dụng các Toán tử - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem & Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> > <a href="../index.html">Hướng dẫn</a> > <a
+                        href="ngon-ngu-co-ban.html">Cơ bản về ngôn ngữ Java</a> > Sử dụng các Toán tử
+                </div>
+
+                <h1>Sử dụng các Toán tử trong Java</h1>
+
+                <section id="intro">
+                    <h2>Toán tử là gì?</h2>
+                    <p>Toán tử là các ký hiệu đặc biệt thực hiện các thao tác cụ thể trên một, hai hoặc ba toán hạng,
+                        sau đó trả về một kết quả.</p>
+                </section>
+
+                <section id="assignment">
+                    <h2>Toán tử gán (Assignment Operator)</h2>
+                    <p>Toán tử gán đơn giản nhất là <code>=</code>, dùng để gán giá trị bên phải cho toán hạng bên trái.
+                    </p>
+                    <div class="code-block">
+                        <pre><code>int speed = 0;
+int gear = 1;</code></pre>
+                    </div>
+                </section>
+
+                <section id="arithmetic">
+                    <h2>Toán tử số học (Arithmetic Operators)</h2>
+                    <p>Java cung cấp các toán tử để thực hiện cộng, trừ, nhân, chia và chia lấy dư:</p>
+                    <ul style="margin-left: 20px;">
+                        <li><code>+</code> : Cộng (cũng dùng để nối chuỗi)</li>
+                        <li><code>-</code> : Trừ</li>
+                        <li><code>*</code> : Nhân</li>
+                        <li><code>/</code> : Chia</li>
+                        <li><code>%</code> : Chia lấy dư</li>
+                    </ul>
+                    <div class="code-block">
+                        <pre><code>int result = 1 + 2; // result là 3
+result = result - 1; // result là 2
+result = result % 7; // result là 3 (số dư của 10 / 7)</code></pre>
+                    </div>
+                </section>
+
+                <section id="unary">
+                    <h2>Toán tử đơn phân (Unary Operators)</h2>
+                    <p>Các toán tử này chỉ cần một toán hạng duy nhất:</p>
+                    <ul style="margin-left: 20px;">
+                        <li><code>++</code> : Tăng giá trị lên 1</li>
+                        <li><code>--</code> : Giảm giá trị đi 1</li>
+                        <li><code>!</code> : Đảo ngược giá trị logic (boolean)</li>
+                        <li><code>-</code> : Đảo dấu giá trị số</li>
+                    </ul>
+                    <div class="code-block">
+                        <pre><code>int i = 3;
+i++; // i là 4
+++i; // i là 5
+IO.println(!true); // In ra false</code></pre>
+                    </div>
+                </section>
+
+                <section id="relational">
+                    <h2>Toán tử so sánh (Relational Operators)</h2>
+                    <p>Dùng để xác định mối quan hệ giữa hai toán hạng:</p>
+                    <ul style="margin-left: 20px;">
+                        <li><code>==</code> : Bằng nhau</li>
+                        <li><code>!=</code> : Khác nhau</li>
+                        <li><code>></code> : Lớn hơn</li>
+                        <li><code>>=</code> : Lớn hơn hoặc bằng</li>
+                        <li><code><</code> : Nhỏ hơn</li>
+                        <li><code><=</code> : Nhỏ hơn hoặc bằng</li>
+                    </ul>
+                </section>
+
+                <section id="conditional">
+                    <h2>Toán tử điều kiện (Conditional Operators)</h2>
+                    <p>Các toán tử logic <code>&&</code> (VÀ) và <code>||</code> (HOẶC) được sử dụng trên hai biểu thức
+                        boolean. Chúng có cơ chế "ngắt sớm" (short-circuiting).</p>
+                    <p>Toán tử tam phân <code>?:</code> là cách viết tắt của câu lệnh <code>if-then-else</code>:</p>
+                    <div class="code-block">
+                        <pre><code>result = someCondition ? value1 : value2;</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="su-dung-var.html">
+                            < Sử dụng định danh kiểu var</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="bieu-thuc-cau-lenh-khoi.html">Biểu thức, Câu lệnh và Khối mã ></a>
+                    </div>
+                </div>
+            </article>
+
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Giới thiệu</a></li>
+                    <li><a href="#assignment">Toán tử gán</a></li>
+                    <li><a href="#arithmetic">Toán tử số học</a></li>
+                    <li><a href="#unary">Toán tử đơn phân</a></li>
+                    <li><a href="#relational">Toán tử so sánh</a></li>
+                    <li><a href="#conditional">Toán tử điều kiện</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

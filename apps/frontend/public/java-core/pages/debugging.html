@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debugging trong Java - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container"><img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo"><span
+                class="logo-text">Java</span></div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb"><a href="../index.html">Trang chủ</a> &gt; Debugging</div>
+                <h1>Debugging trong Java</h1>
+                <section id="what-is">
+                    <h2>Debugging là gì?</h2>
+                    <p>Debugging (gỡ lỗi) là quá trình tìm và sửa lỗi trong chương trình. Hầu hết các IDE Java hiện đại
+                        đều tích hợp debugger mạnh mẽ giúp bạn dừng chương trình tại bất kỳ dòng nào và kiểm tra giá trị
+                        biến.</p>
+                </section>
+                <section id="breakpoints">
+                    <h2>Breakpoints</h2>
+                    <p>Breakpoint là điểm dừng trong code. Khi debugger đạt đến breakpoint, chương trình dừng lại và bạn
+                        có thể:</p>
+                    <ul style="margin-left: 20px;">
+                        <li>Xem giá trị của tất cả biến tại thời điểm đó.</li>
+                        <li>Thực thi từng dòng một (Step Over, Step Into, Step Out).</li>
+                        <li>Thay đổi giá trị biến trực tiếp.</li>
+                    </ul>
+                </section>
+                <section id="ide-debug">
+                    <h2>Debug trong IDE</h2>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>VS Code:</strong> F5 để bắt đầu debug, F9 để đặt/xóa breakpoint.</li>
+                        <li><strong>IntelliJ IDEA:</strong> Shift+F9 để debug, F9 đặt breakpoint.</li>
+                        <li><strong>Eclipse:</strong> F11 để debug, Ctrl+Shift+B để đặt breakpoint.</li>
+                    </ul>
+                </section>
+                <section id="tips">
+                    <h2>Mẹo debug hiệu quả</h2>
+                    <ul style="margin-left: 20px;">
+                        <li>Đọc kỹ stack trace khi có exception.</li>
+                        <li>Dùng logging (<code>IO.println()</code> hoặc <code>java.util.logging</code>) để theo dõi
+                            luồng chương trình.</li>
+                        <li>Viết unit tests để phát hiện lỗi sớm.</li>
+                        <li>Dùng binary search để cô lập vùng code có lỗi.</li>
+                    </ul>
+                </section>
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box"><span class="label">Trước đó</span><a href="chung-chi-java.html">&lt; Chứng chỉ
+                            Java</a></div>
+                    <div class="nav-box" style="text-align: right;"><span class="label">Tiếp theo</span><a
+                            href="../index.html">Quay lại Trang chủ &gt;</a></div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#what-is">Debugging là gì?</a></li>
+                    <li><a href="#breakpoints">Breakpoints</a></li>
+                    <li><a href="#ide-debug">Debug trong IDE</a></li>
+                    <li><a href="#tips">Mẹo debug</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

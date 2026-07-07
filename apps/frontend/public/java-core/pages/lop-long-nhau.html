@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lớp lồng nhau - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; <a
+                        href="lop-va-doi-tuong.html">Lớp và Đối tượng</a> &gt; Lớp lồng nhau
+                </div>
+                <h1>Lớp lồng nhau (Nested Classes)</h1>
+
+                <section id="intro">
+                    <h2>Giới thiệu</h2>
+                    <p>Ngôn ngữ Java cho phép bạn định nghĩa một lớp bên trong một lớp khác. Lớp đó được gọi là
+                        <strong>lớp lồng nhau (nested class)</strong>.</p>
+                    <div class="code-block">
+                        <pre><code>class OuterClass {
+    // ...
+    class NestedClass {
+        // ...
+    }
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="types">
+                    <h2>Các loại lớp lồng nhau</h2>
+                    <p>Lớp lồng nhau được chia thành hai loại:</p>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>Lớp lồng tĩnh (Static Nested Class):</strong> Được khai báo với từ khóa
+                            <code>static</code>. Nó không thể truy cập trực tiếp vào các thành viên instance của lớp bên
+                            ngoài.</li>
+                        <li><strong>Lớp nội bộ (Inner Class):</strong> Không có từ khóa <code>static</code>. Nó có thể
+                            truy cập mọi trường và phương thức của lớp bên ngoài, kể cả các thành viên
+                            <code>private</code>.</li>
+                    </ul>
+                </section>
+
+                <section id="why">
+                    <h2>Khi nào nên dùng?</h2>
+                    <ul style="margin-left: 20px;">
+                        <li>Khi chỉ có một lớp sử dụng lớp đó (nhóm logic liên quan).</li>
+                        <li>Để tăng cường đóng gói (encapsulation).</li>
+                        <li>Để tạo mã ngắn gọn hơn (ví dụ với Anonymous Classes và Lambdas).</li>
+                    </ul>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="tao-va-dung-doi-tuong.html">&lt; Tạo và sử dụng đối tượng</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="enum.html">Enum &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">Giới thiệu</a></li>
+                    <li><a href="#types">Các loại</a></li>
+                    <li><a href="#why">Khi nào dùng?</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

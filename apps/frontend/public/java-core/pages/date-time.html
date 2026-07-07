@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Date Time API - Học Java</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://dev.java/assets/images/java-logo-vector.png" alt="Java Logo">
+            <span class="logo-text">Java</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="../index.html">Hướng dẫn</a></li>
+                <li><a href="#">Xem &amp; Nghe</a></li>
+                <li><a href="#">Hỏi đáp (FAQ)</a></li>
+                <li><a href="#">Oracle University</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            <article>
+                <div class="breadcrumb">
+                    <a href="../index.html">Trang chủ</a> &gt; <a href="../index.html">Hướng dẫn</a> &gt; Date Time API
+                </div>
+                <h1>Date Time API (java.time)</h1>
+
+                <section id="intro">
+                    <h2>API phiên bản mới (java.time)</h2>
+                    <p>Java 8 giới thiệu gói <code>java.time</code> thay thế cho lớp <code>Date</code> và
+                        <code>Calendar</code> cũ vốn bị chỉ trích nhiều. API mới có thiết kế bất biến (immutable), rõ
+                        ràng và an toàn với luồng (thread-safe).</p>
+                </section>
+
+                <section id="classes">
+                    <h2>Các lớp chính</h2>
+                    <div class="code-block">
+                        <pre><code>import java.time.*;
+import java.time.format.DateTimeFormatter;
+
+// Chỉ ngày (không có giờ/múi giờ)
+LocalDate date = LocalDate.now();           // 2025-03-04
+LocalDate birthday = LocalDate.of(1990, 5, 15);
+
+// Chỉ giờ (không có ngày/múi giờ)
+LocalTime time = LocalTime.now();           // 16:30:00.123
+LocalTime noon = LocalTime.of(12, 0);
+
+// Ngày và giờ (không có múi giờ)
+LocalDateTime dateTime = LocalDateTime.now();
+
+// Với múi giờ
+ZonedDateTime zoned = ZonedDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));</code></pre>
+                    </div>
+                </section>
+
+                <section id="operations">
+                    <h2>Thao tác với Date/Time</h2>
+                    <div class="code-block">
+                        <pre><code>LocalDate today = LocalDate.now();
+LocalDate nextWeek = today.plusWeeks(1);
+LocalDate lastMonth = today.minusMonths(1);
+
+// Khoảng cách giữa hai ngày
+Period period = Period.between(birthday, today);
+IO.println("Tuổi: " + period.getYears());
+
+// Định dạng và phân tích
+DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+String formatted = today.format(fmt); // "04/03/2025"
+LocalDate parsed = LocalDate.parse("15/05/1990", fmt);</code></pre>
+                    </div>
+                </section>
+
+                <div class="tutorial-nav" style="margin-top: 40px;">
+                    <div class="nav-box">
+                        <span class="label">Trước đó</span>
+                        <a href="java-io.html">&lt; Java I/O API</a>
+                    </div>
+                    <div class="nav-box" style="text-align: right;">
+                        <span class="label">Tiếp theo</span>
+                        <a href="modules.html">Modules &gt;</a>
+                    </div>
+                </div>
+            </article>
+            <aside class="sidebar">
+                <div class="toc-title">Trong bài học này</div>
+                <ul class="toc-list">
+                    <li><a href="#intro">API mới (java.time)</a></li>
+                    <li><a href="#classes">Các lớp chính</a></li>
+                    <li><a href="#operations">Thao tác</a></li>
+                </ul>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Oracle Corporation. Phiên bản tiếng Việt tái bản dựa trên dev.java.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

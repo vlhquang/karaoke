@@ -1,12 +1,23 @@
+// @ts-nocheck
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import next from "next";
+import express from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import dotenv from "dotenv";
+import { createLiXiExpressApp } from "./src/li-xi-nang-cao/app";
+import { RoomService as LiXiRoomService } from "./src/li-xi-nang-cao/services/room.service";
+import { registerLiXiNamespace } from "./src/li-xi-nang-cao/socket";
+import { startKeepAlive } from "./src/lib/keep-alive";
+import { getStockAutoRefreshStatus, startStockAutoRefreshWorker } from "./src/lib/stock-auto-refresh";
+import { registerGpsTracker } from "./src/gps-tracker";
+import { registerCoTyPhuNamespace } from "./src/co-ty-phu/socket/register-co-ty-phu";
+import { registerFitnessGameNamespace } from "./src/fitness-game/socket";
 import type {
   AddSongPayload,
   ClientToServerEvents,
@@ -19,11 +30,36 @@ import type {
   RoomState,
   ServerToClientEvents,
   SetQueueLimitPayload,
-  SkipSongPayload
+  SkipSongPayload,
+  LotoClientToServerEvents,
+  LotoConfig,
+  LotoCreateRoomPayload,
+  LotoJoinRoomPayload,
+  LotoStartGamePayload,
+  LotoCallNumberPayload,
+  LotoClaimWinPayload,
+  LotoCloseRoomPayload,
+  LotoToggleReadyPayload,
+  LotoResetRoundPayload,
+  LotoRoomSnapshot,
+  LotoRoomState,
+  LotoGameStatus
 } from "@karaoke/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const require = createRequire(import.meta.url);
+const RacingGameRoom = require(resolve(__dirname, "../../racing-game/server/GameRoom.js"));
+const racingConfigCache = require(resolve(__dirname, "../../racing-game/server/configCache.js"));
+
+const resolveExistingPath = (candidates: string[]): string | null => {
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+};
 const envCandidates = [
   resolve(__dirname, ".env"),
   resolve(__dirname, ".env.local"),
@@ -90,6 +126,7 @@ type KaraokeSocket = Parameters<Server<ClientToServerEvents, ServerToClientEvent
   : never;
 
 const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const racingChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 const generateRoomCode = (): string => {
   let code = "";
@@ -97,6 +134,14 @@ const generateRoomCode = (): string => {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
+};
+
+const generateRacingRoomCode = (): string => {
+  let code = "";
+  for (let i = 0; i < 4; i += 1) {
+    code += racingChars.charAt(Math.floor(Math.random() * racingChars.length));
+  }
+  return racingRooms.has(code) ? generateRacingRoomCode() : code;
 };
 
 interface InternalRoom {
@@ -110,6 +155,48 @@ interface InternalRoom {
 }
 
 const rooms = new Map<string, InternalRoom>();
+const racingRooms = new Map<string, any>();
+const racingPlayerSessionByRoom = new Map<string, Map<string, string>>();
+const racingSocketToSession = new Map<string, { roomCode: string; sessionToken: string }>();
+const racingDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const RACING_RECONNECT_GRACE_MS = 60_000;
+
+const getRacingSessionMap = (roomCode: string): Map<string, string> => {
+  const code = roomCode.toUpperCase();
+  const existing = racingPlayerSessionByRoom.get(code);
+  if (existing) return existing;
+  const next = new Map<string, string>();
+  racingPlayerSessionByRoom.set(code, next);
+  return next;
+};
+
+const racingTimerKey = (roomCode: string, sessionToken: string): string => `${roomCode.toUpperCase()}:${sessionToken}`;
+
+const clearRacingDisconnectTimer = (roomCode: string, sessionToken: string): void => {
+  const key = racingTimerKey(roomCode, sessionToken);
+  const timer = racingDisconnectTimers.get(key);
+  if (timer) {
+    clearTimeout(timer);
+    racingDisconnectTimers.delete(key);
+  }
+};
+
+const cleanupRacingRoomSessionRefs = (roomCode: string): void => {
+  const code = roomCode.toUpperCase();
+  racingPlayerSessionByRoom.delete(code);
+  for (const [socketId, ref] of racingSocketToSession.entries()) {
+    if (ref.roomCode === code) {
+      racingSocketToSession.delete(socketId);
+    }
+  }
+  for (const key of racingDisconnectTimers.keys()) {
+    if (key.startsWith(`${code}:`)) {
+      const timer = racingDisconnectTimers.get(key);
+      if (timer) clearTimeout(timer);
+      racingDisconnectTimers.delete(key);
+    }
+  }
+};
 
 const roomState = (room: InternalRoom): RoomState => ({
   roomCode: room.roomCode,
@@ -129,15 +216,197 @@ const snapshot = (room: InternalRoom): RoomSnapshot => ({
 const alreadyInRoom = (room: InternalRoom, videoId: string): boolean =>
   room.nowPlaying?.videoId === videoId || room.queue.some((song) => song.videoId === videoId);
 
+// ── Lô tô room data ──
+
+interface LotoMember {
+  userId: string;
+  displayName: string;
+  socketId: string;
+  ready: boolean;
+  bankingInfo?: { bankId: string; accountNo: string };
+  board: number[][] | null;
+}
+
+interface LotoInternalRoom {
+  roomCode: string;
+  hostId: string;
+  config: LotoConfig;
+  calledNumbers: number[];
+  currentNumber: number | null;
+  gameStatus: LotoGameStatus;
+  members: Map<string, LotoMember>;
+  createdAt: string;
+  autoCallTimer: ReturnType<typeof setInterval> | null;
+}
+
+const lotoRooms = new Map<string, LotoInternalRoom>();
+
+// ── HUD Remote Control room data ──
+
+interface HudInternalRoom {
+  roomCode: string;
+  state: {
+    roadType: "manual";
+    zone: "residential" | "outside";
+    manualMax: number;
+    offset: number;
+    mode: "car" | "moto";
+  };
+  createdAt: string;
+}
+
+const hudRooms = new Map<string, HudInternalRoom>();
+
+const generateHudRoomCode = (): string => {
+  const hudChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 4; i++) {
+    code += hudChars.charAt(Math.floor(Math.random() * hudChars.length));
+  }
+  return hudRooms.has(code) ? generateHudRoomCode() : code;
+};
+
+const computeNearWin = (member: LotoMember, calledNumbers: number[]): { waitingNumber: number }[] => {
+  if (!member.board || !member.ready) return [];
+  const calledSet = new Set(calledNumbers);
+  const results: { waitingNumber: number }[] = [];
+  for (const row of member.board) {
+    const rowNumbers = row.filter((n) => n > 0);
+    if (rowNumbers.length === 0) continue;
+    const missing = rowNumbers.filter((n) => !calledSet.has(n));
+    if (missing.length === 1) {
+      results.push({ waitingNumber: missing[0] });
+    }
+  }
+  return results;
+};
+
+const lotoSnapshot = (room: LotoInternalRoom, forUserId?: string): LotoRoomSnapshot => {
+  const snap: LotoRoomSnapshot = {
+    room: {
+      roomCode: room.roomCode,
+      hostId: room.hostId,
+      config: room.config,
+      calledNumbers: [...room.calledNumbers],
+      currentNumber: room.currentNumber,
+      gameStatus: room.gameStatus,
+      memberCount: room.members.size,
+      readyCount: [...room.members.values()].filter((m) => m.ready).length,
+      members: [...room.members.values()].map((member) => ({
+        userId: member.userId,
+        displayName: member.displayName,
+        ready: member.ready,
+        bankingInfo: member.bankingInfo,
+        nearWinRows: computeNearWin(member, room.calledNumbers)
+      })),
+      createdAt: room.createdAt
+    }
+  };
+  if (forUserId) {
+    const member = room.members.get(forUserId);
+    if (member?.board) {
+      snap.myBoard = member.board;
+    }
+  }
+  return snap;
+};
+
+const pickNextNumber = (room: LotoInternalRoom): number | null => {
+  const max = room.config.maxNumber;
+  const remaining: number[] = [];
+  for (let i = 1; i <= max; i++) {
+    if (!room.calledNumbers.includes(i)) {
+      remaining.push(i);
+    }
+  }
+  if (remaining.length === 0) return null;
+  return remaining[Math.floor(Math.random() * remaining.length)];
+};
+
 const app = next({ dev, hostname: host, port });
 const handle = app.getRequestHandler();
+const liXiRoomService = new LiXiRoomService();
 
 app.prepare().then(() => {
-  const httpServer = createServer((req, res) => handle(req, res));
+  const expressApp = createLiXiExpressApp(liXiRoomService);
+  const racingPublicPath =
+    resolveExistingPath([
+      resolve(__dirname, "../../racing-game/public"),
+      resolve(process.cwd(), "racing-game/public")
+    ]) ?? resolve(__dirname, "../../racing-game/public");
+  const phaserDistPath =
+    resolveExistingPath([
+      resolve(__dirname, "node_modules/phaser/dist"),
+      resolve(__dirname, "../../node_modules/phaser/dist"),
+      resolve(process.cwd(), "node_modules/phaser/dist"),
+      resolve(process.cwd(), "apps/frontend/node_modules/phaser/dist")
+    ]) ?? resolve(__dirname, "../../node_modules/phaser/dist");
+
+  expressApp.get("/health", (req, res) => res.send("OK"));
+  expressApp.get("/api/racing/config", (req, res) => {
+    res.json({ config: racingConfigCache.getConfig() });
+  });
+  expressApp.get("/api/config", (req, res, next) => {
+    if (!String(req.headers.referer ?? "").includes("/racing-game")) {
+      next();
+      return;
+    }
+    res.json({ config: racingConfigCache.getConfig() });
+  });
+  expressApp.post("/api/racing/config", (req, res) => {
+    try {
+      const patch = req.body && req.body.config;
+      const nextConfig = racingConfigCache.updateConfig(patch || {});
+      res.json({ ok: true, config: nextConfig });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Invalid config payload" });
+    }
+  });
+  expressApp.post("/api/config", (req, res, next) => {
+    if (!String(req.headers.referer ?? "").includes("/racing-game")) {
+      next();
+      return;
+    }
+    try {
+      const patch = req.body && req.body.config;
+      const nextConfig = racingConfigCache.updateConfig(patch || {});
+      res.json({ ok: true, config: nextConfig });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Invalid config payload" });
+    }
+  });
+  expressApp.get("/racing-game", (_req, res) => {
+    res.redirect("/racing-game/index.html");
+  });
+  expressApp.use("/racing-game", express.static(racingPublicPath));
+  expressApp.use("/vendor/phaser", express.static(phaserDistPath));
+  expressApp.use("/racing-game/vendor/phaser", express.static(phaserDistPath));
+  expressApp.get("/api/stocks/worker-status", (_req, res) => {
+    res.json({
+      ok: true,
+      data: getStockAutoRefreshStatus()
+    });
+  });
+
+  registerGpsTracker(null as any, expressApp);
+
+  expressApp.all("*", (req, res) => handle(req, res));
+  const httpServer = createServer(expressApp);
+
+  // Start Render Keep-Alive cron (14 mins)
+  startKeepAlive();
+  startStockAutoRefreshWorker();
+
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     cors: { origin: true, methods: ["GET", "POST"] },
-    transports: ["websocket", "polling"]
+    transports: ["polling", "websocket"],
+    maxHttpBufferSize: Number(process.env.SOCKET_MAX_HTTP_BUFFER_SIZE ?? 20 * 1024 * 1024)
   });
+  registerLiXiNamespace(io.of("/lixi"), liXiRoomService);
+  registerCoTyPhuNamespace(io.of("/co-ty-phu"));
+  registerFitnessGameNamespace(io.of("/fitness-game"));
+  registerGpsTracker(io as any, null as any); // Bind socket ONLY after HTTP server starts
+  setInterval(() => liXiRoomService.cleanupExpiredRooms(Date.now()), 5 * 60 * 1000);
 
   const emitRoomState = (roomCode: string): void => {
     const room = rooms.get(roomCode);
@@ -150,6 +419,7 @@ app.prepare().then(() => {
   };
 
   io.on("connection", (socket: KaraokeSocket) => {
+    const anySocket = socket as any;
     socket.on("create_room", (payload, ack) => {
       try {
         const parsed = createRoomSchema.parse(payload);
@@ -451,6 +721,684 @@ app.prepare().then(() => {
         ack({ ok: true });
       } catch (error) {
         ack({ ok: false, message: error instanceof Error ? error.message : "Set queue limit failed" });
+      }
+    });
+
+    // ── Lô tô socket handlers ──
+
+    const lotoRoomPrefix = "loto:";
+
+    const emitLotoState = (roomCode: string): void => {
+      const room = lotoRooms.get(roomCode);
+      if (!room) return;
+      io.to(lotoRoomPrefix + roomCode).emit("loto_state_updated", lotoSnapshot(room));
+    };
+
+    const startAutoCall = (room: LotoInternalRoom): void => {
+      stopAutoCall(room);
+      room.autoCallTimer = setInterval(() => {
+        const num = pickNextNumber(room);
+        if (num === null) {
+          room.gameStatus = "finished";
+          stopAutoCall(room);
+          emitLotoState(room.roomCode);
+          return;
+        }
+        room.currentNumber = num;
+        room.calledNumbers.push(num);
+        io.to(lotoRoomPrefix + room.roomCode).emit("loto_number_called", {
+          number: num,
+          calledNumbers: [...room.calledNumbers]
+        });
+        emitLotoState(room.roomCode);
+      }, room.config.intervalSeconds * 1000);
+    };
+
+    const stopAutoCall = (room: LotoInternalRoom): void => {
+      if (room.autoCallTimer) {
+        clearTimeout(room.autoCallTimer);
+        room.autoCallTimer = null;
+      }
+    };
+
+    socket.on("loto_create_room", (payload: LotoCreateRoomPayload, ack) => {
+      try {
+        const displayName = String(payload.displayName ?? "").trim() || "Host";
+        const config = payload.config;
+        if (!config || ![60, 90].includes(config.maxNumber)) {
+          ack({ ok: false, message: "maxNumber must be 60 or 90" });
+          return;
+        }
+        const interval = Number(config.intervalSeconds);
+        if (!Number.isFinite(interval) || interval < 1 || interval > 60) {
+          ack({ ok: false, message: "intervalSeconds must be between 1 and 60" });
+          return;
+        }
+        if (payload.bankingInfo && (!payload.bankingInfo.bankId || !payload.bankingInfo.accountNo)) {
+          ack({ ok: false, message: "Invalid banking info" });
+          return;
+        }
+
+        const hostUserId = randomUUID();
+        let roomCode = "";
+        for (let i = 0; i < 8; i++) {
+          const candidate = generateRoomCode();
+          if (!lotoRooms.has(candidate)) {
+            roomCode = candidate;
+            break;
+          }
+        }
+        if (!roomCode) {
+          ack({ ok: false, message: "Failed to allocate room code" });
+          return;
+        }
+
+        const room: LotoInternalRoom = {
+          roomCode,
+          hostId: hostUserId,
+          config: {
+            maxNumber: config.maxNumber as 60 | 90,
+            intervalSeconds: interval,
+            voiceEnabled: Boolean(config.voiceEnabled)
+          },
+          calledNumbers: [],
+          currentNumber: null,
+          gameStatus: "waiting",
+          members: new Map([[hostUserId, {
+            userId: hostUserId,
+            displayName,
+            socketId: socket.id,
+            ready: false,
+            bankingInfo: payload.bankingInfo,
+            board: null
+          }]]),
+          createdAt: new Date().toISOString(),
+          autoCallTimer: null
+        };
+
+        lotoRooms.set(roomCode, room);
+        socket.join(lotoRoomPrefix + roomCode);
+        socket.data.user = { userId: hostUserId, roomCode, displayName, role: "host" };
+
+        socket.emit("loto_room_created", lotoSnapshot(room));
+        ack({ ok: true, roomCode, userId: hostUserId });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Create loto room failed" });
+      }
+    });
+
+    socket.on("loto_join_room", (payload: LotoJoinRoomPayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const displayName = String(payload.displayName ?? "").trim() || "Guest";
+        const room = lotoRooms.get(roomCode);
+        if (!room) {
+          ack({ ok: false, message: "Room not found" });
+          return;
+        }
+        if (payload.bankingInfo && (!payload.bankingInfo.bankId || !payload.bankingInfo.accountNo)) {
+          ack({ ok: false, message: "Invalid banking info" });
+          return;
+        }
+
+        const userId = randomUUID();
+        room.members.set(userId, {
+          userId,
+          displayName,
+          socketId: socket.id,
+          ready: false,
+          bankingInfo: payload.bankingInfo,
+          board: null
+        });
+
+        socket.join(lotoRoomPrefix + roomCode);
+        socket.data.user = { userId, roomCode, displayName, role: "guest" };
+
+        socket.emit("loto_room_joined", lotoSnapshot(room));
+        emitLotoState(roomCode);
+        ack({ ok: true, roomCode, userId });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Join loto room failed" });
+      }
+    });
+
+    socket.on("loto_start_game", (payload: LotoStartGamePayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || room.hostId !== user.userId) {
+          ack({ ok: false, message: "Only host can start the game" });
+          return;
+        }
+        if (room.gameStatus === "playing") {
+          ack({ ok: false, message: "Game is already playing" });
+          return;
+        }
+        const hasReadyPlayer = [...room.members.values()].some((member) => member.ready);
+        if (!hasReadyPlayer) {
+          ack({ ok: false, message: "At least one player must be ready" });
+          return;
+        }
+
+        room.gameStatus = "playing";
+        startAutoCall(room);
+        emitLotoState(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Start game failed" });
+      }
+    });
+
+    socket.on("loto_pause_game", (payload: { roomCode: string }, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || room.hostId !== user.userId) {
+          ack({ ok: false, message: "Only host can pause" });
+          return;
+        }
+
+        room.gameStatus = "paused";
+        stopAutoCall(room);
+        emitLotoState(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Pause failed" });
+      }
+    });
+
+    socket.on("loto_call_number", (payload: LotoCallNumberPayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || room.hostId !== user.userId) {
+          ack({ ok: false, message: "Only host can call numbers" });
+          return;
+        }
+
+        const num = pickNextNumber(room);
+        if (num === null) {
+          room.gameStatus = "finished";
+          stopAutoCall(room);
+          emitLotoState(roomCode);
+          ack({ ok: false, message: "All numbers have been called" });
+          return;
+        }
+
+        room.currentNumber = num;
+        room.calledNumbers.push(num);
+        io.to(lotoRoomPrefix + room.roomCode).emit("loto_number_called", {
+          number: num,
+          calledNumbers: [...room.calledNumbers]
+        });
+        emitLotoState(roomCode);
+        ack({ ok: true, number: num });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Call number failed" });
+      }
+    });
+
+    socket.on("loto_claim_win", (payload: LotoClaimWinPayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || user.roomCode !== roomCode) {
+          ack({ ok: false, message: "Join room first" });
+          return;
+        }
+        if (room.gameStatus !== "playing") {
+          ack({ ok: false, message: "Game is not in playing state" });
+          return;
+        }
+        const member = room.members.get(user.userId);
+        if (!member || !member.ready) {
+          ack({ ok: false, message: "Only ready players can claim win" });
+          return;
+        }
+
+        room.gameStatus = "finished";
+        stopAutoCall(room);
+        io.to(lotoRoomPrefix + roomCode).emit("loto_game_won", {
+          winnerName: member.displayName,
+          roomCode,
+          betAmount: room.config.betAmount,
+          winnerBankingInfo: member.bankingInfo
+        });
+        emitLotoState(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Claim win failed" });
+      }
+    });
+
+    socket.on("loto_close_room", (payload: LotoCloseRoomPayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || room.hostId !== user.userId) {
+          ack({ ok: false, message: "Only host can close room" });
+          return;
+        }
+
+        stopAutoCall(room);
+        io.to(lotoRoomPrefix + roomCode).emit("loto_room_closed", { roomCode, message: "Host closed this room" });
+        lotoRooms.delete(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Close loto room failed" });
+      }
+    });
+
+    socket.on("loto_toggle_ready", (payload: LotoToggleReadyPayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const ready = Boolean(payload.ready);
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || user.roomCode !== roomCode) {
+          ack({ ok: false, message: "Join room first" });
+          return;
+        }
+        const member = room.members.get(user.userId);
+        if (!member) {
+          ack({ ok: false, message: "Member not found" });
+          return;
+        }
+        member.ready = ready;
+        room.members.set(member.userId, member);
+        emitLotoState(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Toggle ready failed" });
+      }
+    });
+
+    socket.on("loto_submit_board", (payload: { roomCode: string; board: number[][] }, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || user.roomCode !== roomCode) {
+          ack({ ok: false, message: "Join room first" });
+          return;
+        }
+        const member = room.members.get(user.userId);
+        if (!member) {
+          ack({ ok: false, message: "Member not found" });
+          return;
+        }
+        if (!Array.isArray(payload.board) || payload.board.length === 0 || payload.board.length > 9) {
+          ack({ ok: false, message: "Invalid board" });
+          return;
+        }
+        member.board = payload.board;
+        room.members.set(member.userId, member);
+        emitLotoState(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Submit board failed" });
+      }
+    });
+
+    socket.on("loto_restore_session", (payload: { roomCode: string; userId: string }, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const userId = String(payload.userId ?? "");
+        const room = lotoRooms.get(roomCode);
+        if (!room) {
+          ack({ ok: false, message: "Room not found" });
+          return;
+        }
+        const member = room.members.get(userId);
+        if (!member) {
+          ack({ ok: false, message: "Session expired" });
+          return;
+        }
+        member.socketId = socket.id;
+        room.members.set(userId, member);
+        const role = room.hostId === userId ? "host" : "guest";
+        socket.join(lotoRoomPrefix + roomCode);
+        socket.data.user = { userId, roomCode, displayName: member.displayName, role };
+        const snap = lotoSnapshot(room, userId);
+        socket.emit("loto_state_updated", snap);
+        ack({ ok: true, roomCode, userId, displayName: member.displayName, role });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Restore session failed" });
+      }
+    });
+
+    socket.on("loto_reset_round", (payload: LotoResetRoundPayload, ack) => {
+      try {
+        const roomCode = String(payload.roomCode ?? "").trim().toUpperCase();
+        const room = lotoRooms.get(roomCode);
+        if (!room) { ack({ ok: false, message: "Room not found" }); return; }
+        const user = socket.data.user;
+        if (!user || room.hostId !== user.userId) {
+          ack({ ok: false, message: "Only host can reset round" });
+          return;
+        }
+
+        room.calledNumbers = [];
+        room.currentNumber = null;
+        room.gameStatus = "waiting";
+        for (const m of room.members.values()) {
+          m.board = null;
+        }
+        stopAutoCall(room);
+        emitLotoState(roomCode);
+        ack({ ok: true });
+      } catch (error) {
+        ack({ ok: false, message: error instanceof Error ? error.message : "Reset round failed" });
+      }
+    });
+
+    // Racing game (integrated from /racing-game module)
+    anySocket.on("create-room", ({ playerName, vehicleType, sessionToken }: { playerName: string; vehicleType: string; sessionToken?: string }) => {
+      const roomCode = generateRacingRoomCode();
+      const room = new RacingGameRoom(roomCode, io as any);
+      racingRooms.set(roomCode, room);
+      room.addPlayer(anySocket, playerName, vehicleType);
+      anySocket.join(roomCode);
+      const token = String(sessionToken || randomUUID());
+      const sessions = getRacingSessionMap(roomCode);
+      sessions.set(token, anySocket.id);
+      racingSocketToSession.set(anySocket.id, { roomCode, sessionToken: token });
+      clearRacingDisconnectTimer(roomCode, token);
+      anySocket.emit("room-created", {
+        roomCode,
+        playerId: anySocket.id,
+        players: room.getPlayersInfo(),
+        role: "host",
+        sessionToken: token
+      });
+    });
+
+    anySocket.on("join-room", ({ roomCode, playerName, vehicleType, sessionToken }: { roomCode: string; playerName: string; vehicleType: string; sessionToken?: string }) => {
+      const code = String(roomCode ?? "").trim().toUpperCase();
+      const room = racingRooms.get(code);
+      if (!room) {
+        anySocket.emit("error-msg", { message: "Phòng không tồn tại!" });
+        return;
+      }
+      const token = String(sessionToken || randomUUID());
+      const sessions = getRacingSessionMap(code);
+      const existingPlayerId = sessions.get(token);
+      if (existingPlayerId && room.players?.has(existingPlayerId)) {
+        clearRacingDisconnectTimer(code, token);
+        const existingPlayer = room.players.get(existingPlayerId);
+        room.players.delete(existingPlayerId);
+        existingPlayer.id = anySocket.id;
+        if (playerName && String(playerName).trim()) {
+          existingPlayer.name = String(playerName).trim();
+        }
+        if (vehicleType) {
+          existingPlayer.vehicleType = vehicleType;
+        }
+        room.players.set(anySocket.id, existingPlayer);
+        if (room.hostId === existingPlayerId) {
+          room.hostId = anySocket.id;
+        }
+        sessions.set(token, anySocket.id);
+        racingSocketToSession.set(anySocket.id, { roomCode: code, sessionToken: token });
+        anySocket.join(code);
+        const role = room.hostId === anySocket.id ? "host" : "guest";
+        anySocket.emit("room-joined", {
+          roomCode: code,
+          playerId: anySocket.id,
+          players: room.getPlayersInfo(),
+          role,
+          sessionToken: token
+        });
+        io.to(code).emit("player-updated", { players: room.getPlayersInfo() });
+        return;
+      }
+      if (room.state !== "WAITING" && room.state !== "FINISHED") {
+        anySocket.emit("error-msg", { message: "Trận đấu đã bắt đầu!" });
+        return;
+      }
+      if (room.getPlayerCount() >= room.config.maxPlayers) {
+        anySocket.emit("error-msg", { message: "Phòng đã đầy!" });
+        return;
+      }
+      room.addPlayer(anySocket, playerName, vehicleType);
+      anySocket.join(code);
+      sessions.set(token, anySocket.id);
+      racingSocketToSession.set(anySocket.id, { roomCode: code, sessionToken: token });
+      clearRacingDisconnectTimer(code, token);
+      anySocket.emit("room-joined", {
+        roomCode: code,
+        playerId: anySocket.id,
+        players: room.getPlayersInfo(),
+        role: room.hostId === anySocket.id ? "host" : "guest",
+        sessionToken: token
+      });
+      anySocket.to(code).emit("player-joined", {
+        players: room.getPlayersInfo()
+      });
+    });
+
+    anySocket.on("set-vehicle", ({ roomCode, vehicleType }: { roomCode: string; vehicleType: string }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      if (room.state === "RACING" || room.state === "QUESTION" || room.state === "COUNTDOWN") return;
+      room.setPlayerVehicle(anySocket.id, vehicleType);
+      io.to(room.roomCode).emit("player-updated", { players: room.getPlayersInfo() });
+    });
+
+    anySocket.on("start-game", ({ roomCode }: { roomCode: string }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      if (room.getPlayerCount() < 1) return;
+      if (room.hostId !== anySocket.id) return;
+      room.startGame();
+    });
+
+    anySocket.on("restart-game", ({ roomCode, vehicleType }: { roomCode: string; vehicleType?: string }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      if (room.hostId !== anySocket.id) return;
+      if (vehicleType) {
+        room.setPlayerVehicle(anySocket.id, vehicleType);
+      }
+      room.startGame();
+    });
+
+    anySocket.on("player-input", ({ roomCode, direction }: { roomCode: string; direction: "left" | "right" }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      room.handleInput(anySocket.id, direction);
+    });
+
+    anySocket.on("obstacle-hit", ({ roomCode, obstacle }: { roomCode: string; obstacle: any }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      room.onObstacleHit(anySocket.id, obstacle);
+    });
+
+    anySocket.on("answer-question", ({ roomCode, answerIndex }: { roomCode: string; answerIndex: number }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      room.handleAnswer(anySocket.id, answerIndex);
+    });
+
+    anySocket.on("question-ready", ({ roomCode, questionId }: { roomCode: string; questionId: string }) => {
+      const room = racingRooms.get(String(roomCode ?? "").trim().toUpperCase());
+      if (!room) return;
+      room.handleQuestionReady(anySocket.id, questionId);
+    });
+
+    anySocket.on("leave-room", ({ roomCode }: { roomCode: string }) => {
+      const code = String(roomCode ?? "").trim().toUpperCase();
+      const room = racingRooms.get(code);
+      if (!room) return;
+      const sessionRef = racingSocketToSession.get(anySocket.id);
+      if (sessionRef) {
+        clearRacingDisconnectTimer(sessionRef.roomCode, sessionRef.sessionToken);
+        const sessionMap = getRacingSessionMap(sessionRef.roomCode);
+        sessionMap.delete(sessionRef.sessionToken);
+        racingSocketToSession.delete(anySocket.id);
+      }
+      if (!room.hasPlayer(anySocket.id)) return;
+      room.removePlayer(anySocket.id);
+      anySocket.leave(code);
+      if (room.getPlayerCount() === 0) {
+        room.stop();
+        racingRooms.delete(code);
+        cleanupRacingRoomSessionRefs(code);
+      } else {
+        io.to(code).emit("player-left", { players: room.getPlayersInfo() });
+      }
+      anySocket.emit("left-room", { roomCode: code });
+    });
+
+    anySocket.on("close-room", ({ roomCode }: { roomCode: string }) => {
+      const code = String(roomCode ?? "").trim().toUpperCase();
+      const room = racingRooms.get(code);
+      if (!room) return;
+      if (room.hostId !== anySocket.id) {
+        anySocket.emit("error-msg", { message: "Chỉ chủ phòng mới có thể đóng phòng." });
+        return;
+      }
+      room.stop();
+      io.to(code).emit("room-closed", { roomCode: code, message: "Chủ phòng đã đóng phòng." });
+      racingRooms.delete(code);
+      cleanupRacingRoomSessionRefs(code);
+    });
+
+    // ── HUD Remote Control socket handlers ──
+
+    anySocket.on("hud_create_room", (ack: any) => {
+      try {
+        const roomCode = generateHudRoomCode();
+        const room: HudInternalRoom = {
+          roomCode,
+          state: { roadType: "manual", zone: "residential", manualMax: 60, offset: 0, mode: "moto" },
+          createdAt: new Date().toISOString(),
+        };
+        hudRooms.set(roomCode, room);
+        anySocket.join(`hud:${roomCode}`);
+        // Auto-cleanup 12h
+        setTimeout(() => hudRooms.delete(roomCode), 12 * 60 * 60 * 1000);
+        if (typeof ack === "function") ack({ ok: true, roomCode, state: room.state });
+      } catch (err) {
+        if (typeof ack === "function") ack({ ok: false, message: err instanceof Error ? err.message : "Error" });
+      }
+    });
+
+    anySocket.on("hud_join_room", (payload: { roomCode: string }, ack: any) => {
+      try {
+        const roomCode = String(payload?.roomCode ?? "").toUpperCase().trim();
+        const room = hudRooms.get(roomCode);
+        if (!room) {
+          if (typeof ack === "function") ack({ ok: false, message: "Không tìm thấy phòng HUD. Kiểm tra lại mã phòng." });
+          return;
+        }
+        anySocket.join(`hud:${roomCode}`);
+        if (typeof ack === "function") ack({ ok: true, state: room.state });
+      } catch (err) {
+        if (typeof ack === "function") ack({ ok: false, message: err instanceof Error ? err.message : "Error" });
+      }
+    });
+
+    anySocket.on("hud_update_state", (payload: { roomCode: string; state: Partial<HudInternalRoom["state"]> }, ack: any) => {
+      try {
+        const roomCode = String(payload?.roomCode ?? "").toUpperCase().trim();
+        const room = hudRooms.get(roomCode);
+        if (!room) {
+          if (typeof ack === "function") ack({ ok: false, message: "Phòng HUD không tồn tại." });
+          return;
+        }
+        room.state = { ...room.state, ...payload.state };
+        // Broadcast đến các thiết bị KHÁC trong phòng (loại trừ sender để tránh loop)
+        anySocket.to(`hud:${roomCode}`).emit("hud_state_updated" as any, { state: room.state });
+        if (typeof ack === "function") ack({ ok: true });
+      } catch (err) {
+        if (typeof ack === "function") ack({ ok: false, message: err instanceof Error ? err.message : "Error" });
+      }
+    });
+
+    anySocket.on("hud_leave_room", (payload: { roomCode: string }, ack: any) => {
+      const roomCode = String(payload?.roomCode ?? "").toUpperCase().trim();
+      anySocket.leave(`hud:${roomCode}`);
+      if (typeof ack === "function") ack({ ok: true });
+    });
+
+    socket.on("disconnect", () => {
+      const user = socket.data.user;
+      if (user && (user.role === "host" || user.role === "guest")) {
+        const roomCode = user.roomCode;
+        const lotoRoom = lotoRooms.get(roomCode);
+        if (lotoRoom) {
+          lotoRoom.members.delete(user.userId);
+          if (lotoRoom.members.size === 0) {
+            lotoRooms.delete(roomCode);
+          } else {
+            emitLotoState(roomCode);
+          }
+        }
+      }
+    });
+
+    anySocket.on("disconnect", () => {
+      const sessionRef = racingSocketToSession.get(anySocket.id);
+      if (sessionRef) {
+        racingSocketToSession.delete(anySocket.id);
+        const { roomCode, sessionToken } = sessionRef;
+        const key = racingTimerKey(roomCode, sessionToken);
+        clearRacingDisconnectTimer(roomCode, sessionToken);
+        const timer = setTimeout(() => {
+          const room = racingRooms.get(roomCode);
+          if (!room) {
+            cleanupRacingRoomSessionRefs(roomCode);
+            return;
+          }
+          const sessionMap = getRacingSessionMap(roomCode);
+          const playerId = sessionMap.get(sessionToken);
+          if (!playerId || !room.hasPlayer(playerId)) {
+            return;
+          }
+          room.removePlayer(playerId);
+          sessionMap.delete(sessionToken);
+          if (room.getPlayerCount() === 0) {
+            room.stop();
+            racingRooms.delete(roomCode);
+            cleanupRacingRoomSessionRefs(roomCode);
+          } else {
+            io.to(roomCode).emit("player-left", {
+              players: room.getPlayersInfo()
+            });
+          }
+          racingDisconnectTimers.delete(key);
+        }, RACING_RECONNECT_GRACE_MS);
+        racingDisconnectTimers.set(key, timer);
+        return;
+      }
+
+      for (const [code, room] of racingRooms.entries()) {
+        if (!room.hasPlayer(anySocket.id)) continue;
+        room.removePlayer(anySocket.id);
+        if (room.getPlayerCount() === 0) {
+          room.stop();
+          racingRooms.delete(code);
+          cleanupRacingRoomSessionRefs(code);
+        } else {
+          io.to(code).emit("player-left", {
+            players: room.getPlayersInfo()
+          });
+        }
+        break;
       }
     });
   });

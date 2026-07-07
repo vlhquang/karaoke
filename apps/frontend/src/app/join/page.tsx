@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -11,10 +12,10 @@ export default function JoinPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-4">
       <section className="rounded-2xl border border-slate-700 bg-slate-900/60 p-6">
-        <h1 className="mb-4 text-2xl font-bold">Vao phong Karaoke</h1>
+        <h1 className="mb-4 text-2xl font-bold">Vào phòng Karaoke</h1>
         <input
           className="mb-3 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-center uppercase tracking-[0.2em]"
-          placeholder="ROOM CODE"
+          placeholder="MÃ PHÒNG"
           value={code}
           onChange={(event) => {
             const next = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -27,9 +28,15 @@ export default function JoinPage() {
           onClick={() => router.push(`/room/${normalizedCode}`)}
           disabled={normalizedCode.length !== 6}
         >
-          Tiep tuc
+          Tiếp tục
         </button>
-        <p className="mt-3 text-xs text-slate-400">Nhap ma phong 6 ky tu do chu phong cung cap.</p>
+        <p className="mt-3 text-xs text-slate-400">Nhập mã phòng 6 ký tự do chủ phòng cung cấp.</p>
+        <Link
+          href="/karaoke"
+          className="mt-3 inline-block text-xs text-slate-400 hover:text-cyan-300"
+        >
+          ← Quay lại Karaoke
+        </Link>
       </section>
     </main>
   );
