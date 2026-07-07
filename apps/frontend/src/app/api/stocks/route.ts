@@ -40,11 +40,12 @@ export async function POST(request: Request) {
 
     try {
       const parsed = JSON.parse(text) as { ok?: boolean; message?: string };
-      if (!parsed?.ok && action === "delete" && /unsupported action/i.test(String(parsed?.message ?? ""))) {
+      const recentActions = ["delete", "update_status", "update_prices", "save_config"];
+      if (!parsed?.ok && recentActions.includes(action) && /unsupported action/i.test(String(parsed?.message ?? ""))) {
         return NextResponse.json({
           ok: false,
           message:
-            "Apps Script đang là bản cũ chưa hỗ trợ cập nhật trạng thái DELETED. Hãy cập nhật và redeploy file /docs/STOCK_APPS_SCRIPT.gs rồi dùng lại URL /exec mới."
+            `Apps Script đang là bản cũ chưa hỗ trợ action "${action}". Hãy copy code mới nhất từ file /docs/STOCK_APPS_SCRIPT.gs vào Apps Script editor, chọn "Deploy" > "New Deployment", chọn loại "Web app", quyền truy cập "Anyone", rồi sử dụng URL /exec mới nhất.`
         });
       }
       return NextResponse.json(parsed);

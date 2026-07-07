@@ -5,9 +5,10 @@ import { env } from "./env";
 interface SocketLike {
   connected: boolean;
   connect: () => void;
-  on: (event: string, handler: (...args: unknown[]) => void) => void;
-  off: (event: string) => void;
-  emit: (event: string, payload: unknown, ack?: (response: any) => void) => void;
+  on: (event: string, handler: (...args: any[]) => void) => void;
+  off: (event: string, handler?: (...args: any[]) => void) => void;
+  once: (event: string, handler: (...args: any[]) => void) => void;
+  emit: (event: string, ...args: any[]) => void;
 }
 
 declare global {

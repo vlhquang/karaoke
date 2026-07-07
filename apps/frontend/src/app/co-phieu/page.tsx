@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, FormEvent, ChangeEvent } from "react";
-import Link from "next/link";
+import { createPortal } from "react-dom";
 
 interface Transaction {
     id: number;
@@ -9,7 +9,7 @@ interface Transaction {
     date: string;
     price: number;
     quantity: number;
-    status: "HOLD" | "SOLD";
+    status: "HOLD" | "SOLD" | "HIDDEN";
     sellPrice?: number;
     sellDate?: string;
 }
@@ -19,6 +19,7 @@ interface PriceInfo {
     previous: number | null;
     opening: number | null;
     reference: number | null;
+    color: string | null;
     timestamp: string | null;
 }
 
@@ -55,13 +56,33 @@ export default function StockPage() {
     const [sellPriceInput, setSellPriceInput] = useState("");
     const [analysisSymbol, setAnalysisSymbol] = useState<string | null>(null);
 
+    // Profit/Loss target states
+    const [profitTarget, setProfitTarget] = useState<number>(10);
+    const [lossTarget, setLossTarget] = useState<number>(5);
+
     // Server-side refresh configuration states
     const [autoRefreshMinutes, setAutoRefreshMinutes] = useState(1);
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
     const [workerStatus, setWorkerStatus] = useState<WorkerStatus | null>(null);
     const [recentlyUpdatedSymbols, setRecentlyUpdatedSymbols] = useState<Record<string, boolean>>({});
+    const [refreshCountdown, setRefreshCountdown] = useState(60);
+    const [isMinimalMode, setIsMinimalMode] = useState(false);
+    const [isWakeLockActive, setIsWakeLockActive] = useState(false);
+    const [isAutoUpdateEnabled, setIsAutoUpdateEnabled] = useState(true);
+    const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
+    const [isPiPActive, setIsPiPActive] = useState(false);
+    const [verificationInput, setVerificationInput] = useState("");
+    const [verificationError, setVerificationError] = useState("");
+    const wakeLockRef = useRef<any>(null);
+    const pipWindowRef = useRef<any>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const isFramelessPiPActiveRef = useRef(false);
+    const [isFramelessActive, setIsFramelessActive] = useState(false);
+
+    const [isAnalysisMode, setIsAnalysisMode] = useState(false);
+    const [showHidden, setShowHidden] = useState(false);
     const isSyncingPricesRef = useRef(false);
-    const lastWorkerSignalRef = useRef<string>("");
     const highlightTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
     useEffect(() => {
@@ -71,15 +92,112 @@ export default function StockPage() {
             setIsLoggedIn(true);
             loadTransactions(savedCode, true);
             loadServerData(savedCode);
+            loadWorkerStatus(savedCode);
         }
+
+        const savedProfit = localStorage.getItem("stock_profit_target");
+        const savedLoss = localStorage.getItem("stock_loss_target");
+        if (savedProfit) setProfitTarget(parseFloat(savedProfit));
+        if (savedLoss) setLossTarget(parseFloat(savedLoss));
+
         setIsInitialized(true);
+
+        // Load UI preferences
+        const savedMinimal = localStorage.getItem("stock_minimal_mode");
+        const savedAnalysis = localStorage.getItem("stock_analysis_mode");
+        const savedWakeLock = localStorage.getItem("stock_wake_lock");
+        const savedAutoUpdate = localStorage.getItem("stock_auto_update");
+
+        if (savedMinimal === "true") setIsMinimalMode(true);
+        if (savedAnalysis === "true") setIsAnalysisMode(true);
+        if (savedWakeLock === "true") setIsWakeLockActive(true);
+        if (savedAutoUpdate === "false") setIsAutoUpdateEnabled(false);
     }, []);
 
     useEffect(() => {
         return () => {
             Object.values(highlightTimersRef.current).forEach((timer) => clearTimeout(timer));
+            if (wakeLockRef.current) {
+                wakeLockRef.current.release().catch(console.error);
+            }
         };
     }, []);
+
+    // Wake Lock Logic
+    useEffect(() => {
+        if (!isWakeLockActive) {
+            if (wakeLockRef.current) {
+                wakeLockRef.current.release().then(() => {
+                    wakeLockRef.current = null;
+                }).catch(console.error);
+            }
+            return;
+        }
+
+        const requestWakeLock = async () => {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+                    console.log('Wake Lock is active');
+                }
+            } catch (err: any) {
+                console.error(`${err.name}, ${err.message}`);
+                setIsWakeLockActive(false);
+            }
+        };
+
+        requestWakeLock();
+
+        const handleVisibilityChange = () => {
+            if (wakeLockRef.current !== null && document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            if (wakeLockRef.current) {
+                wakeLockRef.current.release().catch(console.error);
+                wakeLockRef.current = null;
+            }
+        };
+    }, [isWakeLockActive]);
+
+    // Auto-refresh countdown logic
+    useEffect(() => {
+        if (!isLoggedIn || !isAutoUpdateEnabled) return;
+
+        const hasHoldStocks = transactions.some(t => t.status === "HOLD");
+        if (!hasHoldStocks) return;
+
+        if (isRefreshingPrices) return;
+
+        const timer = setInterval(() => {
+            setRefreshCountdown((prev: number) => {
+                if (prev <= 1) {
+                    // Trigger refresh
+                    const holdSymbols = transactions
+                        .filter((t: Transaction) => t.status === "HOLD")
+                        .map((t: Transaction) => t.symbol);
+                    if (holdSymbols.length > 0) {
+                        fetchRealtimePrices(holdSymbols, true);
+                    }
+                    return 60;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [isLoggedIn, isRefreshingPrices, transactions]);
+
+    // Reset countdown when refresh finishes
+    useEffect(() => {
+        if (!isRefreshingPrices) {
+            setRefreshCountdown(60);
+        }
+    }, [isRefreshingPrices]);
 
     const markSymbolRecentlyUpdated = (symbol: string) => {
         const normalizedSymbol = symbol.trim().toUpperCase();
@@ -89,16 +207,188 @@ export default function StockPage() {
             clearTimeout(highlightTimersRef.current[normalizedSymbol]);
         }
 
-        setRecentlyUpdatedSymbols((prev) => ({ ...prev, [normalizedSymbol]: true }));
+        setRecentlyUpdatedSymbols((prev: Record<string, boolean>) => ({ ...prev, [normalizedSymbol]: true }));
 
         highlightTimersRef.current[normalizedSymbol] = setTimeout(() => {
-            setRecentlyUpdatedSymbols((prev) => {
+            setRecentlyUpdatedSymbols((prev: Record<string, boolean>) => {
                 const next = { ...prev };
                 delete next[normalizedSymbol];
                 return next;
             });
             delete highlightTimersRef.current[normalizedSymbol];
         }, 5000);
+    };
+
+    const drawFramelessContent = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        const holdGroups = Object.entries(groupedTransactions)
+            .filter(([_, txs]) => txs.some(t => t.status === "HOLD"));
+
+        if (holdGroups.length === 0) {
+            ctx.fillStyle = "#020617";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#64748b";
+            ctx.font = "bold 20px sans-serif";
+            ctx.fillText("No Hold Stocks", 20, 50);
+            return;
+        }
+
+        // Layout constants
+        const itemWidth = 150;
+        const itemHeight = 70;
+        const padding = 10;
+        const cols = Math.floor((canvas.width - padding) / (itemWidth + padding)) || 1;
+
+        // Adjust canvas height if needed
+        const rows = Math.ceil(holdGroups.length / cols);
+        const neededHeight = rows * (itemHeight + padding) + padding;
+        if (canvas.height !== neededHeight) {
+            canvas.height = neededHeight;
+        }
+
+        ctx.fillStyle = "#020617";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        holdGroups.forEach(([symbol, txs], index) => {
+            const col = index % cols;
+            const row = Math.floor(index / cols);
+            const x = padding + col * (itemWidth + padding);
+            const y = padding + row * (itemHeight + padding);
+
+            const info = currentPrices[symbol] || null;
+            const currentPriceValue = info?.current || 0;
+            const holdTxs = txs.filter(t => (t.status === "HOLD" || (showHidden && t.status === "HIDDEN")));
+            const avgPrice = holdTxs.reduce((sum, t) => sum + t.price, 0) / (holdTxs.length || 1);
+            const pPerc = currentPriceValue > 0 ? ((currentPriceValue - avgPrice) / avgPrice) * 100 : 0;
+
+            // Card background
+            ctx.fillStyle = "#0f172a";
+            ctx.strokeStyle = "#1e293b";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(x, y, itemWidth, itemHeight, 8);
+            ctx.fill();
+            ctx.stroke();
+
+            // Symbol
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "black 14px sans-serif";
+            ctx.fillText(symbol, x + 10, y + 25);
+
+            // Price color
+            let color = "#94a3b8"; // slate-400
+            const ref = info?.reference || info?.opening || 0;
+            if (currentPriceValue > 0) {
+                if (info?.color === "purple" || currentPriceValue >= ref * 1.069) color = "#d946ef"; // fuchsia-500
+                else if (info?.color === "blue" || currentPriceValue <= ref * 0.931) color = "#06b6d4"; // cyan-500
+                else if (currentPriceValue > ref) color = "#34d399"; // emerald-400
+                else if (currentPriceValue < ref) color = "#f87171"; // red-400
+            }
+
+            ctx.fillStyle = color;
+            ctx.font = "black 18px sans-serif";
+            ctx.fillText(currentPriceValue > 0 ? formatMoney(currentPriceValue) : "---", x + 10, y + 50);
+
+            // P/L %
+            ctx.fillStyle = pPerc >= 0 ? "#34d399" : "#f87171";
+            ctx.font = "bold 12px sans-serif";
+            const pPercText = (pPerc >= 0 ? "+" : "") + pPerc.toFixed(1) + "%";
+            const metrics = ctx.measureText(pPercText);
+            ctx.fillText(pPercText, x + itemWidth - metrics.width - 10, y + 25);
+
+            // AVG label
+            ctx.fillStyle = "#475569";
+            ctx.font = "bold 9px sans-serif";
+            ctx.fillText("AVG: " + formatMoney(avgPrice), x + 10, y + 62);
+        });
+    };
+
+    const handleOpenFramelessPiP = async () => {
+        if (!videoRef.current || !canvasRef.current) return;
+
+        try {
+            // Initial draw
+            drawFramelessContent();
+
+            // Create stream
+            const stream = canvasRef.current.captureStream(5); // 5 fps is enough for stocks
+            videoRef.current.srcObject = stream;
+
+            await videoRef.current.play();
+            await (videoRef.current as any).requestPictureInPicture();
+
+            isFramelessPiPActiveRef.current = true;
+            setIsFramelessActive(true);
+
+            videoRef.current.addEventListener('leavepictureinpicture', () => {
+                isFramelessPiPActiveRef.current = false;
+                setIsFramelessActive(false);
+            }, { once: true });
+
+        } catch (err) {
+            console.error("Failed to open Frameless PiP", err);
+            alert("Không thể mở Frameless PiP. Có thể trình duyệt của bạn không hỗ trợ.");
+        }
+    };
+
+    const handleOpenPiP = async () => {
+        if (!('documentPictureInPicture' in window)) {
+            alert("Trình duyệt của bạn chưa hỗ trợ tính năng Floating Popup (Document PiP). Vui lòng sử dụng Chrome hoặc Edge phiên bản mới nhất.");
+            return;
+        }
+
+        try {
+            if (pipWindowRef.current) {
+                pipWindowRef.current.close();
+            }
+
+            const pipWindow = await (window as any).documentPictureInPicture.requestWindow({
+                width: 600,
+                height: 150,
+                disallowReturnToOpener: true,
+            });
+
+            const allStyles = Array.from(document.styleSheets);
+            allStyles.forEach((styleSheet) => {
+                try {
+                    const cssRules = Array.from(styleSheet.cssRules)
+                        .map((rule) => rule.cssText)
+                        .join("");
+                    const styleTag = pipWindow.document.createElement("style");
+                    styleTag.textContent = cssRules;
+                    pipWindow.document.head.appendChild(styleTag);
+                } catch (e) {
+                    if (styleSheet.href) {
+                        const linkTag = pipWindow.document.createElement("link");
+                        linkTag.rel = "stylesheet";
+                        linkTag.href = styleSheet.href;
+                        pipWindow.document.head.appendChild(linkTag);
+                    }
+                }
+            });
+
+            pipWindow.document.title = "Stock";
+            pipWindow.document.body.className = "bg-slate-950 text-slate-200 overflow-x-hidden p-1 select-none";
+
+            const pipContainer = pipWindow.document.createElement("div");
+            pipContainer.id = "pip-root";
+            pipWindow.document.body.appendChild(pipContainer);
+
+            pipWindow.addEventListener("pagehide", () => {
+                setIsPiPActive(false);
+                pipWindowRef.current = null;
+            });
+
+            pipWindowRef.current = pipWindow;
+            setIsPiPActive(true);
+            setIsMinimalMode(true);
+        } catch (err) {
+            console.error("Failed to open PiP window", err);
+        }
     };
 
     const syncPricesFromServer = async (code: string) => {
@@ -125,6 +415,7 @@ export default function StockPage() {
                         opening: p.openingPrice,
                         reference: p.referencePrice,
                         previous: null,
+                        color: typeof p.color === "string" ? p.color : null,
                         timestamp: ts
                     };
                     const tsMs = parseTimestampToMs(ts);
@@ -135,7 +426,7 @@ export default function StockPage() {
                         latestTs = ts;
                     }
                 }
-                setCurrentPrices((prev) => {
+                setCurrentPrices((prev: Record<string, PriceInfo>) => {
                     const next = { ...prev };
                     for (const symbol in mappedPrices) {
                         const incoming = mappedPrices[symbol];
@@ -158,6 +449,9 @@ export default function StockPage() {
                 });
                 changedSymbols.forEach(markSymbolRecentlyUpdated);
                 setLastUpdated(latestTs);
+                if (isFramelessPiPActiveRef.current) {
+                    drawFramelessContent();
+                }
             }
         } catch (err) {
             console.error("Failed to sync stock prices from server", err);
@@ -170,18 +464,17 @@ export default function StockPage() {
         try {
             await syncPricesFromServer(code);
 
-            // Load config from server
             const cRes = await fetch("/api/stocks", {
                 method: "POST",
                 headers: { "Content-Type": "text/plain;charset=utf-8" },
                 body: JSON.stringify({ action: "get_config", accessCode: code }),
             });
             const cData = await cRes.json();
-                if (cData.ok && cData.data) {
-                    if (cData.data.AUTO_REFRESH_MINUTES !== undefined) {
-                        setAutoRefreshMinutes(parseInt(cData.data.AUTO_REFRESH_MINUTES) || 1);
-                    }
+            if (cData.ok && cData.data) {
+                if (cData.data.AUTO_REFRESH_MINUTES !== undefined) {
+                    setAutoRefreshMinutes(parseInt(cData.data.AUTO_REFRESH_MINUTES) || 1);
                 }
+            }
         } catch (err) {
             console.error("Failed to load server data", err);
         }
@@ -220,7 +513,6 @@ export default function StockPage() {
         setIsRefreshingPrices(true);
         const uniqueSymbols = Array.from(new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean)));
 
-        // Start all fetches concurrently
         await Promise.allSettled(
             uniqueSymbols.map(async (symbol) => {
                 try {
@@ -229,7 +521,6 @@ export default function StockPage() {
                     const res = await fetch(`/api/stocks/price?symbol=${symbol}${refreshParam}${cacheBuster}`);
                     const data = await res.json();
                     if (data.ok) {
-                        // Update state IMMEDIATELY for this specific symbol
                         setCurrentPrices((prev: Record<string, PriceInfo>) => ({
                             ...prev,
                             [symbol]: {
@@ -237,10 +528,27 @@ export default function StockPage() {
                                 opening: data.openingPrice,
                                 reference: data.referencePrice,
                                 previous: prev[symbol]?.current || null,
+                                color: data.color || null,
                                 timestamp: data.timestamp
                             }
                         }));
                         markSymbolRecentlyUpdated(symbol);
+
+                        // Update global lastUpdated if this fetch is newer
+                        if (data.timestamp) {
+                            setLastUpdated((prev: string | null) => {
+                                if (!prev) return data.timestamp;
+                                const currentT = parseTimestampToMs(prev);
+                                const newT = parseTimestampToMs(data.timestamp);
+                                if (currentT !== null && newT !== null && newT > currentT) {
+                                    return data.timestamp;
+                                }
+                                return prev;
+                            });
+                        }
+                        if (isFramelessPiPActiveRef.current) {
+                            drawFramelessContent();
+                        }
                     }
                 } catch (err) {
                     console.error(`Failed to fetch price for ${symbol}`, err);
@@ -265,10 +573,10 @@ export default function StockPage() {
             });
             const data = await res.json();
             if (data.ok) {
-                const list = (data.data || []).map((tx: Transaction) => ({
+                const list = (data.data || []).map((tx: any) => ({
                     ...tx,
                     symbol: String(tx.symbol || "").trim().toUpperCase(),
-                    status: String(tx.status || "").trim().toUpperCase() as "HOLD" | "SOLD"
+                    status: String(tx.status || "").trim().toUpperCase() as "HOLD" | "SOLD" | "HIDDEN"
                 }));
                 setTransactions(list);
                 if (!isSilent) showToast("Tải dữ liệu từ Google Sheets xong");
@@ -371,7 +679,7 @@ export default function StockPage() {
     };
 
     const handleDelete = async (id: number) => {
-        if (!confirm("Xác nhận đánh dấu giao dịch này là DELETED?")) return;
+        if (!confirm("Xác nhận xóa vĩnh viễn giao dịch này?")) return;
         setIsLoading(true);
         try {
             const res = await fetch("/api/stocks", {
@@ -382,7 +690,7 @@ export default function StockPage() {
             const data = await res.json();
             if (data.ok) {
                 setTransactions(transactions.filter((tx: Transaction) => tx.id !== id));
-                showToast("Đã cập nhật trạng thái DELETED");
+                showToast("Đã xóa giao dịch");
             } else {
                 alert(data.message || "Xóa thất bại");
             }
@@ -393,9 +701,43 @@ export default function StockPage() {
         }
     };
 
+    const handleToggleHide = async (tx: Transaction) => {
+        let newStatus: "HOLD" | "HIDDEN" | "SOLD";
+        if (tx.status === "HIDDEN") {
+            newStatus = (tx.sellPrice && tx.sellPrice > 0) ? "SOLD" : "HOLD";
+        } else {
+            newStatus = "HIDDEN";
+        }
+        setIsLoading(true);
+        try {
+            const res = await fetch("/api/stocks", {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({
+                    action: "update_status",
+                    accessCode,
+                    id: tx.id,
+                    status: newStatus,
+                }),
+            });
+            const data = await res.json();
+            if (data.ok) {
+                setTransactions(transactions.map((t: Transaction) =>
+                    t.id === tx.id ? { ...t, status: newStatus } : t
+                ));
+                showToast(newStatus === "HIDDEN" ? "Đã ẩn giao dịch" : "Đã hiện lại giao dịch");
+            } else {
+                alert(data.message || "Thao tác thất bại");
+            }
+        } catch (err) {
+            alert("Lỗi kết nối server");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleOpenSellDialog = (tx: Transaction) => {
         setSellTx(tx);
-        // Default sell price is current price if available, otherwise buy price
         const current = currentPrices[tx.symbol]?.current || tx.price;
         setSellPriceInput(current.toLocaleString("vi-VN"));
     };
@@ -417,14 +759,17 @@ export default function StockPage() {
                     action: "sell",
                     accessCode,
                     id: sellTx.id,
-                    sellPrice: sellPriceValue
+                    sellPrice: sellPriceValue,
                 }),
             });
             const data = await res.json();
             if (data.ok) {
+                const now = new Date();
+                const pad = (n: number) => n.toString().padStart(2, '0');
+                const formattedNow = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
                 setTransactions(transactions.map((tx: Transaction) =>
                     tx.id === sellTx.id
-                        ? { ...tx, status: "SOLD", sellPrice: sellPriceValue, sellDate: data.data?.sellDate || new Date().toISOString().split("T")[0] }
+                        ? { ...tx, status: "SOLD", sellPrice: sellPriceValue, sellDate: data.data?.sellDate || formattedNow }
                         : tx
                 ));
                 setSellTx(null);
@@ -443,624 +788,1069 @@ export default function StockPage() {
         setAnalysisSymbol(symbol.toUpperCase());
     };
 
-    const analysisUrl = analysisSymbol
-        ? `https://fireant.vn/ma-chung-khoan/${encodeURIComponent(analysisSymbol)}`
-        : "";
+    const totalInvestment = useMemo(() => {
+        return transactions
+            .filter((tx: Transaction) => (tx.status === "HOLD" || (showHidden && tx.status === "HIDDEN")))
+            .reduce((sum: number, tx: Transaction) => sum + tx.price * tx.quantity, 0);
+    }, [transactions, showHidden]);
 
-    useEffect(() => {
-        if (!isLoggedIn || !accessCode) return;
-        loadWorkerStatus(accessCode);
-        syncPricesFromServer(accessCode);
-        const timer = setInterval(() => {
-            loadWorkerStatus(accessCode);
-            syncPricesFromServer(accessCode);
-        }, workerStatus?.running ? 3000 : 10000);
-        return () => clearInterval(timer);
-    }, [isLoggedIn, accessCode, workerStatus?.running]);
+    const totalMarketValue = useMemo(() => {
+        return transactions
+            .filter((tx: Transaction) => (tx.status === "HOLD" || (showHidden && tx.status === "HIDDEN")))
+            .reduce((sum: number, tx: Transaction) => {
+                const current = currentPrices[tx.symbol]?.current || 0;
+                return sum + (current > 0 ? current : tx.price) * tx.quantity;
+            }, 0);
+    }, [transactions, currentPrices, showHidden]);
 
-    useEffect(() => {
-        if (!isLoggedIn || !accessCode || !workerStatus) return;
-        const signal = [
-            workerStatus.lastRunAt ?? "",
-            workerStatus.lastStatus ?? "",
-            workerStatus.lastMessage ?? ""
-        ].join("|");
-        if (signal !== lastWorkerSignalRef.current) {
-            lastWorkerSignalRef.current = signal;
-            syncPricesFromServer(accessCode);
-        }
-    }, [isLoggedIn, accessCode, workerStatus]);
+    const totalProfitLossManual = totalMarketValue - totalInvestment;
+    const totalProfitValueSold = useMemo(() => {
+        return transactions
+            .filter((tx: Transaction) => tx.status === "SOLD" && tx.sellPrice !== undefined)
+            .reduce((sum: number, tx: Transaction) => sum + (tx.sellPrice! - tx.price) * tx.quantity, 0);
+    }, [transactions]);
 
-    const nextCronLabel = useMemo(() => {
-        if (!workerStatus?.nextRunAt) return null;
-        return formatDateTime(workerStatus.nextRunAt);
-    }, [workerStatus]);
+    const totalSoldInvestment = useMemo(() => {
+        return transactions
+            .filter((tx: Transaction) => tx.status === "SOLD" && tx.sellPrice !== undefined)
+            .reduce((sum: number, tx: Transaction) => sum + tx.price * tx.quantity, 0);
+    }, [transactions]);
 
-    const lastUpdatedLabel = useMemo(() => formatDateTime(lastUpdated), [lastUpdated]);
-    const cronIntervalLabel = useMemo(
-        () => `${workerStatus?.intervalMinutes ?? autoRefreshMinutes} phút/lần`,
-        [workerStatus, autoRefreshMinutes]
-    );
+    const overallTotalProfit = totalProfitLossManual + totalProfitValueSold;
+    const overallTotalInvestment = totalInvestment + totalSoldInvestment;
 
-    const totals = useMemo(() => {
-        let totalInvested = 0;
-        let totalCurrentValue = 0;
-
-        transactions.forEach((tx: Transaction) => {
-            const cost = tx.price * tx.quantity;
-            totalInvested += cost;
-
-            if (tx.status === "SOLD") {
-                const proceed = (tx.sellPrice || 0) * tx.quantity;
-                totalCurrentValue += proceed;
-            } else {
-                const currentPrice = currentPrices[tx.symbol]?.current || 0;
-                if (currentPrice > 0) {
-                    totalCurrentValue += currentPrice * tx.quantity;
-                } else {
-                    totalCurrentValue += cost;
-                }
-            }
-        });
-
-        const profit = totalCurrentValue - totalInvested;
-        const percent = totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
-        return { totalInvested, totalCurrentValue, profit, percent };
-    }, [transactions, currentPrices]);
-
-    const groupedData = useMemo(() => {
+    const groupedTransactions = useMemo(() => {
         const groups: Record<string, Transaction[]> = {};
         transactions.forEach((tx: Transaction) => {
+            if (tx.status === "HIDDEN" && !showHidden) return;
             if (!groups[tx.symbol]) groups[tx.symbol] = [];
             groups[tx.symbol].push(tx);
         });
-        Object.keys(groups).forEach((symbol: string) => {
-            groups[symbol].sort((a: Transaction, b: Transaction) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        });
         return groups;
-    }, [transactions]);
+    }, [transactions, showHidden]);
+
+    const analysisUrl = analysisSymbol ? `https://fireant.vn/ma-chung-khoan/${analysisSymbol}` : "";
+
+    const getStockPriceColorClass = (price: number, info: PriceInfo | null) => {
+        if (!info || price <= 0) return "text-slate-600";
+
+        // Tier 1: Direct color from Vietstock
+        if (info.color === "purple") return "text-stock-ceiling";
+        if (info.color === "blue") return "text-stock-floor";
+
+        // Tier 2: Calculation Fallback (7% margin for HOSE)
+        const ref = info.reference || info.opening || 0;
+        if (ref > 0) {
+            if (price >= ref * 1.069) return "text-stock-ceiling";
+            if (price <= ref * 0.931) return "text-stock-floor";
+        }
+
+        // Standard colors
+        if (price > ref) return "text-emerald-400";
+        if (price < ref) return "text-red-400";
+        return "text-slate-400"; // Reference price
+    };
 
     if (!isInitialized) return null;
 
     if (!isLoggedIn) {
         return (
-            <main className="flex min-h-screen items-center justify-center bg-slate-950 p-4 font-sans text-slate-100">
-                <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/50 p-8 shadow-2xl backdrop-blur-xl">
-                    <div className="mb-8 text-center">
-                        <h1 className="text-3xl font-bold tracking-tight text-white">Quản lý Cổ phiếu</h1>
-                        <p className="mt-2 text-slate-400">Nhập mã truy cập để tiếp tục</p>
+            <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 font-sans text-slate-200">
+                <div className="w-full max-w-md space-y-8 rounded-3xl border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-xl">
+                    <div className="text-center">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
+                            <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                        </div>
+                        <h2 className="mt-6 text-2xl font-black tracking-tight text-white uppercase">Danh Mục Đầu Tư</h2>
+                        <p className="mt-2 text-sm text-slate-500">Nhập mã để quản lý danh mục</p>
                     </div>
-                    <form onSubmit={handleLogin} className="space-y-6">
-                        <input
-                            type="password"
-                            value={accessCode}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setAccessCode(e.target.value)}
-                            placeholder="Mã truy cập"
-                            className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-5 py-4 text-center text-lg outline-none transition focus:border-cyan-500/50"
-                            required
-                        />
+
+                    <form className="mt-8 space-y-4" onSubmit={handleLogin}>
+                        <div>
+                            <input
+                                autoFocus
+                                type="password"
+                                value={accessCode}
+                                onChange={(e: ChangeEvent<HTMLInputElement>) => setAccessCode(e.target.value)}
+                                className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-5 py-4 text-center font-mono text-xl tracking-[0.5em] text-white outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
+                                placeholder="••••••"
+                            />
+                            {loginError && <p className="mt-2 text-center text-sm font-bold text-red-500 uppercase">{loginError}</p>}
+                        </div>
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full rounded-2xl bg-cyan-600 py-4 font-bold text-white hover:bg-cyan-500 disabled:opacity-50"
+                            className="w-full rounded-2xl bg-cyan-600 py-4 font-black text-white hover:bg-cyan-500 active:scale-[0.98] transition-all disabled:opacity-50"
                         >
-                            {isLoading ? "Đang xác thực..." : "Đăng nhập"}
+                            {isLoading ? "ĐANG XÁC THỰC..." : "TRUY CẬP HỆ THỐNG"}
                         </button>
                     </form>
-                    {loginError && <p className="mt-4 text-center text-sm text-red-400">{loginError}</p>}
-                    <div className="mt-8 text-center">
+
+                    <div className="pt-4 border-t border-slate-800">
                         <button
-                            onClick={() => window.location.href = "/"}
-                            className="text-sm text-slate-500 hover:text-cyan-400"
+                            onClick={handleBackToPortal}
+                            className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-300 transition-colors uppercase"
                         >
-                            ← Quay lại Portal
+                            Quay lại trang chủ portal
                         </button>
                     </div>
                 </div>
-            </main>
+            </div>
         );
     }
 
     return (
-        <main className="min-h-screen bg-slate-950 p-4 font-sans text-slate-100 md:p-8">
-            <div className="mx-auto max-w-6xl">
-                <header className="mb-6 flex items-center justify-between gap-4">
-                    <h1 className="text-2xl font-bold md:text-3xl uppercase tracking-tight">HOLDING</h1>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => loadTransactions(accessCode)}
-                            disabled={isRefreshingSheet}
-                            className="rounded-xl border border-slate-700 bg-slate-900/50 px-3 py-2 text-[10px] md:text-xs font-medium transition hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                            {isRefreshingSheet ? "Đang tải..." : "Làm mới"}
-                        </button>
-                        <button
-                            onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
-                            disabled={isRefreshingPrices || transactions.filter(t => t.status === "HOLD").length === 0}
-                            className="rounded-xl border border-emerald-900/30 bg-emerald-950/20 px-3 py-2 text-[10px] md:text-xs font-medium text-emerald-400 transition hover:bg-emerald-900/30 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                            {isRefreshingPrices ? "Đang cập nhật..." : "Làm mới giá"}
-                        </button>
-                        {/* <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/50 px-3 py-1.5">
-                            <span className="text-[10px] md:text-xs text-slate-400 select-none">Auto</span>
-                            <span className="text-[10px] md:text-xs text-cyan-400 font-bold whitespace-nowrap">
-                                {cronIntervalLabel}
-                            </span>
-
-                            {lastUpdatedLabel && (
-                                <div className="ml-1 flex items-center gap-1 border-l border-slate-700 pl-2">
-                                    <span className="text-[8px] md:text-[10px] text-slate-500 whitespace-nowrap">
-                                        Cập nhật: {lastUpdatedLabel}
-                                    </span>
-                                </div>
-                            )}
-
-                            <div className="ml-1 flex items-center gap-1 border-l border-slate-700 pl-2">
-                                <span className="text-[8px] md:text-[10px] text-slate-500 whitespace-nowrap">
-                                    Config: Google Sheet
-                                </span>
-                            </div>
-
-                            <div className="ml-1 flex items-center gap-1 border-l border-slate-700 pl-2">
-                                <span className="text-[8px] md:text-[10px] text-slate-500 whitespace-nowrap">
-                                    Cron kế: {nextCronLabel || workerStatus?.lastMessage || "đang tính..."}
-                                </span>
-                            </div>
-                        </div> */}
-                        <button
-                            onClick={handleBackToPortal}
-                            className="ml-2 text-xs text-slate-500 hover:text-cyan-400"
-                        >
-                            ← Portal
-                        </button>
-                    </div>
-                </header>
-
-                {/* Tổng quan - Single Card */}
-                <section className="mb-6">
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 backdrop-blur-md">
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
-                            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Danh mục tổng quát</h2>
-                            <div className={`text-lg font-black ${totals.percent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                {totals.percent >= 0 ? "+" : ""}{totals.percent.toFixed(2)}%
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <p className="text-xs uppercase tracking-wider text-slate-500">Đầu tư</p>
-                                <p className="text-xl font-bold">{formatMoney(totals.totalInvested)}</p>
+        <main className="min-h-screen bg-slate-950 font-sans text-slate-200">
+            {/* Header section with worker status */}
+            <header className="border-b border-slate-800 bg-slate-900/50 pt-8 pb-6 bg-transparent">
+                <div className="mx-auto max-w-6xl px-4 flex flex-col items-center">
+                    <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-cyan-500 text-slate-950">
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                </svg>
                             </div>
                             <div>
-                                <p className="text-xs uppercase tracking-wider text-slate-500">Hiện tại + Đã bán</p>
-                                <p className="text-xl font-bold text-cyan-400">{formatMoney(totals.totalCurrentValue)}</p>
-                            </div>
-                            <div className="col-span-2 rounded-xl bg-slate-800/30 p-3 mt-1 flex items-center justify-between">
-                                <p className="text-xs uppercase tracking-wider text-slate-500">Tổng Lãi / Lỗ</p>
-                                <p className={`text-2xl font-black ${totals.profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                    {totals.profit >= 0 ? "+" : ""}{formatMoney(totals.profit)}
-                                </p>
+                                <h1 className="text-xl font-black text-white leading-none uppercase">Stock Manager</h1>
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Portfolio Tracker Pro</p>
                             </div>
                         </div>
-                    </div>
-                </section>
-
-                {/* Form thêm nhanh */}
-                <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900/20 p-4">
-                    <form onSubmit={handleAdd} className="flex flex-wrap gap-2">
-                        <input
-                            placeholder="Mã CP"
-                            value={symbolInput}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setSymbolInput(e.target.value.toUpperCase())}
-                            className="flex-1 min-w-[70px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-cyan-500"
-                            required
-                        />
-                        <input
-                            type="date"
-                            value={dateInput}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setDateInput(e.target.value)}
-                            className="flex-[1.5] min-w-[110px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-cyan-500"
-                            required
-                        />
-                        <input
-                            placeholder="Giá mua"
-                            value={priceInput}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setPriceInput(formatInputNumber(e.target.value))}
-                            className="flex-1 min-w-[90px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-cyan-500"
-                            required
-                        />
-                        <input
-                            placeholder="SL"
-                            value={quantityInput}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setQuantityInput(formatInputNumber(e.target.value))}
-                            className="flex-[0.5] min-w-[60px] rounded-xl border border-slate-700 bg-slate-800/30 px-3 py-2 text-sm outline-none focus:border-cyan-500"
-                            required
-                        />
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-950 transition hover:bg-white disabled:opacity-50"
-                        >
-                            Thêm
-                        </button>
-                    </form>
-                    {addError && <p className="mt-2 text-[11px] text-red-400 text-center">{addError}</p>}
-                </section>
-
-                {/* Danh sách Grouped */}
-                <div className="space-y-4">
-                    {Object.keys(groupedData).length === 0 ? (
-                        <div className="py-20 text-center text-slate-500 border border-dashed border-slate-800 rounded-2xl text-sm">
-                            Trống.
-                        </div>
-                    ) : (
-                        Object.keys(groupedData).sort().map((symbol) => {
-                            const txs = groupedData[symbol]!;
-                            const priceInfo = currentPrices[symbol];
-                            const currentPriceValue = priceInfo?.current || 0;
-                            const isRecentlyUpdated = Boolean(recentlyUpdatedSymbols[symbol]);
-
-                            let gInv = 0, gQty = 0, gProfit = 0;
-                            txs.forEach((t: Transaction) => {
-                                const cost = t.price * t.quantity;
-                                gInv += cost;
-                                if (t.status === "SOLD") {
-                                    gProfit += (t.sellPrice! * t.quantity) - cost;
-                                } else {
-                                    gQty += t.quantity;
-                                    if (currentPriceValue > 0) {
-                                        gProfit += (currentPriceValue * t.quantity) - cost;
-                                    }
-                                }
-                            });
-                            const gPerc = gInv > 0 ? (gProfit / gInv) * 100 : 0;
-
-                            return (
-                                <div
-                                    key={symbol}
-                                    className={`rounded-2xl border overflow-hidden transition-all duration-300 ${isRecentlyUpdated
-                                        ? "border-emerald-500/80 bg-emerald-500/5 ring-1 ring-emerald-400/60"
-                                        : "border-slate-800 bg-slate-900/40"
-                                        }`}
+                        <div className="flex flex-col items-end gap-1">
+                            {/* Worker status and update time removed */}
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => {
+                                        setIsVerifyingPassword(true);
+                                        setVerificationInput("");
+                                        setVerificationError("");
+                                    }}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isMinimalMode ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
                                 >
-                                    <div className="bg-slate-800/40 px-4 py-3 flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 gap-3">
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => openAnalysisPopup(symbol)}
-                                                className="text-xl font-black text-cyan-300 underline decoration-dotted underline-offset-4 hover:text-cyan-200"
-                                                title={`Mở phân tích kỹ thuật ${symbol}`}
-                                            >
-                                                {symbol}
-                                            </button>
-                                            {isRecentlyUpdated && (
-                                                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300 animate-pulse">
-                                                    Vừa cập nhật
-                                                </span>
-                                            )}
-                                            {gQty > 0 && <span className="text-sm text-slate-500 font-mono">({gQty})</span>}
-                                        </div>
+                                    Tối giản
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const next = !isAnalysisMode;
+                                        setIsAnalysisMode(next);
+                                        if (next) setIsMinimalMode(false);
+                                        localStorage.setItem("stock_analysis_mode", next.toString());
+                                        localStorage.setItem("stock_minimal_mode", "false");
+                                    }}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isAnalysisMode ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Phân tích
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const next = !isWakeLockActive;
+                                        setIsWakeLockActive(next);
+                                        localStorage.setItem("stock_wake_lock", next.toString());
+                                    }}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isWakeLockActive ? "bg-orange-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Sáng màn
+                                </button>
+                                <button
+                                    onClick={() => setShowHidden(!showHidden)}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${showHidden ? "bg-purple-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Hiện Ẩn
+                                </button>
+                                <button
+                                    onClick={handleOpenPiP}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isPiPActive ? "bg-purple-500 text-white" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Popup UI
+                                </button>
+                                <button
+                                    onClick={handleOpenFramelessPiP}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isFramelessActive ? "bg-red-500 text-white" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Frameless
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const next = !isAutoUpdateEnabled;
+                                        setIsAutoUpdateEnabled(next);
+                                        localStorage.setItem("stock_auto_update", next.toString());
+                                    }}
+                                    className={`w-20 rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${isAutoUpdateEnabled ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-400"}`}
+                                >
+                                    Auto
+                                </button>
+                            </div>
+                        </div>
 
-                                        <div className="flex-1 md:text-right">
-                                            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Giá hiện tại</p>
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-mono text-slate-500 leading-none mb-1">
-                                                    Cập nhật: {priceInfo?.timestamp || "--/--/---- --:--:--"}
-                                                </span>
+                    </div>
+                </div>
+            </header>
 
-                                                <div className="flex items-baseline md:justify-end gap-2">
-                                                    <span className={`text-2xl font-black ${currentPriceValue > 0 && priceInfo?.reference
-                                                        ? (currentPriceValue > priceInfo.reference ? "text-emerald-400" : currentPriceValue < priceInfo.reference ? "text-red-400" : "text-cyan-400")
-                                                        : "text-slate-600"
-                                                        }`}>
-                                                        {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "..."}
+            <div className={`mx-auto max-w-6xl px-4 py-8 space-y-8 ${isMinimalMode || isAnalysisMode ? "hidden" : "block"}`}>
+                {/* Summary Section moved here */}
+                <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg shadow-cyan-950/10">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Đang đầu tư (Hold)</p>
+                        <p className="mt-1 text-2xl font-black text-white">{formatMoney(totalInvestment)}</p>
+                        <div className="mt-1 text-[10px] font-bold text-slate-600 uppercase border-t border-slate-800/50 pt-1">
+                            Giá trị TT: <span className="text-white">{formatMoney(totalMarketValue)}</span>
+                        </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg shadow-emerald-950/10">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Lãi / Lỗ tạm tính</p>
+                        <div className="mt-1 flex items-baseline gap-2">
+                            <p className={`text-2xl font-black ${totalProfitLossManual >= 0 ? "text-emerald-400" : "text-red-400 text-opacity-80"}`}>
+                                {(totalProfitLossManual > 0 ? "+" : "") + formatMoney(totalProfitLossManual)}
+                            </p>
+                            <span className={`text-xs font-bold ${totalProfitLossManual >= 0 ? "text-emerald-500/60" : "text-red-500/60"}`}>
+                                ({totalInvestment > 0 ? ((totalProfitLossManual / totalInvestment) * 100).toFixed(2) : "0.00"}%)
+                            </span>
+                        </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg shadow-slate-950/10">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Lợi nhuận chốt (Sold)</p>
+                        <div className="mt-1 flex items-baseline gap-2">
+                            <p className={`text-2xl font-black ${totalProfitValueSold >= 0 ? "text-emerald-400" : "text-red-400 text-opacity-80"}`}>
+                                {(totalProfitValueSold > 0 ? "+" : "") + formatMoney(totalProfitValueSold)}
+                            </p>
+                            <span className={`text-xs font-bold ${totalProfitValueSold >= 0 ? "text-emerald-500/60" : "text-red-500/60"}`}>
+                                ({totalSoldInvestment > 0 ? ((totalProfitValueSold / totalSoldInvestment) * 100).toFixed(2) : "0.00"}%)
+                            </span>
+                        </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-emerald-900/10 p-4 shadow-lg border-emerald-500/20">
+                        <p className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-widest">Tổng hiệu suất (Hold+Sold)</p>
+                        <div className="mt-1 flex items-baseline gap-2">
+                            <p className={`text-2xl font-black ${overallTotalProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                {(overallTotalProfit > 0 ? "+" : "") + formatMoney(overallTotalProfit)}
+                            </p>
+                            <span className={`text-xs font-bold ${overallTotalProfit >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                                ({overallTotalInvestment > 0 ? ((overallTotalProfit / overallTotalInvestment) * 100).toFixed(2) : "0.00"}%)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {/* Form and Settings Grid */}
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                    {/* Add Transaction Form */}
+                    <div className="lg:col-span-8">
+                        <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6">
+                            <div className="flex items-center gap-2 mb-6">
+                                <div className="h-5 w-1 bg-cyan-500 rounded-full"></div>
+                                <h3 className="text-sm font-black text-white uppercase tracking-widest">Thêm giao dịch mới</h3>
+                            </div>
+
+                            <form className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4" onSubmit={handleAdd}>
+                                <div>
+                                    <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Mã Chứng Khoán</label>
+                                    <input
+                                        type="text"
+                                        value={symbolInput}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setSymbolInput(e.target.value.toUpperCase())}
+                                        className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-sm font-bold text-white outline-none focus:border-cyan-500"
+                                        placeholder="VND, HPG..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Ngày Mua</label>
+                                    <input
+                                        type="date"
+                                        value={dateInput}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setDateInput(e.target.value)}
+                                        className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-sm font-bold text-white outline-none focus:border-cyan-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Giá Vốn</label>
+                                    <input
+                                        type="text"
+                                        value={priceInput}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setPriceInput(formatInputNumber(e.target.value))}
+                                        className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-sm font-bold text-white outline-none focus:border-cyan-500 text-right"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Số Lượng</label>
+                                    <input
+                                        type="text"
+                                        value={quantityInput}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setQuantityInput(formatInputNumber(e.target.value))}
+                                        className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-sm font-bold text-white outline-none focus:border-cyan-500 text-right"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2 md:col-span-4 flex items-center justify-between gap-4">
+                                    {addError && <p className="text-xs font-bold text-red-500 uppercase">{addError}</p>}
+                                    <button
+                                        type="submit"
+                                        disabled={isLoading}
+                                        className="ml-auto flex items-center gap-2 rounded-xl bg-cyan-600 px-8 py-3.5 text-xs font-black text-white hover:bg-cyan-500 active:scale-95 transition-all disabled:opacity-50"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        THÊM VÀO DANH MỤC
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {/* Target Settings */}
+                    <div className="lg:col-span-4">
+                        <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6 h-full">
+                            <div className="flex items-center gap-2 mb-6">
+                                <div className="h-5 w-1 bg-emerald-500 rounded-full"></div>
+                                <h3 className="text-sm font-black text-white uppercase tracking-widest">Thiết lập mục tiêu</h3>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Chốt lời mục tiêu</label>
+                                        <span className="text-xs font-black text-emerald-400">{profitTarget}%</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="100"
+                                        value={profitTarget}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                            const val = parseInt(e.target.value);
+                                            setProfitTarget(val);
+                                            localStorage.setItem("stock_profit_target", val.toString());
+                                        }}
+                                        className="w-full accent-emerald-500"
+                                    />
+                                </div>
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Cắt lỗ kỷ luật</label>
+                                        <span className="text-xs font-black text-red-400">{lossTarget}%</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="100"
+                                        value={lossTarget}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                            const val = parseInt(e.target.value);
+                                            setLossTarget(val);
+                                            localStorage.setItem("stock_loss_target", val.toString());
+                                        }}
+                                        className="w-full accent-red-500"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    {Object.keys(groupedTransactions).sort().map((symbol: string) => {
+                        const txs = groupedTransactions[symbol].sort((a: Transaction, b: Transaction) => b.id - a.id);
+                        const price = currentPrices[symbol];
+                        const currentPriceValue = price?.current || 0;
+                        const isRecentlyChanged = recentlyUpdatedSymbols[symbol];
+
+                        return (
+                            <div key={symbol} className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/40 shadow-sm transition-all hover:bg-slate-900/60">
+                                <div className={`flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/50 px-6 py-4 transition-colors duration-[2000ms] ${isRecentlyChanged ? "price-update-flash" : "bg-transparent"}`}>
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            onClick={() => openAnalysisPopup(symbol)}
+                                            className="group flex flex-col"
+                                        >
+                                            <span className="text-2xl font-black text-white group-hover:text-cyan-400 transition-colors uppercase">{symbol}</span>
+                                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter group-hover:text-cyan-600">Xem Fireant Chart →</span>
+                                        </button>
+                                        <div className="h-8 w-px bg-slate-800 mx-2 hidden sm:block"></div>
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-slate-500 uppercase font-black">Thị giá</span>
+                                                {price?.timestamp && (
+                                                    <span className="text-[9px] font-bold text-slate-500 bg-slate-800/50 px-1.5 py-0.5 rounded">
+                                                        {formatDateTime(price.timestamp)}
                                                     </span>
-
-                                                    {currentPriceValue > 0 && priceInfo?.reference !== undefined && priceInfo?.reference !== null && (
-                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${currentPriceValue >= priceInfo.reference ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
-                                                            {currentPriceValue >= priceInfo.reference ? "↑" : "↓"}
-                                                            {formatMoney(Math.abs(currentPriceValue - priceInfo.reference))}
-                                                            <span className="ml-1 opacity-70">
-                                                                ({(((currentPriceValue - priceInfo.reference) / priceInfo.reference) * 100).toFixed(2)}%)
-                                                            </span>
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                {/* Giá tham chiếu & Giá mở cửa */}
-                                                {priceInfo && (
-                                                    <div className="flex gap-3 md:justify-end mt-1">
-                                                        {priceInfo.reference !== null && (
-                                                            <span className="text-[10px] font-mono text-slate-500">
-                                                                TC: <span className="text-yellow-500 font-bold">{formatMoney(priceInfo.reference)}</span>
-                                                            </span>
-                                                        )}
-                                                        {priceInfo.opening !== null && (
-                                                            <span className="text-[10px] font-mono text-slate-500">
-                                                                MO: <span className="text-sky-400 font-bold">{formatMoney(priceInfo.opening)}</span>
-                                                            </span>
-                                                        )}
+                                                )}
+                                                {isRecentlyChanged && (
+                                                    <span className="animate-pulse flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[8px] font-black text-emerald-500">
+                                                        <span className="h-1 w-1 rounded-full bg-emerald-500"></span>
+                                                        VỪA CẬP NHẬT
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xl font-black ${getStockPriceColorClass(currentPriceValue, price || null)}`}>
+                                                    {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "Đang chờ..."}
+                                                </span>
+                                                {currentPriceValue > 0 && price?.reference && (
+                                                    <div className={`flex items-center gap-1 text-[11px] font-black ${getStockPriceColorClass(currentPriceValue, price || null)}`}>
+                                                        <span>{currentPriceValue >= price.reference ? "+" : ""}{formatMoney(currentPriceValue - price.reference)}</span>
+                                                        <span>({((currentPriceValue - price.reference) / price.reference * 100).toFixed(1)}%)</span>
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
-
-                                        <div className="md:ml-4 flex flex-col items-end justify-center border-l border-slate-800/50 pl-4">
-                                            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Tổng Lãi / Lỗ</p>
-                                            <p className={`text-lg font-black leading-none ${gProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                                {gProfit !== 0 ? (gProfit > 0 ? "+" : "") + formatMoney(gProfit) : "0"}
-                                            </p>
-                                            <p className={`text-[11px] font-bold ${gProfit >= 0 ? "text-emerald-500/60" : "text-red-500/60"}`}>
-                                                {gPerc.toFixed(1)}%
-                                            </p>
-                                        </div>
                                     </div>
 
-                                    {/* Desktop Table */}
-                                    <div className="hidden md:block overflow-x-auto">
-                                        <table className="w-full text-sm text-left">
-                                            <tbody className="divide-y divide-slate-800/30">
-                                                {txs.map((tx: Transaction) => {
-                                                    const isSold = tx.status === "SOLD";
-                                                    const hasLivePrice = currentPriceValue > 0;
-                                                    let p = 0;
-                                                    let pPerc = 0;
-                                                    if (isSold) {
-                                                        p = (tx.sellPrice! - tx.price) * tx.quantity;
-                                                        pPerc = ((tx.sellPrice! - tx.price) / tx.price) * 100;
-                                                    } else if (hasLivePrice) {
-                                                        p = (currentPriceValue - tx.price) * tx.quantity;
-                                                        pPerc = ((currentPriceValue - tx.price) / tx.price) * 100;
-                                                    }
+                                    <div className="mt-3 flex items-center gap-6 sm:mt-0">
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-[10px] text-slate-500 uppercase font-black">Mở cửa / Tham chiếu</span>
+                                            <span className="text-xs font-bold text-slate-400">{formatMoney(price?.opening || 0)} / {formatMoney(price?.reference || 0)}</span>
+                                        </div>
+                                        <div className="h-8 w-px bg-slate-800/50"></div>
+                                        <div className="flex flex-col items-end mr-2">
+                                            <span className="text-[10px] text-slate-500 uppercase font-black">Hiệu suất danh mục ({symbol})</span>
+                                            <div className="flex flex-col items-end">
+                                                {(() => {
+                                                    const symbolHoldTxs = txs.filter((t: Transaction) => t.status === "HOLD");
+                                                    const symbolSoldTxs = txs.filter((t: Transaction) => t.status === "SOLD");
+
+                                                    const groupInvestment = symbolHoldTxs.reduce((sum: number, t: Transaction) => sum + t.price * t.quantity, 0);
+                                                    const groupMarketValue = symbolHoldTxs.reduce((sum: number, t: Transaction) => {
+                                                        const current = currentPriceValue;
+                                                        return sum + (current > 0 ? current : t.price) * t.quantity;
+                                                    }, 0);
+                                                    const groupUnrealizedPL = groupMarketValue - groupInvestment;
+
+                                                    const groupSoldInvestment = symbolSoldTxs.reduce((sum: number, t: Transaction) => sum + t.price * t.quantity, 0);
+                                                    const groupRealizedPL = symbolSoldTxs.reduce((sum: number, t: Transaction) => sum + ((t.sellPrice || 0) - t.price) * t.quantity, 0);
+
+                                                    const groupTotalPL = groupUnrealizedPL + groupRealizedPL;
+                                                    const groupTotalInvestment = groupInvestment + groupSoldInvestment;
+                                                    const groupPLPerc = groupTotalInvestment > 0 ? (groupTotalPL / groupTotalInvestment) * 100 : 0;
 
                                                     return (
-                                                        <tr key={tx.id} className={`hover:bg-slate-800/20 ${isSold ? "bg-slate-900/80 opacity-60" : ""}`}>
-                                                            <td className="px-4 py-2">
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-slate-400">{new Date(tx.date).toLocaleDateString("vi-VN")}</span>
-                                                                    {isSold && <span className="text-[10px] font-bold text-emerald-500 uppercase">ĐÃ BÁN {tx.sellDate}</span>}
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-4 py-2 text-right">
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-[10px] text-slate-500 uppercase font-bold">Mua</span>
-                                                                    <span className="text-slate-200">{formatMoney(tx.price)}</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-4 py-2 text-right">
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-[10px] text-slate-500 uppercase font-bold">SL</span>
-                                                                    <span className="text-slate-200">{tx.quantity}</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-4 py-2 text-right">
-                                                                {isSold ? (
-                                                                    <div className="flex flex-col">
-                                                                        <span className="text-[10px] text-emerald-600 uppercase font-bold">Bán</span>
-                                                                        <span className="text-emerald-400 font-bold">{formatMoney(tx.sellPrice!)}</span>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="flex flex-col">
-                                                                        <span className="text-[10px] text-slate-500 uppercase font-bold">Đang giữ</span>
-                                                                        <span className="text-slate-400">HOLD</span>
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                            <td className={`px-4 py-2 text-right font-bold ${p >= 0 ? "text-emerald-500/60" : "text-red-500/60"}`}>
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-[10px] text-slate-500 uppercase font-bold">Lãi/Lỗ {isSold ? "thực" : "tính"}</span>
-                                                                    <span>
-                                                                        {(p > 0 ? "+" : "") + formatMoney(p)}
-                                                                        {(isSold || hasLivePrice) && p !== 0 && tx.price > 0 && (
-                                                                            <span className="ml-1 text-[11px] opacity-60">
-                                                                                ({pPerc.toFixed(1)}%)
-                                                                            </span>
-                                                                        )}
-                                                                    </span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-4 py-2 text-right">
-                                                                <div className="flex items-center justify-end gap-1">
-                                                                    {!isSold && (
-                                                                        <button
-                                                                            onClick={() => handleOpenSellDialog(tx)}
-                                                                            className="rounded-lg bg-emerald-600/20 px-3 py-1.5 text-[10px] font-bold text-emerald-400 hover:bg-emerald-600/40 transition-colors"
-                                                                        >
-                                                                            BÁN
-                                                                        </button>
-                                                                    )}
-                                                                    <button
-                                                                        onClick={() => handleDelete(tx.id)}
-                                                                        className="p-2 text-slate-700 hover:text-red-500 transition-colors"
-                                                                        title="Xóa vĩnh viễn"
-                                                                    >
-                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                                        </svg>
-                                                                    </button>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-sm font-black ${groupTotalPL >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                                {(groupTotalPL >= 0 ? "+" : "") + formatMoney(groupTotalPL)}
+                                                            </span>
+                                                            <span className={`text-[10px] font-black ${groupTotalPL >= 0 ? "text-emerald-500/70" : "text-red-500/70"}`}>
+                                                                ({groupPLPerc.toFixed(1)}%)
+                                                            </span>
+                                                        </div>
                                                     );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <div className="md:hidden divide-y divide-slate-800/30">
-                                        {txs.map((tx: Transaction) => {
-                                            const isSold = tx.status === "SOLD";
-                                            const hasLivePrice = currentPriceValue > 0;
-                                            let p = 0;
-                                            let pPerc = 0;
-                                            if (isSold) {
-                                                p = (tx.sellPrice! - tx.price) * tx.quantity;
-                                                pPerc = ((tx.sellPrice! - tx.price) / tx.price) * 100;
-                                            } else if (hasLivePrice) {
-                                                p = (currentPriceValue - tx.price) * tx.quantity;
-                                                pPerc = ((currentPriceValue - tx.price) / tx.price) * 100;
-                                            }
-
-                                            return (
-                                                <div key={tx.id} className={`px-4 py-3 flex flex-col gap-2 ${isSold ? "bg-slate-900/60 opacity-60" : ""}`}>
-                                                    <div className="flex items-center justify-between text-[11px] font-bold">
-                                                        <span className="text-slate-500 uppercase">{new Date(tx.date).toLocaleDateString("vi-VN")}</span>
-                                                        {isSold ? (
-                                                            <span className="text-emerald-500 uppercase">ĐÃ BÁN {tx.sellDate}</span>
-                                                        ) : (
-                                                            <span className="text-cyan-600 uppercase tracking-widest">ĐANG GIỮ</span>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[10px] text-slate-600 uppercase font-bold">Mua {tx.quantity}</span>
-                                                            <span className="text-sm font-medium">{formatMoney(tx.price)}</span>
-                                                        </div>
-
-                                                        {isSold && (
-                                                            <div className="flex flex-col items-center">
-                                                                <span className="text-[10px] text-emerald-700 uppercase font-bold text-center">Bán</span>
-                                                                <span className="text-sm font-bold text-emerald-400">{formatMoney(tx.sellPrice!)}</span>
-                                                            </div>
-                                                        )}
-
-                                                        <div className="flex flex-col items-end">
-                                                            <span className="text-[10px] text-slate-600 uppercase font-bold">Lãi / Lỗ</span>
-                                                            <div className={`text-sm font-bold ${p >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                                                {(p > 0 ? "+" : "") + formatMoney(p)}
-                                                                {(isSold || hasLivePrice) && p !== 0 && (
-                                                                    <span className="ml-1 text-[10px] opacity-60">({pPerc.toFixed(1)}%)</span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex items-center justify-end gap-2 mt-1">
-                                                        {!isSold && (
-                                                            <button
-                                                                onClick={() => handleOpenSellDialog(tx)}
-                                                                className="flex-1 rounded-xl bg-emerald-600/20 py-2.5 text-xs font-bold text-emerald-400 active:bg-emerald-600/40"
-                                                            >
-                                                                BÁN GIAO DỊCH NÀY
-                                                            </button>
-                                                        )}
-                                                        <button
-                                                            onClick={() => handleDelete(tx.id)}
-                                                            className={`p-2.5 rounded-xl border border-slate-800 text-slate-600 hover:text-red-500 active:bg-red-500/10 ${!isSold ? "" : "flex-1"}`}
-                                                        >
-                                                            <svg className="mx-auto w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                            </svg>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                                })()}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            );
-                        })
-                    )}
-                </div>
-            </div >
 
-            {/* Sell Dialog Modal */}
-            {
-                sellTx && (
+                                {/* Transactions Table (Desktop) */}
+                                <div className="hidden md:block overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="bg-slate-900/50 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                                <th className="px-6 py-4">Ngày giao dịch</th>
+                                                <th className="px-4 py-4 text-right">Giá vốn / TB</th>
+                                                <th className="px-4 py-4 text-right">Số lượng</th>
+                                                <th className="px-4 py-4 text-center">Trạng thái</th>
+                                                <th className="px-4 py-4 text-right">Giá mục tiêu</th>
+                                                <th className="px-6 py-4 text-right">Lãi/Lỗ tạm tính</th>
+                                                <th className="px-6 py-4 text-right">Thao tác</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-800/30">
+                                            {txs.map((tx: Transaction) => {
+                                                const isSold = tx.status === "SOLD";
+                                                const hasLivePrice = currentPriceValue > 0;
+                                                let p = 0;
+                                                let pPerc = 0;
+                                                if (isSold) {
+                                                    p = (tx.sellPrice! - tx.price) * tx.quantity;
+                                                    pPerc = ((tx.sellPrice! - tx.price) / tx.price) * 100;
+                                                } else if (hasLivePrice) {
+                                                    p = (currentPriceValue - tx.price) * tx.quantity;
+                                                    pPerc = ((currentPriceValue - tx.price) / tx.price) * 100;
+                                                }
+
+                                                return (
+                                                    <tr key={tx.id} className={`group hover:bg-slate-800/20 transition-colors ${isSold ? "opacity-60 bg-slate-900/60" : ""}`}>
+                                                        <td className="px-6 py-5">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-bold text-slate-300">{new Date(tx.date).toLocaleDateString("vi-VN")}</span>
+                                                                {isSold && (
+                                                                    <span className="text-[10px] font-bold text-slate-500 mt-1">Bán: {formatSellDate(tx.sellDate)}</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-5 text-right text-sm font-bold text-white">
+                                                            {formatMoney(tx.price)}
+                                                        </td>
+                                                        <td className="px-4 py-5 text-right text-sm font-bold text-slate-400">
+                                                            {tx.quantity.toLocaleString("vi-VN")}
+                                                        </td>
+                                                        <td className="px-4 py-5 text-center">
+                                                            <span className={`inline-flex rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-tighter ${isSold ? "bg-emerald-950 text-emerald-500" : "bg-cyan-950 text-cyan-500"}`}>
+                                                                {isSold ? "ĐÃ BÁN" : "ĐANG GIỮ"}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-5 text-right">
+                                                            {!isSold && (
+                                                                <div className="flex flex-col gap-1 items-end">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[9px] font-bold text-emerald-600">T: </span>
+                                                                        <span className="text-[11px] font-black text-emerald-500/80">{formatMoney(tx.price * (1 + profitTarget / 100))}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[9px] font-bold text-red-600">C: </span>
+                                                                        <span className="text-[11px] font-black text-red-500/80">{formatMoney(tx.price * (1 - lossTarget / 100))}</span>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {isSold && (
+                                                                <div className="flex flex-col items-end">
+                                                                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-tighter">Giá bán thực tế</span>
+                                                                    <span className="text-sm font-black text-emerald-500">{formatMoney(tx.sellPrice!)}</span>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className={`px-6 py-5 text-right font-black ${p >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm">{p >= 0 ? "+" : ""}{formatMoney(p)}</span>
+                                                                {(isSold || hasLivePrice) && (
+                                                                    <span className="text-[10px] opacity-60">({pPerc.toFixed(1)}%)</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-5 text-right">
+                                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                {!isSold && (
+                                                                    <button
+                                                                        onClick={() => handleOpenSellDialog(tx)}
+                                                                        className="rounded-lg bg-emerald-600/20 px-4 py-2 text-[10px] font-black text-emerald-400 hover:bg-emerald-600/40"
+                                                                    >
+                                                                        CHỐT BÁN
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => handleToggleHide(tx)}
+                                                                    className="rounded-lg bg-slate-800 px-3 py-2 text-[10px] font-black text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
+                                                                    title={tx.status === "HIDDEN" ? "Hiện lại" : "Ẩn giao dịch"}
+                                                                >
+                                                                    {tx.status === "HIDDEN" ? "HIỆN" : "ẨN"}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDelete(tx.id)}
+                                                                    className="p-2 text-slate-700 hover:text-red-500 transition-colors"
+                                                                    title="Xóa vĩnh viễn"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Mobile View (Cards) */}
+                                <div className="md:hidden divide-y divide-slate-800/30">
+                                    {txs.map((tx: Transaction) => {
+                                        const isSold = tx.status === "SOLD";
+                                        const hasLivePrice = currentPriceValue > 0;
+                                        let p = 0;
+                                        let pPerc = 0;
+                                        if (isSold) {
+                                            p = (tx.sellPrice! - tx.price) * tx.quantity;
+                                            pPerc = ((tx.sellPrice! - tx.price) / tx.price) * 100;
+                                        } else if (hasLivePrice) {
+                                            p = (currentPriceValue - tx.price) * tx.quantity;
+                                            pPerc = ((currentPriceValue - tx.price) / tx.price) * 100;
+                                        }
+
+                                        return (
+                                            <div key={tx.id} className={`px-6 py-4 flex flex-col gap-3 ${isSold ? "bg-slate-900/60 opacity-60" : ""}`}>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-black text-slate-500 uppercase">{new Date(tx.date).toLocaleDateString("vi-VN")}</span>
+                                                    <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${isSold ? "bg-emerald-950 text-emerald-500" : "bg-cyan-950 text-cyan-500"}`}>
+                                                        {isSold ? `ĐÃ BÁN ${formatSellDate(tx.sellDate)} - ${formatMoney(tx.sellPrice!)}` : "ĐANG GIỮ"}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[9px] font-bold text-slate-600 uppercase">Mua {tx.quantity.toLocaleString("vi-VN")}</span>
+                                                        <span className="text-base font-black text-white">{formatMoney(tx.price)}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-end">
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-[9px] font-bold text-slate-600 uppercase">Lãi / Lỗ</span>
+                                                            <div className={`text-base font-black ${p >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                                {p >= 0 ? "+" : ""}{formatMoney(p)}
+                                                                <span className="ml-1 text-xs opacity-60">({pPerc.toFixed(1)}%)</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-4 bg-slate-950/30 rounded-xl px-3 py-2">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[8px] font-black text-emerald-600 uppercase">Mục tiêu</span>
+                                                        <span className="text-[10px] font-bold text-emerald-500">{formatMoney(tx.price * (1 + profitTarget / 100))}</span>
+                                                    </div>
+                                                    <div className="w-px h-4 bg-slate-800"></div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[8px] font-black text-red-600 uppercase">Cắt lỗ</span>
+                                                        <span className="text-[10px] font-bold text-red-500">{formatMoney(tx.price * (1 - lossTarget / 100))}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    {!isSold && (
+                                                        <button
+                                                            onClick={() => handleOpenSellDialog(tx)}
+                                                            className="flex-1 rounded-xl bg-emerald-600/20 py-3 text-[10px] font-black text-emerald-400 active:bg-emerald-600/40"
+                                                        >
+                                                            BÁN GIAO DỊCH NÀY
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => handleToggleHide(tx)}
+                                                        className="rounded-xl border border-slate-800 bg-slate-800 px-4 py-3 text-[10px] font-black text-slate-400 active:text-white"
+                                                    >
+                                                        {tx.status === "HIDDEN" ? "HIỆN" : "ẨN"}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(tx.id)}
+                                                        className="h-10 w-10 flex items-center justify-center rounded-xl border border-slate-800 text-slate-700 active:bg-red-500/10 active:text-red-500"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Sell Dialog Modal */}
+                {sellTx && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setSellTx(null)}></div>
-                        <div className="relative w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-                            <h3 className="mb-1 text-xl font-bold text-white">Xác nhận bán</h3>
-                            <p className="mb-6 text-sm text-slate-400">
-                                Bán <span className="text-white font-bold">{sellTx.quantity}</span> cổ phiếu <span className="text-white font-bold">{sellTx.symbol}</span> mua ngày {new Date(sellTx.date).toLocaleDateString("vi-VN")}?
+                        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => setSellTx(null)}></div>
+                        <div className="relative w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
+                            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
+                                <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 11l3 3L22 4" />
+                                </svg>
+                            </div>
+                            <h3 className="mb-1 text-xl font-black text-white uppercase">Xác nhận bán</h3>
+                            <p className="mb-8 text-xs font-bold text-slate-500 uppercase leading-relaxed">
+                                Bán <span className="text-white">{sellTx.quantity}</span> cổ phiếu <span className="text-cyan-400">{sellTx.symbol}</span> mua ngày {new Date(sellTx.date).toLocaleDateString("vi-VN")}?
                             </p>
 
-                            <div className="space-y-4">
+                            <div className="space-y-6">
                                 <div>
-                                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Giá bán thực tế</label>
+                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">Giá bán thực tế</label>
                                     <input
                                         autoFocus
                                         value={sellPriceInput}
                                         onChange={(e: ChangeEvent<HTMLInputElement>) => setSellPriceInput(formatInputNumber(e.target.value))}
-                                        className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-lg font-bold outline-none focus:border-emerald-500"
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-5 py-4 text-2xl font-black text-white outline-none focus:border-emerald-500 transition-all text-right"
                                         placeholder="0"
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3 pt-2">
+                                <div className="grid grid-cols-2 gap-4">
                                     <button
                                         onClick={() => setSellTx(null)}
-                                        className="rounded-2xl border border-slate-700 py-3 font-bold text-slate-400 transition hover:bg-slate-800"
+                                        className="rounded-2xl border border-slate-700 py-4 text-xs font-black text-slate-400 hover:bg-slate-800 transition-all uppercase"
                                     >
-                                        Hủy
+                                        Hủy bỏ
                                     </button>
                                     <button
                                         onClick={handleConfirmSell}
                                         disabled={isLoading}
-                                        className="rounded-2xl bg-emerald-600 py-3 font-bold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                                        className="rounded-2xl bg-emerald-600 py-4 text-xs font-black text-white hover:bg-emerald-500 active:scale-95 transition-all disabled:opacity-50 uppercase shadow-lg shadow-emerald-900/20"
                                     >
-                                        {isLoading ? "Đang xử lý..." : "Xác nhận Bán"}
+                                        {isLoading ? "Đang lưu..." : "Xác nhận bán"}
                                     </button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                )
-            }
+                )}
 
-            {/* Symbol Analysis Popup */}
-            {
-                analysisSymbol && (
+                {/* Symbol Analysis Popup */}
+                {analysisSymbol && (
                     <div className="fixed inset-0 z-[105] flex items-center justify-center p-2 sm:p-4">
                         <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm" onClick={() => setAnalysisSymbol(null)}></div>
-                        <div className="relative w-full max-w-6xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden">
-                            <div className="flex items-center justify-between gap-2 border-b border-slate-800 px-3 py-2 sm:px-4 sm:py-3">
-                                <p className="text-xs sm:text-sm font-bold text-white">
-                                    Chi tiết mã: <span className="text-cyan-300">{analysisSymbol}</span>
-                                </p>
-                                <div className="flex items-center gap-2">
+                        <div className="relative w-full max-w-6xl h-[90vh] rounded-3xl border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden flex flex-col">
+                            <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-6 py-4 bg-slate-900/50">
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Dữ liệu phân tích chứng khoán</p>
+                                    <h3 className="text-lg font-black text-white uppercase leading-none">Fireant Chart: <span className="text-cyan-400">{analysisSymbol}</span></h3>
+                                </div>
+                                <div className="flex items-center gap-3">
                                     <a
                                         href={analysisUrl}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="rounded-lg border border-cyan-700/40 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-bold text-cyan-300 hover:bg-cyan-500/20"
+                                        className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-[10px] font-black text-cyan-400 hover:bg-cyan-500/20 transition-all uppercase"
                                     >
                                         Mở tab mới
                                     </a>
                                     <button
-                                        type="button"
                                         onClick={() => setAnalysisSymbol(null)}
-                                        className="rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-bold text-slate-300 hover:bg-slate-800"
+                                        className="rounded-xl bg-slate-800 px-4 py-2.5 text-[10px] font-black text-slate-300 hover:bg-slate-700 transition-all uppercase"
                                     >
                                         Đóng
                                     </button>
                                 </div>
                             </div>
-                            <iframe
-                                src={analysisUrl}
-                                title={`Fireant ${analysisSymbol}`}
-                                className="h-[78vh] w-full bg-slate-950"
-                                referrerPolicy="strict-origin-when-cross-origin"
-                            />
+                            <div className="flex-1 relative">
+                                <iframe
+                                    src={analysisUrl}
+                                    title={`Fireant ${analysisSymbol}`}
+                                    className="absolute inset-0 h-full w-full"
+                                    referrerPolicy="strict-origin-when-cross-origin"
+                                />
+                            </div>
                         </div>
                     </div>
-                )
-            }
+                )}
 
-            {/* Toast Notification */}
-            {
-                notification && (
-                    <div className="fixed bottom-8 left-1/2 z-[110] -translate-x-1/2 animate-bounce">
-                        <div className={`flex items-center gap-3 rounded-full border px-6 py-3 shadow-2xl backdrop-blur-xl ${notification.type === "success"
+                {/* Bubble Buttons at Bottom */}
+                <div className="fixed bottom-8 right-8 z-[90] flex flex-col gap-4 items-end">
+                    <button
+                        onClick={() => loadTransactions(accessCode)}
+                        disabled={isRefreshingSheet}
+                        className="group flex h-14 w-14 md:h-16 md:w-auto md:px-6 items-center justify-center gap-3 rounded-2xl bg-slate-900 border border-slate-800 text-white shadow-2xl hover:scale-110 active:scale-95 transition-all disabled:opacity-50"
+                        title="Làm mới dữ liệu từ Sheets"
+                    >
+                        <div className={isRefreshingSheet ? "animate-spin" : ""}>
+                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </div>
+                        <span className="hidden md:block text-xs font-black uppercase tracking-widest">Làm mới Sheet</span>
+                    </button>
+                    <button
+                        onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
+                        disabled={isRefreshingPrices || transactions.filter((t: Transaction) => t.status === "HOLD").length === 0}
+                        className="group flex h-14 w-14 md:h-16 md:w-auto md:px-6 items-center justify-center gap-3 rounded-2xl bg-cyan-600 text-white shadow-2xl hover:scale-110 active:scale-95 transition-all disabled:opacity-50"
+                        title="Làm mới giá thị trường"
+                    >
+                        <div className="relative flex items-center justify-center">
+                            <div className={isRefreshingPrices ? "animate-spin" : ""}>
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                </svg>
+                            </div>
+                            {!isRefreshingPrices && (
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-900 text-[8px] font-black text-cyan-400 border border-cyan-500/30">
+                                    {refreshCountdown}
+                                </span>
+                            )}
+                        </div>
+                        <span className="hidden md:block text-xs font-black uppercase tracking-widest">Làm mới giá</span>
+                    </button>
+                </div>
+
+                {/* Toast Notification */}
+                {notification && (
+                    <div className="fixed bottom-12 left-1/2 z-[110] -translate-x-1/2 animate-bounce">
+                        <div className={`flex items-center gap-3 rounded-full border px-8 py-3.5 shadow-2xl backdrop-blur-xl ${notification.type === "success"
                             ? "border-emerald-500/50 bg-emerald-950/80 text-emerald-300"
                             : "border-cyan-500/50 bg-cyan-950/80 text-cyan-300"
                             }`}>
-                            <span className="text-xs font-bold uppercase tracking-widest leading-none">{notification.msg}</span>
+                            <div className={`h-2 w-2 rounded-full ${notification.type === "success" ? "bg-emerald-400" : "bg-cyan-400"}`}></div>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{notification.msg}</span>
                         </div>
                     </div>
-                )
-            }
-        </main >
+                )}
+            </div>
+
+            {/* Minimalist Mode View */}
+            {isMinimalMode && !isPiPActive && (
+                <div className="fixed inset-0 top-[120px] bg-slate-950 z-10 overflow-y-auto px-4 pb-32">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {Object.entries(groupedTransactions).map(([symbol, txs]) => {
+                            const holdTxs = txs.filter(t => t.status === "HOLD");
+                            if (holdTxs.length === 0) return null;
+
+                            const info = currentPrices[symbol] || null;
+                            const currentPriceValue = info?.current || 0;
+                            const referenceValue = info?.reference || 0;
+                            const avgPrice = holdTxs.reduce((sum, t) => sum + t.price, 0) / holdTxs.length;
+
+                            const pPerc = currentPriceValue > 0
+                                ? ((currentPriceValue - avgPrice) / avgPrice) * 100
+                                : 0;
+
+                            const isRecentlyUpdated = recentlyUpdatedSymbols[symbol];
+
+                            return (
+                                <div
+                                    key={symbol}
+                                    onClick={() => openAnalysisPopup(symbol)}
+                                    className={`relative rounded-2xl border p-4 transition-all active:scale-95 ${isRecentlyUpdated ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.3)]" : "border-slate-800 bg-slate-900/40"
+                                        }`}
+                                >
+                                    <div className="flex flex-col h-full justify-between gap-1">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-black text-white">{symbol}</span>
+                                            {isRecentlyUpdated && (
+                                                <span className="flex h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                            )}
+                                        </div>
+                                        <div className={`text-xl font-black leading-none ${getStockPriceColorClass(currentPriceValue, info)}`}>
+                                            {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "---"}
+                                        </div>
+                                        <div className="flex items-center justify-between mt-1 border-t border-slate-800/50 pt-1">
+                                            <div className="flex flex-col">
+                                                <span className="text-[8px] font-bold text-slate-500 uppercase">TC / AVG</span>
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                    {referenceValue > 0 ? formatMoney(referenceValue) : "---"} / {formatMoney(avgPrice)}
+                                                </span>
+                                            </div>
+                                            <span className={`text-sm font-black ${pPerc >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                {pPerc >= 0 ? "+" : ""}{pPerc.toFixed(1)}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Quick Summary in Minimal Mode - Simplified */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 p-4 flex justify-end items-center z-20">
+                        <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2">Refresh in</span>
+                            {!isAutoUpdateEnabled && (
+                                <button
+                                    onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
+                                    className="rounded-xl bg-cyan-600 p-3 text-white shadow-lg active:scale-90 transition-all"
+                                >
+                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                </button>
+                            )}
+                            <div className="relative">
+                                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800 text-cyan-400 border border-slate-700`}>
+                                    <span className="text-xs font-black">{refreshCountdown}s</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Analysis Mode View */}
+            {isAnalysisMode && !isPiPActive && (
+                <div className="fixed inset-0 top-[100px] bg-slate-950 z-10 overflow-y-auto px-0 pb-32 snap-y snap-mandatory scroll-smooth">
+                    <div className="flex flex-col gap-0 w-full">
+                        {Array.from(new Set(transactions.filter(t => (t.status === "HOLD" || (showHidden && t.status === "HIDDEN"))).map(t => t.symbol))).map((symbol) => (
+                            <div key={symbol} className="flex flex-col h-[calc(100vh-100px)] w-full border-b border-slate-800 snap-start shrink-0">
+                                <div className="flex items-center justify-between px-6 py-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800/50 z-20">
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                                            <span className="font-black text-xs">Chart</span>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-black text-white uppercase tracking-tight">{symbol}</h3>
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fireant Deep Analysis</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <a
+                                            href={`https://fireant.vn/ma-chung-khoan/${symbol}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-2 text-[10px] font-black text-slate-400 hover:text-white hover:bg-slate-800 transition-all uppercase"
+                                        >
+                                            View Original
+                                        </a>
+                                        <div className="h-8 w-[1px] bg-slate-800 mx-2"></div>
+                                        <div className="text-right hidden sm:block">
+                                            <p className="text-[10px] font-black text-cyan-500 uppercase tracking-tighter">Live Chart</p>
+                                            <p className="text-[8px] font-medium text-slate-600 uppercase tracking-widest">Scroll for next</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex-1 relative bg-slate-950">
+                                    <iframe
+                                        src={`https://fireant.vn/ma-chung-khoan/${symbol}`}
+                                        title={`Fireant ${symbol}`}
+                                        className="absolute inset-0 h-full w-full border-none"
+                                        referrerPolicy="strict-origin-when-cross-origin"
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Quick Summary in Analysis Mode */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 p-4 flex justify-end items-center z-20">
+                        <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2">Refresh in</span>
+                            {!isAutoUpdateEnabled && (
+                                <button
+                                    onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
+                                    className="rounded-xl bg-cyan-600 p-3 text-white shadow-lg active:scale-90 transition-all"
+                                >
+                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                </button>
+                            )}
+                            <div className="relative">
+                                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800 text-cyan-400 border border-slate-700`}>
+                                    <span className="text-xs font-black">{refreshCountdown}s</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Password Verification Modal */}
+            {isVerifyingPassword && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl" onClick={() => setIsVerifyingPassword(false)}></div>
+                    <div className="relative w-full max-w-xs rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl text-center">
+                        <div className="mb-6 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
+                            <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                        </div>
+                        <h3 className="mb-1 text-base font-black text-white uppercase tracking-tight">Xác thực quyền hạn</h3>
+                        <p className="mb-6 text-[10px] font-bold text-slate-500 uppercase">Nhập mật khẩu truy cập để chuyển chế độ</p>
+
+                        <div className="space-y-4">
+                            <input
+                                autoFocus
+                                type="password"
+                                value={verificationInput}
+                                onChange={(e: ChangeEvent<HTMLInputElement>) => setVerificationInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        if (verificationInput === accessCode) {
+                                            const next = !isMinimalMode;
+                                            setIsMinimalMode(next);
+                                            localStorage.setItem("stock_minimal_mode", next.toString());
+                                            setIsVerifyingPassword(false);
+                                        } else {
+                                            setVerificationError("Mật khẩu không đúng");
+                                        }
+                                    }
+                                }}
+                                className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-5 py-4 text-center font-mono text-xl tracking-[0.5em] text-white outline-none focus:border-cyan-500 transition-all"
+                                placeholder="••••••"
+                            />
+                            {verificationError && <p className="text-[10px] font-black text-red-500 uppercase">{verificationError}</p>}
+
+                            <div className="grid grid-cols-2 gap-3 pt-2">
+                                <button
+                                    onClick={() => setIsVerifyingPassword(false)}
+                                    className="rounded-xl border border-slate-700 py-3 text-[10px] font-black text-slate-500 hover:bg-slate-800 transition-all uppercase"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (verificationInput === accessCode) {
+                                            const next = !isMinimalMode;
+                                            setIsMinimalMode(next);
+                                            localStorage.setItem("stock_minimal_mode", next.toString());
+                                            setIsVerifyingPassword(false);
+                                        } else {
+                                            setVerificationError("Mật khẩu không đúng");
+                                        }
+                                    }}
+                                    className="rounded-xl bg-cyan-600 py-3 text-[10px] font-black text-white hover:bg-cyan-500 transition-all uppercase"
+                                >
+                                    Xác nhận
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Portal for PiP window */}
+            {isPiPActive && pipWindowRef.current && createPortal(
+                <div className="w-full h-full flex flex-col">
+                    <div className="flex flex-row flex-wrap gap-2 items-start content-start overflow-y-auto flex-1">
+                        {Object.entries(groupedTransactions).map(([symbol, txs]) => {
+                            const holdTxs = txs.filter(t => t.status === "HOLD");
+                            if (holdTxs.length === 0) return null;
+
+                            const info = currentPrices[symbol] || null;
+                            const currentPriceValue = info?.current || 0;
+                            const referenceValue = info?.reference || 0;
+                            const avgPrice = holdTxs.reduce((sum, t) => sum + t.price, 0) / holdTxs.length;
+
+                            const pPerc = currentPriceValue > 0
+                                ? ((currentPriceValue - avgPrice) / avgPrice) * 100
+                                : 0;
+
+                            const isRecentlyUpdated = recentlyUpdatedSymbols[symbol];
+
+                            return (
+                                <div
+                                    key={symbol}
+                                    className={`relative rounded-xl border p-2 min-w-[140px] flex-1 transition-all active:scale-95 ${isRecentlyUpdated ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.3)]" : "border-slate-800 bg-slate-900/40"
+                                        }`}
+                                >
+                                    <div className="flex flex-col h-full justify-between gap-1">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-black text-white">{symbol}</span>
+                                            {isRecentlyUpdated && (
+                                                <span className="flex h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                            )}
+                                        </div>
+                                        <div className={`text-xl font-black leading-none ${getStockPriceColorClass(currentPriceValue, info)}`}>
+                                            {currentPriceValue > 0 ? formatMoney(currentPriceValue) : "---"}
+                                        </div>
+                                        <div className="flex items-center justify-between mt-1 border-t border-slate-800/50 pt-1">
+                                            <div className="flex flex-col">
+                                                <span className="text-[8px] font-bold text-slate-500 uppercase">TC / AVG</span>
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                    {referenceValue > 0 ? formatMoney(referenceValue) : "---"} / {formatMoney(avgPrice)}
+                                                </span>
+                                            </div>
+                                            <span className={`text-sm font-black ${pPerc >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                {pPerc >= 0 ? "+" : ""}{pPerc.toFixed(1)}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                        <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Update: {refreshCountdown}s</span>
+                        {!isAutoUpdateEnabled && (
+                            <button
+                                onClick={() => fetchRealtimePrices(transactions.filter((t: Transaction) => t.status === "HOLD").map((t: Transaction) => t.symbol), true)}
+                                className="rounded-md bg-cyan-600 p-1 text-white shadow-lg active:scale-90 transition-all"
+                            >
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
+                </div>,
+                pipWindowRef.current.document.getElementById("pip-root")
+            )}
+            {/* Hidden elements for Frameless Mode */}
+            <canvas ref={canvasRef} width={600} height={150} className="hidden" />
+            <video ref={videoRef} className="hidden" muted playsInline />
+        </main>
     );
 }
 
@@ -1082,7 +1872,6 @@ function formatDateTime(input: string | null): string | null {
 
 function parseTimestampToMs(input: string | null): number | null {
     if (!input) return null;
-
     const nativeMs = Date.parse(input);
     if (!Number.isNaN(nativeMs)) return nativeMs;
 
@@ -1101,4 +1890,26 @@ function parseTimestampToMs(input: string | null): number | null {
     );
 
     return Number.isNaN(utcMs) ? null : utcMs;
+}
+
+function formatSellDate(input: string | undefined | null): string {
+    if (!input) return "N/A";
+
+    // Check if it's already in dd/MM/yyyy HH:mm:ss format
+    const longFormatRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+    if (longFormatRegex.test(input)) return input;
+
+    // Try to parse as date
+    const date = new Date(input);
+    if (isNaN(date.getTime())) return input;
+
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const d = pad(date.getDate());
+    const m = pad(date.getMonth() + 1);
+    const y = date.getFullYear();
+    // const h = pad(date.getHours());
+    // const min = pad(date.getMinutes());
+    // const s = pad(date.getSeconds());
+
+    return `${d}/${m}/${y}`;
 }

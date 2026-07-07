@@ -18,7 +18,7 @@ const bootstrap = async (): Promise<void> => {
       origin: env.BACKEND_CORS_ORIGIN,
       methods: ["GET", "POST"]
     },
-    transports: ["websocket", "polling"]
+    transports: ["polling", "websocket"]
   });
 
   const roomService = new RoomService();

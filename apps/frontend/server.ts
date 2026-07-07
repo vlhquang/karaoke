@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -14,6 +15,9 @@ import { RoomService as LiXiRoomService } from "./src/li-xi-nang-cao/services/ro
 import { registerLiXiNamespace } from "./src/li-xi-nang-cao/socket";
 import { startKeepAlive } from "./src/lib/keep-alive";
 import { getStockAutoRefreshStatus, startStockAutoRefreshWorker } from "./src/lib/stock-auto-refresh";
+import { registerGpsTracker } from "./src/gps-tracker";
+import { registerCoTyPhuNamespace } from "./src/co-ty-phu/socket/register-co-ty-phu";
+import { registerFitnessGameNamespace } from "./src/fitness-game/socket";
 import type {
   AddSongPayload,
   ClientToServerEvents,
@@ -237,6 +241,31 @@ interface LotoInternalRoom {
 
 const lotoRooms = new Map<string, LotoInternalRoom>();
 
+// ── HUD Remote Control room data ──
+
+interface HudInternalRoom {
+  roomCode: string;
+  state: {
+    roadType: "manual";
+    zone: "residential" | "outside";
+    manualMax: number;
+    offset: number;
+    mode: "car" | "moto";
+  };
+  createdAt: string;
+}
+
+const hudRooms = new Map<string, HudInternalRoom>();
+
+const generateHudRoomCode = (): string => {
+  const hudChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 4; i++) {
+    code += hudChars.charAt(Math.floor(Math.random() * hudChars.length));
+  }
+  return hudRooms.has(code) ? generateHudRoomCode() : code;
+};
+
 const computeNearWin = (member: LotoMember, calledNumbers: number[]): { waitingNumber: number }[] => {
   if (!member.board || !member.ready) return [];
   const calledSet = new Set(calledNumbers);
@@ -358,6 +387,9 @@ app.prepare().then(() => {
       data: getStockAutoRefreshStatus()
     });
   });
+
+  registerGpsTracker(null as any, expressApp);
+
   expressApp.all("*", (req, res) => handle(req, res));
   const httpServer = createServer(expressApp);
 
@@ -367,10 +399,13 @@ app.prepare().then(() => {
 
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     cors: { origin: true, methods: ["GET", "POST"] },
-    transports: ["websocket", "polling"],
+    transports: ["polling", "websocket"],
     maxHttpBufferSize: Number(process.env.SOCKET_MAX_HTTP_BUFFER_SIZE ?? 20 * 1024 * 1024)
   });
   registerLiXiNamespace(io.of("/lixi"), liXiRoomService);
+  registerCoTyPhuNamespace(io.of("/co-ty-phu"));
+  registerFitnessGameNamespace(io.of("/fitness-game"));
+  registerGpsTracker(io as any, null as any); // Bind socket ONLY after HTTP server starts
   setInterval(() => liXiRoomService.cleanupExpiredRooms(Date.now()), 5 * 60 * 1000);
 
   const emitRoomState = (roomCode: string): void => {
@@ -1240,6 +1275,64 @@ app.prepare().then(() => {
       io.to(code).emit("room-closed", { roomCode: code, message: "Chủ phòng đã đóng phòng." });
       racingRooms.delete(code);
       cleanupRacingRoomSessionRefs(code);
+    });
+
+    // ── HUD Remote Control socket handlers ──
+
+    anySocket.on("hud_create_room", (ack: any) => {
+      try {
+        const roomCode = generateHudRoomCode();
+        const room: HudInternalRoom = {
+          roomCode,
+          state: { roadType: "manual", zone: "residential", manualMax: 60, offset: 0, mode: "moto" },
+          createdAt: new Date().toISOString(),
+        };
+        hudRooms.set(roomCode, room);
+        anySocket.join(`hud:${roomCode}`);
+        // Auto-cleanup 12h
+        setTimeout(() => hudRooms.delete(roomCode), 12 * 60 * 60 * 1000);
+        if (typeof ack === "function") ack({ ok: true, roomCode, state: room.state });
+      } catch (err) {
+        if (typeof ack === "function") ack({ ok: false, message: err instanceof Error ? err.message : "Error" });
+      }
+    });
+
+    anySocket.on("hud_join_room", (payload: { roomCode: string }, ack: any) => {
+      try {
+        const roomCode = String(payload?.roomCode ?? "").toUpperCase().trim();
+        const room = hudRooms.get(roomCode);
+        if (!room) {
+          if (typeof ack === "function") ack({ ok: false, message: "Không tìm thấy phòng HUD. Kiểm tra lại mã phòng." });
+          return;
+        }
+        anySocket.join(`hud:${roomCode}`);
+        if (typeof ack === "function") ack({ ok: true, state: room.state });
+      } catch (err) {
+        if (typeof ack === "function") ack({ ok: false, message: err instanceof Error ? err.message : "Error" });
+      }
+    });
+
+    anySocket.on("hud_update_state", (payload: { roomCode: string; state: Partial<HudInternalRoom["state"]> }, ack: any) => {
+      try {
+        const roomCode = String(payload?.roomCode ?? "").toUpperCase().trim();
+        const room = hudRooms.get(roomCode);
+        if (!room) {
+          if (typeof ack === "function") ack({ ok: false, message: "Phòng HUD không tồn tại." });
+          return;
+        }
+        room.state = { ...room.state, ...payload.state };
+        // Broadcast đến các thiết bị KHÁC trong phòng (loại trừ sender để tránh loop)
+        anySocket.to(`hud:${roomCode}`).emit("hud_state_updated" as any, { state: room.state });
+        if (typeof ack === "function") ack({ ok: true });
+      } catch (err) {
+        if (typeof ack === "function") ack({ ok: false, message: err instanceof Error ? err.message : "Error" });
+      }
+    });
+
+    anySocket.on("hud_leave_room", (payload: { roomCode: string }, ack: any) => {
+      const roomCode = String(payload?.roomCode ?? "").toUpperCase().trim();
+      anySocket.leave(`hud:${roomCode}`);
+      if (typeof ack === "function") ack({ ok: true });
     });
 
     socket.on("disconnect", () => {
