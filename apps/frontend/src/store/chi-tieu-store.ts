@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { hashColor, textColorFor } from "../chi-tieu/lib/color";
-import { formatMoney, formatDateVi } from "../chi-tieu/lib/format";
+import { formatMoney, formatDateVi, toIsoDateString } from "../chi-tieu/lib/format";
 
 export type Loai = "thu" | "chi";
 
@@ -41,8 +41,10 @@ export interface ChiTieuState {
     category: string;
     soTien: number;
     note?: string;
+    date?: string;
   }) => Promise<void>;
   upsertCategory: (ten: string, loai: Loai) => Promise<void>;
+  deleteTransaction: (id: number) => Promise<void>;
   setSettings: (settings: Partial<Settings>) => Promise<void>;
   logout: () => void;
   clearError: () => void;
@@ -50,6 +52,29 @@ export interface ChiTieuState {
 
 const ACCESS_CODE_KEY = "chitieu_access_code";
 const CACHE_KEY = "chitieu_cache_v1";
+const SESSION_EXPIRY_KEY = "chitieu_session_expiry";
+const SESSION_DURATION_MS = 4 * 60 * 60 * 1000; // 4 tiếng
+
+const saveSessionExpiry = () => {
+  try {
+    localStorage.setItem(SESSION_EXPIRY_KEY, String(Date.now() + SESSION_DURATION_MS));
+  } catch {}
+};
+
+const clearSessionExpiry = () => {
+  try {
+    localStorage.removeItem(SESSION_EXPIRY_KEY);
+  } catch {}
+};
+
+const isSessionValid = (): boolean => {
+  try {
+    const expiry = Number(localStorage.getItem(SESSION_EXPIRY_KEY) ?? "0");
+    return expiry > Date.now();
+  } catch {
+    return false;
+  }
+};
 
 type SetFn = (fn: (state: ChiTieuState) => Partial<ChiTieuState>) => void;
 type GetFn = () => ChiTieuState;
@@ -133,9 +158,10 @@ const postAction = async (
 
 export const useChiTieuStore = create<ChiTieuState>((set, get) => {
   const cache = loadCache();
+  const storedCode = loadAccessCode();
   return {
-    accessCode: loadAccessCode(),
-    initialized: false,
+    accessCode: storedCode,
+    initialized: isSessionValid() && !!storedCode,
     loading: false,
     errorMessage: "",
     transactions: cache.transactions,
@@ -151,11 +177,12 @@ export const useChiTieuStore = create<ChiTieuState>((set, get) => {
     login: async (accessCode) => {
       set(() => ({ loading: true, errorMessage: "" }));
       try {
-        const result = await get().post({ action: "login", accessCode });
+        const result = await postAction({ action: "login", accessCode });
         if (!result.ok) {
           throw new Error(result.message || "Sai ma truy cap");
         }
         saveAccessCode(accessCode);
+        saveSessionExpiry();
         set(() => ({ accessCode, initialized: true }));
         await get().loadAll();
       } catch (error) {
@@ -208,25 +235,26 @@ export const useChiTieuStore = create<ChiTieuState>((set, get) => {
           loai: input.loai,
           category: input.category,
           soTien: input.soTien,
-          note: input.note || ""
+          note: input.note || "",
+          date: input.date ?? toIsoDateString(new Date())
         });
         if (!result.ok) {
           throw new Error((result as { ok: false; message?: string }).message || "Them giao dich that bai");
         }
 
-        const data = (result as { ok: true; data: { id: number; category: Category } }).data;
-        const category = data.category ?? {
+        const data = (result as { ok: true; data?: { id?: number; category?: Category } }).data;
+        const category = data?.category ?? {
           ten: input.category,
           loai: input.loai,
           mau: hashColor(input.category)
         };
         const transaction: Transaction = {
-          id: data.id,
+          id: data?.id ?? Date.now(),
           loai: input.loai,
           category: input.category,
           soTien: input.soTien,
           note: input.note,
-          createdAt: new Date().toISOString()
+          createdAt: input.date ? new Date(input.date).toISOString() : new Date().toISOString()
         };
 
         set((state) => {
@@ -258,6 +286,27 @@ export const useChiTieuStore = create<ChiTieuState>((set, get) => {
       }
     },
 
+    deleteTransaction: async (id) => {
+      set(() => ({ loading: true, errorMessage: "" }));
+      try {
+        const result = await get().post({ action: "delete", id });
+        if (!result.ok) {
+          throw new Error((result as { ok: false; message?: string }).message || "Xoa giao dich that bai");
+        }
+        set((state) => {
+          const transactions = state.transactions.filter((tx) => tx.id !== id);
+          saveCache({ transactions, categories: state.categories, settings: state.settings });
+          return { transactions };
+        });
+      } catch (error) {
+        set(() => ({
+          errorMessage: error instanceof Error ? error.message : "Xoa giao dich that bai"
+        }));
+      } finally {
+        set(() => ({ loading: false }));
+      }
+    },
+
     setSettings: async (settings) => {
       set(() => ({ loading: true, errorMessage: "" }));
       try {
@@ -281,6 +330,7 @@ export const useChiTieuStore = create<ChiTieuState>((set, get) => {
 
     logout: () => {
       clearAccessCode();
+      clearSessionExpiry();
       set(() => ({
         accessCode: "",
         initialized: false,

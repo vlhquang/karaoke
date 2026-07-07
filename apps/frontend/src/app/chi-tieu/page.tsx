@@ -1,21 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChiTieuStore } from "../../store/chi-tieu-store";
 import LoginCard from "../../chi-tieu/components/LoginCard";
+import QuickEntryForm from "../../chi-tieu/components/QuickEntryForm";
 import TransactionForm from "../../chi-tieu/components/TransactionForm";
 import SummaryReport from "../../chi-tieu/components/SummaryReport";
 import SettingsPanel from "../../chi-tieu/components/SettingsPanel";
 
-type Tab = "input" | "summary" | "settings";
+type Tab = "quick" | "input" | "summary" | "settings";
 
 export default function ChiTieuPage() {
   const initialized = useChiTieuStore((s) => s.initialized);
   const accessCode = useChiTieuStore((s) => s.accessCode);
   const loading = useChiTieuStore((s) => s.loading);
   const login = useChiTieuStore((s) => s.login);
+  const loadAll = useChiTieuStore((s) => s.loadAll);
   const logout = useChiTieuStore((s) => s.logout);
-  const [tab, setTab] = useState<Tab>("input");
+  const [tab, setTab] = useState<Tab>("quick");
+
+  // Khi session được restore từ localStorage (initialized = true ngay từ đầu),
+  // login() không được gọi nên loadAll() cũng không chạy — refresh dữ liệu ở nền.
+  const wasInitializedOnMount = useRef(initialized);
+  useEffect(() => {
+    if (wasInitializedOnMount.current) {
+      void loadAll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!initialized && accessCode) {
@@ -45,6 +57,7 @@ export default function ChiTieuPage() {
 
       <nav className="mt-5 flex flex-wrap gap-2">
         {([
+          { key: "quick", label: "⚡ Nhanh" },
           { key: "input", label: "Nhập" },
           { key: "summary", label: "Tổng hợp" },
           { key: "settings", label: "Cài đặt" }
@@ -64,6 +77,11 @@ export default function ChiTieuPage() {
       </nav>
 
       <section className="mt-5">
+        {tab === "quick" && (
+          <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4 md:p-6">
+            <QuickEntryForm onSuccess={() => setTab("summary")} />
+          </div>
+        )}
         {tab === "input" && (
           <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4 md:p-6">
             <TransactionForm />

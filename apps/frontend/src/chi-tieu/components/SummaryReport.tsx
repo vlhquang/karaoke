@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useChiTieuStore, type Loai, type Transaction } from "../../store/chi-tieu-store";
+import { useChiTieuStore, type Loai } from "../../store/chi-tieu-store";
 import DateRangePicker from "./DateRangePicker";
 import { formatMoney, formatDateVi, getSalaryCycle } from "../lib/format";
 
@@ -14,8 +14,11 @@ export default function SummaryReport() {
   const transactions = useChiTieuStore((s) => s.transactions);
   const categories = useChiTieuStore((s) => s.categories);
   const settings = useChiTieuStore((s) => s.settings);
+  const deleteTransaction = useChiTieuStore((s) => s.deleteTransaction);
+  const loading = useChiTieuStore((s) => s.loading);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const filtered = useMemo(() => {
     if (!from && !to) return transactions;
@@ -64,6 +67,15 @@ export default function SummaryReport() {
     const { from: f, to: t } = getSalaryCycle(settings.salaryDay);
     setFrom(f.toISOString().slice(0, 10));
     setTo(t.toISOString().slice(0, 10));
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      return;
+    }
+    setConfirmDeleteId(null);
+    await deleteTransaction(id);
   };
 
   const thuWidth = summary.thu + summary.chi === 0 ? "0%" : `${(summary.thu / (summary.thu + summary.chi)) * 100}%`;
@@ -140,11 +152,12 @@ export default function SummaryReport() {
                   <th className="pb-2 pr-4">Mục lục</th>
                   <th className="pb-2 pr-4 text-right">Số tiền</th>
                   <th className="pb-2 pr-4">Ghi chú</th>
+                  <th className="pb-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {filtered.map((tx) => (
-                  <tr key={tx.id}>
+                  <tr key={tx.id} className="group">
                     <td className="py-2 pr-4 text-slate-300">{formatDateVi(tx.createdAt)}</td>
                     <td className="py-2 pr-4">
                       <span className={tx.loai === "thu" ? "text-emerald-300" : "text-rose-300"}>
@@ -156,6 +169,33 @@ export default function SummaryReport() {
                       {formatMoney(tx.soTien)}
                     </td>
                     <td className="py-2 pr-4 text-slate-400">{tx.note || "-"}</td>
+                    <td className="py-2 text-right">
+                      {confirmDeleteId === tx.id ? (
+                        <span className="inline-flex items-center gap-1">
+                          <button
+                            onClick={() => void handleDelete(tx.id)}
+                            disabled={loading}
+                            className="rounded px-2 py-0.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-40"
+                          >
+                            Xoá
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="rounded px-2 py-0.5 text-xs text-slate-400 hover:bg-slate-700"
+                          >
+                            Huỷ
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(tx.id)}
+                          className="rounded p-1 text-slate-600 opacity-0 hover:bg-slate-700 hover:text-rose-300 group-hover:opacity-100"
+                          title="Xoá giao dịch"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
