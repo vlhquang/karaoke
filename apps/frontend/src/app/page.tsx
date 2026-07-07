@@ -52,6 +52,12 @@ export default function HomePage() {
       badge: "New"
     },
     {
+      href: "/xem-phim",
+      title: "Tải & Xem Phim",
+      description: "Tải phim từ link (Bilibili, YouTube...) lưu vào Google Drive và xem online.",
+      badge: "New"
+    },
+    {
       href: "/gps-tracker/sender.html",
       title: "Chia sẻ hành trình",
       description: "Trình theo dõi GPS realtime, ứng dụng web chuyên dụng chia sẻ vị trí xe.",

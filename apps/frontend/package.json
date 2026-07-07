@@ -26,6 +26,7 @@
     "express": "^4.21.2",
     "google-auth-library": "^10.6.1",
     "google-spreadsheet": "^5.2.0",
+    "googleapis": "^173.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.12.0",
     "next": "^15.5.15",
@@ -50,6 +51,7 @@
     "three": "^0.184.0",
     "tsx": "^4.7.0",
     "uuid": "^14.0.0",
+    "yt-dlp-wrap": "^2.3.12",
     "zod": "^3.24.1",
     "zustand": "^5.0.2"
   },
