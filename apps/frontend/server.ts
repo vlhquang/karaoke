@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";

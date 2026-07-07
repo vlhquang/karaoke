@@ -74,6 +74,12 @@ export default function HomePage() {
       title: "Hiện tượng khoa học",
       description: "Phòng Thí Nghiệm Vũ Trụ Của Bé - Mô phỏng 3D hiện tượng thiên văn (Ngày/đêm, Các mùa, Thủy triều).",
       badge: "New"
+    },
+    {
+      href: "/chi-tieu",
+      title: "Chi tieu",
+      description: "Quan ly thu/chi ca nhan voi Google Sheets.",
+      badge: "New"
     }
   ];
 
