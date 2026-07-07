@@ -1,0 +1,21 @@
+{
+    "name": "GPS Tracker",
+    "short_name": "GPS",
+    "description": "Chia sẻ hành trình GPS thời gian thực",
+    "start_url": "./sender.html",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#0ea5e9",
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

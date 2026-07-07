@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720" role="img" aria-labelledby="title desc">
+  <title id="title">Tuyến du lịch Việt Nam</title>
+  <desc id="desc">Minh họa tuyến du lịch xuyên Việt với các điểm dừng nổi bật</desc>
+  <defs>
+    <linearGradient id="sea" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#dff8ff"/>
+      <stop offset="1" stop-color="#f1fbf3"/>
+    </linearGradient>
+    <linearGradient id="route" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#2f7e79"/>
+      <stop offset="0.55" stop-color="#f2a541"/>
+      <stop offset="1" stop-color="#d84f3a"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#16333a" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect width="720" height="720" rx="42" fill="url(#sea)"/>
+  <path d="M545 85c-48 12-93 38-112 79-19 42 9 72 5 112-5 51-64 75-76 126-12 54 36 87 26 139-7 39-43 70-90 96" fill="none" stroke="#ffffff" stroke-width="52" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" filter="url(#softShadow)"/>
+  <path d="M545 85c-48 12-93 38-112 79-19 42 9 72 5 112-5 51-64 75-76 126-12 54 36 87 26 139-7 39-43 70-90 96" fill="none" stroke="url(#route)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#ffffff" stroke="#17343b" stroke-width="7">
+    <circle cx="545" cy="85" r="24"/>
+    <circle cx="438" cy="278" r="20"/>
+    <circle cx="363" cy="402" r="22"/>
+    <circle cx="388" cy="542" r="20"/>
+    <circle cx="298" cy="637" r="24"/>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#17343b">
+    <text x="487" y="66">Bắc</text>
+    <text x="462" y="286">Huế</text>
+    <text x="298" y="395">Đà Nẵng</text>
+    <text x="411" y="552">Nha Trang</text>
+    <text x="187" y="661">Nam</text>
+  </g>
+  <g opacity="0.32" fill="#2f7e79">
+    <path d="M132 148h104l-52-70z"/>
+    <rect x="110" y="148" width="148" height="28" rx="14"/>
+    <path d="M91 527c46-27 92-27 138 0 40 24 80 24 120 0v52c-40 24-80 24-120 0-46-27-92-27-138 0z"/>
+  </g>
+</svg>

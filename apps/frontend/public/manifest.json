@@ -1,0 +1,11 @@
+{
+  "name": "HUD Tốc Độ GPS",
+  "short_name": "HUD GPS",
+  "description": "Đồng hồ tốc độ GPS thông minh cho xe máy và ô tô",
+  "start_url": "/hud",
+  "scope": "/hud",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary"
+}
