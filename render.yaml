@@ -5,7 +5,7 @@ services:
     plan: free
     rootDir: .
     autoDeploy: true
-    buildCommand: npm install && NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS="--max-old-space-size=4096" npm run build
+    buildCommand: npm install --no-audit --no-fund && npm run build
     startCommand: npm run start -w @karaoke/frontend
     healthCheckPath: /health
     envVars:
@@ -13,6 +13,10 @@ services:
         value: 20
       - key: NODE_ENV
         value: production
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=4096
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
       - key: YOUTUBE_API_KEY
         sync: false
       - key: NEXT_PUBLIC_APP_ORIGIN
