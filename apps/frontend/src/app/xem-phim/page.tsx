@@ -120,6 +120,34 @@ function autoSelectQuality(qualities: FileGroup["qualities"]): number {
   return 0; // default: cao nhất
 }
 
+// Làm sạch và trích xuất URL hợp lệ từ chuỗi văn bản bất kỳ (hỗ trợ copy-paste có chứa text mô tả)
+function cleanAndExtractUrl(text: string): string {
+  const trimmed = text.trim();
+  // Regex để tìm URL bắt đầu bằng http:// hoặc https://
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const match = trimmed.match(urlRegex);
+  if (match) {
+    return match[0];
+  }
+  
+  // Nếu dán text không có http nhưng có dạng domain ví dụ: bilibili.tv/...
+  const words = trimmed.split(/\s+/);
+  for (const word of words) {
+    if (
+      word.includes(".") && 
+      !word.startsWith("http") && 
+      (word.includes("/") || word.includes("localhost") || word.includes("www"))
+    ) {
+      const parts = word.split("/");
+      const domain = parts[0];
+      if (domain.includes(".") && domain.length > 3) {
+        return `https://${word}`;
+      }
+    }
+  }
+  return trimmed;
+}
+
 /* ─── Sub-components ─────────────────────────────────── */
 function ProgressBar({ percent, color }: { percent: number; color: string }) {
   return (
@@ -762,8 +790,9 @@ export default function XemPhimPage() {
 
   /* URL changed → reset formats */
   const handleUrlChange = (v: string) => {
-    setUrl(v);
-    if (v.trim() !== fetchedUrl) { setResolutions([]); setSelectedRes(null); setFormatError(""); }
+    const cleaned = cleanAndExtractUrl(v);
+    setUrl(cleaned);
+    if (cleaned !== fetchedUrl) { setResolutions([]); setSelectedRes(null); setFormatError(""); }
   };
 
   /* Submit */
@@ -885,7 +914,7 @@ export default function XemPhimPage() {
           {/* URL row */}
           <div className="flex gap-2">
             <input
-              type="url"
+              type="text"
               value={url}
               onChange={(e) => handleUrlChange(e.target.value)}
               placeholder="https://www.bilibili.tv/vi/video/..."

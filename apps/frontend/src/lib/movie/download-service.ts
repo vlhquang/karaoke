@@ -70,12 +70,18 @@ export function resumeDownload(id: string): boolean {
 }
 
 function buildFormatArg(resolution?: number): string {
-  if (!resolution) return "bestvideo+bestaudio/best";
+  const resLimit = resolution ? `[height<=${resolution}]` : "";
   return [
-    `bestvideo[height<=${resolution}][ext=mp4]+bestaudio[ext=m4a]`,
-    `bestvideo[height<=${resolution}]+bestaudio`,
-    `best[height<=${resolution}]`,
-    "best",
+    // 1. Ưu tiên H.264 video + AAC audio để tương thích tối đa với TV và iPhone (iOS Safari)
+    `bestvideo${resLimit}[vcodec^=avc1]+bestaudio[acodec^=mp4a]`,
+    `bestvideo${resLimit}[vcodec^=avc1]+bestaudio`,
+    // 2. Tiếp theo là video mp4 + audio m4a nói chung
+    `bestvideo${resLimit}[ext=mp4]+bestaudio[ext=m4a]`,
+    // 3. Các lựa chọn dự phòng khác
+    `bestvideo${resLimit}+bestaudio`,
+    `best${resLimit}[ext=mp4]`,
+    `best${resLimit}`,
+    "best"
   ].join("/");
 }
 
