@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
   devIndicators: false,
   typescript: {
     // Disable type checking during next build (run separately to save memory)
