@@ -119,23 +119,12 @@ export async function streamDriveFile(
   );
 
   const stream = res.data as unknown as NodeJS.ReadableStream;
-  const driveHeaders = res.headers as Record<string, string>;
-  const driveStatus = res.status as number;
-
   const resHeaders: Record<string, string> = {
-    "Content-Type": driveHeaders["content-type"] || contentType,
+    "Content-Type": contentType,
     "Accept-Ranges": "bytes",
     "Cache-Control": "private, max-age=3600, immutable",
   };
 
-  // 1. Nếu Google Drive trả về partial content thành công, ưu tiên forward trực tiếp header từ Google Drive
-  if (driveStatus === 206 || driveHeaders["content-range"]) {
-    if (driveHeaders["content-range"]) resHeaders["Content-Range"] = driveHeaders["content-range"];
-    resHeaders["Content-Length"] = driveHeaders["content-length"] || String(parseInt(totalSize || "0") - 1);
-    return { stream, contentType, status: 206, headers: resHeaders };
-  }
-
-  // 2. Fallback tự tính toán thủ công nếu Google API không trả về header mong muốn
   if (rangeHeader && totalSize) {
     const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
     if (match) {
@@ -147,7 +136,6 @@ export async function streamDriveFile(
     }
   }
 
-  const finalLength = driveHeaders["content-length"] || totalSize;
-  if (finalLength) resHeaders["Content-Length"] = finalLength;
+  if (totalSize) resHeaders["Content-Length"] = totalSize;
   return { stream, contentType, status: 200, headers: resHeaders };
 }
