@@ -206,7 +206,10 @@ async function processJob(id: string, url: string, resolution?: number, resume =
     if (modeFinal === "cancel") {
       updateJob(id, { stage: "cancelled" });
     } else if (modeFinal === "none") {
-      const message = err instanceof Error ? err.message : String(err);
+      let message = err instanceof Error ? err.message : String(err);
+      if (message.includes("'NoneType' object is not subscriptable") && url.includes("bilibili")) {
+        message = "Lỗi: Bilibili chặn tải video từ IP ngoài Đông Nam Á. Để khắc phục, bạn có thể thiết lập biến môi trường HTTP_PROXY (trỏ về proxy Việt Nam/Singapore) trên Render, hoặc tạo lại ứng dụng ở Region Singapore.";
+      }
       updateJob(id, { stage: "error", error: message });
     }
   } finally {

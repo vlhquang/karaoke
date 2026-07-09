@@ -3,6 +3,7 @@ services:
     name: realtime-karaoke-room
     env: node
     plan: free
+    region: singapore
     rootDir: .
     autoDeploy: true
     buildCommand: npm install --no-audit --no-fund && npm run build
