@@ -122,7 +122,7 @@ export async function streamDriveFile(
   const resHeaders: Record<string, string> = {
     "Content-Type": contentType,
     "Accept-Ranges": "bytes",
-    "Cache-Control": "no-store",
+    "Cache-Control": "private, max-age=3600, immutable",
   };
 
   if (rangeHeader && totalSize) {

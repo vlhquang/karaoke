@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import VideoPlayer from "./VideoPlayer";
 
 /* ─── Types ─────────────────────────────────────────── */
 type JobStage = "pending" | "downloading" | "uploading" | "done" | "error" | "paused" | "cancelled";
@@ -502,7 +503,7 @@ function DriveFileCard({
           ) : (
             <div className="flex h-full items-center justify-center text-4xl text-slate-600">🎬</div>
           )}
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30 transition group-hover:bg-black/50">
             <div className="rounded-full bg-cyan-500 p-3 shadow-lg">
               <svg className="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z" />
@@ -609,7 +610,7 @@ function DriveFileRow({
         ) : (
           <div className="flex h-full items-center justify-center text-slate-600">🎬</div>
         )}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition group-hover/thumb:opacity-100">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 transition group-hover/thumb:bg-black/60">
           <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
         </div>
       </button>
@@ -1104,7 +1105,7 @@ export default function XemPhimPage() {
       )}
 
       {playingGroup && (
-        <VideoModal group={playingGroup} onClose={() => setPlayingGroup(null)} />
+        <VideoPlayer group={playingGroup} onClose={() => setPlayingGroup(null)} />
       )}
     </main>
   );
