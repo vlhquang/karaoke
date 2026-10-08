@@ -7,6 +7,12 @@ import { getFirestore, FieldValue, type Firestore } from "firebase-admin/firesto
 import { decodeState, encodeState, ruleSchema, tick, type Candle } from "./btc-bot-engine";
 
 const API = "https://data-api.binance.vision/api/v3";
+export function marketRetryAt(header: string | null, status: number, now: number): number {
+  const seconds = header === null ? NaN : Number(header);
+  const date = header === null ? NaN : Date.parse(header);
+  const wait = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : Number.isFinite(date) && date > now ? date - now : status === 418 ? 86400000 : 60000;
+  return now + Math.max(1000, wait);
+}
 function workerErrorDetails(error: unknown) {
   const value = error as { code?: string | number; name?: string; cause?: { code?: string } } | null;
   const code = value?.code || value?.cause?.code || value?.name || "UNKNOWN";
@@ -102,21 +108,36 @@ export function startBtcBotWorker(db: Firestore): () => void {
   const jobs = db.collection("btcBotJobs");
   const portfolio = (uid: string) => db.doc(`users/${uid}/private/portfolio`);
   let busy = false, candles: Candle[] = [], candlesAt = 0;
+  const cooldownRef = db.doc("btcBotControl/marketCooldown");
+  let retryAt = 0;
+  let pauseStatus = 418;
   async function json(path: string) {
     const response = await fetch(API + path, { signal: AbortSignal.timeout(8000) });
     if (!response.ok) {
       console.error("[btc-bot] Binance request failed", { path, status: response.status });
+      if (response.status === 418 || response.status === 429) {
+        pauseStatus = response.status;
+        retryAt = marketRetryAt(response.headers.get("Retry-After"), response.status, Date.now());
+        await cooldownRef.set({ retryAt, httpStatus: response.status });
+        console.warn("[btc-bot] Market requests paused", { httpStatus: response.status, retryAt: new Date(retryAt).toISOString() });
+      }
       throw new Error("Market unavailable");
     }
     return response.json();
   }
   async function work() {
-    if (busy) return;
+    if (busy || Date.now() < retryAt) return;
     busy = true;
     let stage = "firestore-list-active-jobs";
     try {
       const active = await jobs.where("enabled", "==", true).get();
       if (active.empty) return;
+      const cooldown = (await cooldownRef.get()).data();
+      retryAt = Number(cooldown?.retryAt) || retryAt;
+      if (Date.now() < retryAt) {
+        await publishMarketPause(active.docs, cooldown?.httpStatus || 418);
+        return;
+      }
       stage = "binance-fetch-price";
       const quote = await json("/ticker/price?symbol=BTCUSDT");
       stage = "binance-validate-price";
@@ -131,6 +152,10 @@ export function startBtcBotWorker(db: Firestore): () => void {
           if (candles.some(c => !Object.values(c).every(Number.isFinite) || c.low <= 0 || c.high < c.low || c.close < c.low || c.close > c.high)) throw new Error("Invalid candle values");
           candlesAt = Date.now();
         } catch (error) { candlesAt = 0; console.error("[btc-bot] Candle fetch failed", workerErrorDetails(error)); }
+      }
+      if (Date.now() < retryAt) {
+        await publishMarketPause(active.docs, pauseStatus);
+        return;
       }
       for (const account of active.docs) {
         if (Date.now() - quoteAt > 15000) break;
@@ -153,8 +178,23 @@ export function startBtcBotWorker(db: Firestore): () => void {
           });
         } catch (error) { console.error("[btc-bot] Account tick failed; will retry", workerErrorDetails(error)); }
       }
-    } catch (error) { console.error("[btc-bot] Worker tick failed; will retry", { stage, ...workerErrorDetails(error) }); }
+    } catch (error) {
+      console.error("[btc-bot] Worker tick failed; will retry", { stage, ...workerErrorDetails(error) });
+      if (Date.now() < retryAt) {
+        try { const active = await jobs.where("enabled", "==", true).get(); await publishMarketPause(active.docs, pauseStatus); }
+        catch (publishError) { console.error("[btc-bot] Cannot publish market pause", workerErrorDetails(publishError)); }
+      }
+    }
     finally { busy = false; }
+  }
+  async function publishMarketPause(accounts: Array<{ id: string }>, httpStatus: number) {
+    for (const account of accounts) {
+      await db.runTransaction(async transaction => {
+        const ref = portfolio(account.id), snapshot = await transaction.get(ref), data = snapshot.data();
+        if (!data?.serverManaged || !decodeState(data.state).session.enabled) return;
+        transaction.update(ref, { worker: { ...data.worker, status: "market-paused", httpStatus, retryAt }, updatedAt: FieldValue.serverTimestamp() });
+      });
+    }
   }
   const timer = setInterval(() => { void work(); }, 5000);
   timer.unref();
