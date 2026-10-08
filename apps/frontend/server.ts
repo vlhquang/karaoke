@@ -18,6 +18,7 @@ import { getStockAutoRefreshStatus, startStockAutoRefreshWorker } from "./src/li
 import { registerGpsTracker } from "./src/gps-tracker";
 import { registerCoTyPhuNamespace } from "./src/co-ty-phu/socket/register-co-ty-phu";
 import { registerFitnessGameNamespace } from "./src/fitness-game/socket";
+import { registerBtcBotService } from "./src/lib/btc-bot-service";
 import type {
   AddSongPayload,
   ClientToServerEvents,
@@ -390,6 +391,7 @@ app.prepare().then(() => {
 
   registerGpsTracker(null as any, expressApp);
 
+  registerBtcBotService(expressApp);
   expressApp.all("*", (req, res) => handle(req, res));
   const httpServer = createServer(expressApp);
 

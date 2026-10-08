@@ -34,3 +34,13 @@ services:
         sync: false
       - key: GOOGLE_DRIVE_FOLDER_ID
         sync: false
+      - key: BTC_BOT_ENABLED
+        value: "false"
+      - key: BTC_FIREBASE_PROJECT_ID
+        value: btc-monitor-ee8e5
+      - key: BTC_FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      - key: BTC_ALLOWED_ORIGIN
+        value: https://vlhquang.github.io
+      - key: BTC_ALLOWED_UIDS
+        sync: false
