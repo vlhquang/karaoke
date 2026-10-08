@@ -7,6 +7,20 @@ import { getFirestore, FieldValue, type Firestore } from "firebase-admin/firesto
 import { decodeState, encodeState, ruleSchema, tick, type Candle } from "./btc-bot-engine";
 
 const API = "https://data-api.binance.vision/api/v3";
+function workerErrorDetails(error: unknown) {
+  const value = error as { code?: string | number; name?: string; cause?: { code?: string } } | null;
+  const code = value?.code || value?.cause?.code || value?.name || "UNKNOWN";
+  const hints: Record<string, string> = {
+    "7": "Firestore permission denied: check service account IAM permissions",
+    "8": "Firestore quota exhausted: check usage and billing",
+    "9": "Firestore precondition failed: check database setup and required indexes",
+    "16": "Firebase credential rejected: check service account configuration",
+    TimeoutError: "Binance request timed out",
+    ENOTFOUND: "Cannot resolve market API hostname",
+    ECONNRESET: "Market API connection reset",
+  };
+  return { code, hint: hints[String(code)] || "Check preceding Binance HTTP status or Firebase configuration" };
+}
 export function registerBtcBotService(app: Express): void {
   if (process.env.BTC_BOT_ENABLED !== "true") return;
   const projectId = process.env.BTC_FIREBASE_PROJECT_ID;
@@ -90,16 +104,22 @@ export function startBtcBotWorker(db: Firestore): () => void {
   let busy = false, candles: Candle[] = [], candlesAt = 0;
   async function json(path: string) {
     const response = await fetch(API + path, { signal: AbortSignal.timeout(8000) });
-    if (!response.ok) throw new Error("Market unavailable");
+    if (!response.ok) {
+      console.error("[btc-bot] Binance request failed", { path, status: response.status });
+      throw new Error("Market unavailable");
+    }
     return response.json();
   }
   async function work() {
     if (busy) return;
     busy = true;
+    let stage = "firestore-list-active-jobs";
     try {
       const active = await jobs.where("enabled", "==", true).get();
       if (active.empty) return;
+      stage = "binance-fetch-price";
       const quote = await json("/ticker/price?symbol=BTCUSDT");
+      stage = "binance-validate-price";
       const price = Number(quote.price);
       const quoteAt = Date.now();
       if (quote.symbol !== "BTCUSDT" || !Number.isFinite(price) || price <= 0) throw new Error("Invalid quote");
@@ -110,7 +130,7 @@ export function startBtcBotWorker(db: Firestore): () => void {
           candles = rows.map((r: unknown[]) => ({ time: Number(r[0]), open: Number(r[1]), high: Number(r[2]), low: Number(r[3]), close: Number(r[4]), closeTime: Number(r[6]) }));
           if (candles.some(c => !Object.values(c).every(Number.isFinite) || c.low <= 0 || c.high < c.low || c.close < c.low || c.close > c.high)) throw new Error("Invalid candle values");
           candlesAt = Date.now();
-        } catch { candlesAt = 0; }
+        } catch (error) { candlesAt = 0; console.error("[btc-bot] Candle fetch failed", workerErrorDetails(error)); }
       }
       for (const account of active.docs) {
         if (Date.now() - quoteAt > 15000) break;
@@ -131,9 +151,9 @@ export function startBtcBotWorker(db: Firestore): () => void {
             if (!bot.session.enabled) transaction.set(account.ref, { enabled: false });
             transaction.set(view, { state, serverManaged: true, worker: { status, lastTickAt: now, price }, updatedAt: FieldValue.serverTimestamp() });
           });
-        } catch { console.error("[btc-bot] Account tick failed; will retry"); }
+        } catch (error) { console.error("[btc-bot] Account tick failed; will retry", workerErrorDetails(error)); }
       }
-    } catch { console.error("[btc-bot] Worker tick failed; will retry"); }
+    } catch (error) { console.error("[btc-bot] Worker tick failed; will retry", { stage, ...workerErrorDetails(error) }); }
     finally { busy = false; }
   }
   const timer = setInterval(() => { void work(); }, 5000);
