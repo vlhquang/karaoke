@@ -654,7 +654,6 @@
                 }
                 $('#status-decoding').hide();
                 $('#btn-claim-lộc').fadeIn();
-                $('#tap-hint').fadeIn();
                 const isJackpot = (shuffledAmounts[currentOpeningIdx] === config.max);
                 if (isJackpot) {
                     $('#reveal-overlay').addClass('jackpot-revealed');
@@ -719,11 +718,11 @@
                 $('#reveal-overlay').fadeOut();
             };
 
-            $('#btn-claim-lộc, #reveal-overlay').click((e) => { if (canCloseOverlay) closeAndClaim(); });
-            $('#reveal-card-content').click((e) => {
-                if (config.scratchMode && !isScratchingComplete) e.stopPropagation();
-                else if (canCloseOverlay) closeAndClaim();
-            });
+            // Chỉ nút "NHẬN LỘC" mới đóng overlay
+            $('#btn-claim-lộc').click((e) => { e.stopPropagation(); if (canCloseOverlay) closeAndClaim(); });
+            // Chặn click trên card và overlay không bubble lên gây đóng ngoài ý muốn
+            $('#reveal-card-content').click((e) => { e.stopPropagation(); });
+            $('#reveal-overlay').click((e) => { /* không đóng khi click nền overlay */ });
         });
     </script>
 </body>
