@@ -15,6 +15,7 @@ import { RoomService as LiXiRoomService } from "./src/li-xi-nang-cao/services/ro
 import { registerLiXiNamespace } from "./src/li-xi-nang-cao/socket";
 import { startKeepAlive } from "./src/lib/keep-alive";
 import { getStockAutoRefreshStatus, startStockAutoRefreshWorker } from "./src/lib/stock-auto-refresh";
+import { startNewsTeamsWorker } from "./src/lib/news-teams-worker";
 import { registerGpsTracker } from "./src/gps-tracker";
 import { registerCoTyPhuNamespace } from "./src/co-ty-phu/socket/register-co-ty-phu";
 import { registerFitnessGameNamespace } from "./src/fitness-game/socket";
@@ -398,6 +399,7 @@ app.prepare().then(() => {
   // Start Render Keep-Alive cron (14 mins)
   startKeepAlive();
   startStockAutoRefreshWorker();
+  startNewsTeamsWorker();
 
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     cors: { origin: true, methods: ["GET", "POST"] },

@@ -44,3 +44,9 @@ services:
         value: https://vlhquang.github.io
       - key: BTC_ALLOWED_UIDS
         sync: false
+      - key: NEWS_TEAMS_WEBHOOK_URL
+        sync: false
+      - key: NEWS_RSS_URLS
+        value: ""
+      - key: NEWS_POLL_INTERVAL_MINUTES
+        value: "5"
