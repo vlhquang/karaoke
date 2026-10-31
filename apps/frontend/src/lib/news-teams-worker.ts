@@ -85,11 +85,12 @@ export const startNewsTeamsWorker = (): void => {
   const intervalMs = intervalMinutes * 60_000;
   const sentIds = new Set<string>();
   let running = false;
-  let initialized = false;
+  let lastSuccessfulScanAt: number | null = null;
 
   const scan = async (): Promise<void> => {
     if (running) return;
     running = true;
+    const scanStartedAt = Date.now();
     let allFeedsScanned = true;
     try {
       for (const feedUrl of feedUrls) {
@@ -97,12 +98,19 @@ export const startNewsTeamsWorker = (): void => {
           const response = await fetch(feedUrl, { signal: AbortSignal.timeout(15_000) });
           if (!response.ok) throw new Error(`RSS returned HTTP ${response.status}`);
           const items = parseFeed(await response.text()).reverse();
+          let sentCount = 0;
+          let ignoredCount = 0;
           for (const item of items) {
-            if (!initialized) {
+            const publishedAt = item.publishedAt ? Date.parse(item.publishedAt) : Number.NaN;
+            if (lastSuccessfulScanAt === null || !Number.isFinite(publishedAt) || publishedAt <= lastSuccessfulScanAt) {
               sentIds.add(item.id);
+              ignoredCount += 1;
               continue;
             }
-            if (sentIds.has(item.id)) continue;
+            if (sentIds.has(item.id)) {
+              ignoredCount += 1;
+              continue;
+            }
             const notify = await fetch(webhookUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -111,15 +119,16 @@ export const startNewsTeamsWorker = (): void => {
             });
             if (!notify.ok) throw new Error(`Teams webhook returned HTTP ${notify.status}`);
             sentIds.add(item.id);
+            sentCount += 1;
             if (sentIds.size > 500) sentIds.delete(sentIds.values().next().value!);
           }
-          console.info(`[News] Scanned ${items.length} items from ${feedUrl}`);
+          console.info(`[News] Scanned ${items.length} items from ${feedUrl} (${sentCount} sent, ${ignoredCount} ignored)`);
         } catch (error) {
           allFeedsScanned = false;
           console.error(`[News] Failed to scan ${feedUrl}:`, error);
         }
       }
-      if (allFeedsScanned) initialized = true;
+      if (allFeedsScanned) lastSuccessfulScanAt = scanStartedAt;
     } finally {
       running = false;
     }

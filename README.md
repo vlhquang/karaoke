@@ -52,4 +52,4 @@ The frontend Node server polls RSS feeds and posts new articles to a Teams chann
 3. Optionally set `NEWS_RSS_URLS` to comma-separated RSS URLs. When left blank, the worker scans Vietnam technology/AI/cybersecurity, Vietnam digital banking/fintech/Java, then global cybersecurity/AI/banking/Java feeds, in that order.
 4. Set `NEWS_POLL_INTERVAL_MINUTES` to any positive number of minutes, such as `1`, `5`, or `15`. The default is `5`.
 
-The first scan records the current feed items as a baseline. Later scans post each unseen item with a link to the article. Seen IDs are kept in process memory, so a server restart starts a fresh baseline. The worker runs in the web server process; use an always-on instance for reliable polling at short intervals.
+The first successful scan records the current feed items as a baseline. Later scans post only items with a valid publication date newer than the previous successful scan, and skip items without a readable date. Seen IDs and the scan timestamp are kept in process memory, so a server restart starts a fresh baseline. The worker runs in the web server process; use an always-on instance for reliable polling at short intervals.
