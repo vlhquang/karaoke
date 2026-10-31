@@ -88,10 +88,14 @@ export const startNewsTeamsWorker = (): void => {
   let lastSuccessfulScanAt: number | null = null;
 
   const scan = async (): Promise<void> => {
-    if (running) return;
+    if (running) {
+      console.warn("[News] Scan skipped because the previous cycle is still running.");
+      return;
+    }
     running = true;
     const scanStartedAt = Date.now();
     let allFeedsScanned = true;
+    console.info(`[News] Scan cycle started at ${new Date(scanStartedAt).toISOString()}.`);
     try {
       for (const feedUrl of feedUrls) {
         try {
@@ -135,6 +139,17 @@ export const startNewsTeamsWorker = (): void => {
   };
 
   console.info(`[News] Starting RSS scan every ${intervalMinutes} minute(s).`);
-  void scan();
-  setInterval(() => void scan(), intervalMs);
+  const runScheduledScan = async (): Promise<void> => {
+    const cycleStartedAt = Date.now();
+    try {
+      await scan();
+    } catch (error) {
+      console.error("[News] Scan cycle failed unexpectedly:", error);
+    }
+    const nextDelayMs = Math.max(0, intervalMs - (Date.now() - cycleStartedAt));
+    const nextRunAt = new Date(Date.now() + nextDelayMs).toISOString();
+    console.info(`[News] Next scan scheduled at ${nextRunAt}.`);
+    setTimeout(() => void runScheduledScan(), nextDelayMs);
+  };
+  void runScheduledScan();
 };
