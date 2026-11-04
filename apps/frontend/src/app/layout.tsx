@@ -1,6 +1,9 @@
 import "./globals.css";
 import "../co-ty-phu/components/co-ty-phu.css";
 import "../game-hub/components/game-hub.css";
+import "../portal/portal.css";
+import "../portal/portal-legacy.css";
+import { PortalFrame } from "../portal/PortalFrame";
 import type { Metadata, Viewport } from "next";
 import { Orbitron } from "next/font/google";
 
@@ -17,11 +20,11 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "HUD GPS",
+    title: "Nhà mình",
   },
   title: {
-    default: "Portal Dịch vụ Tiện ích & Giải trí",
-    template: "%s | Portal Dịch vụ"
+    default: "Nhà mình — Giải trí, học tập & tiện ích",
+    template: "%s | Nhà mình"
   },
   description: "Kho ứng dụng web đa năng: Đồng hồ đo tốc độ GPS HUD cho ô tô/xe máy, phòng hát Karaoke realtime, game Lô tô, Lì xì online, theo dõi Cổ phiếu và nhiều tiện ích giải trí khác.",
   keywords: ["HUD tốc độ", "đồng hồ đo tốc độ xe máy", "GPS speedometer", "karaoke online", "game lô tô online", "phát bao lì xì", "theo dõi cổ phiếu", "mini game"],
@@ -30,7 +33,7 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'vi_VN',
     url: 'https://karaoke-lqjm.onrender.com',
-    siteName: 'Portal Dịch vụ Tiện ích',
+    siteName: 'Nhà mình',
     title: 'Cổng Ứng Dụng Giải Trí & Tiện Ích Đa Năng',
     description: 'Trải nghiệm đo tốc độ kính lái HUD cho ô tô, phòng hát karaoke chia sẻ, và các mini game vui nhộn trực tuyến ngay trên trình duyệt.',
   },
@@ -52,7 +55,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi" suppressHydrationWarning className={orbitron.variable}>
-      <body>{children}</body>
+      <body><PortalFrame>{children}</PortalFrame></body>
     </html>
   );
 }

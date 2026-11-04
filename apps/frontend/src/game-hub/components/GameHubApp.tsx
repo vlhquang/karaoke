@@ -257,7 +257,7 @@ export function GameHubApp() {
 
           <aside className="game-hub-player-summary">
             <strong>{getEngineLabel(selectedGame)}</strong>
-            <p>{selectedGame.requiresCamera ? "Game này cần quyền camera. Camera sẽ nằm trong màn chơi và có thể ẩn preview." : "Game này chạy trực tiếp trong full-screen web bằng keyboard/local input."}</p>
+            <p>{selectedGame.requiresCamera ? "Cho phép dùng camera để điều khiển bằng chuyển động. Bạn có thể ẩn hình xem trước trong khi chơi." : "Chơi ngay trên trình duyệt. Xem hướng dẫn để biết phím điều khiển của từng người."}</p>
             <button type="button" onClick={launchGame}>
               <Play aria-hidden="true" size={18} />
               <span>Vào màn chơi</span>
@@ -277,12 +277,12 @@ export function GameHubApp() {
             Game Hub đa nền tảng
           </span>
           <h1>Game Hub</h1>
-          <p>Chọn game, chọn số người chơi, rồi vào màn chơi full màn hình với engine mới và hướng dẫn pause tức thì.</p>
+          <p>Chọn một trò chơi, rủ bạn bè và cùng thử sức. Mở hướng dẫn bất cứ lúc nào để tạm dừng.</p>
         </div>
         <div className="game-hub-hero-panel">
           <Gamepad2 aria-hidden="true" size={34} />
           <strong>{playableGameRegistry.length} game</strong>
-          <span>R3F runtime mới, legacy adapter và camera motion cùng chung flow.</span>
+          <span>Đối kháng, phối hợp hay vận động trước camera. Bạn muốn thử trò nào?</span>
         </div>
       </section>
 
@@ -304,7 +304,7 @@ export function GameHubApp() {
           <div className="game-hub-selected">
             <span style={{ "--game-accent": selectedGame.accent } as CSSProperties} />
             <small>
-              {selectedGame.modeLabel} | {getEngineLabel(selectedGame)}
+              {selectedGame.modeLabel}
             </small>
             <h2>{selectedGame.title}</h2>
             <p>{selectedGame.objective}</p>
@@ -316,8 +316,8 @@ export function GameHubApp() {
 
           <div className="game-hub-control-card">
             <CircleHelp aria-hidden="true" size={22} />
-            <strong>Flow mới</strong>
-            <p>Game sẽ đi qua chọn game, chọn số người chơi, rồi vào full-screen web. Nút hướng dẫn luôn pause trận đấu.</p>
+            <strong>Sẵn sàng cùng chơi</strong>
+            <p>Chọn trò chơi và số người tham gia. Khi cần nghỉ, mở hướng dẫn để tạm dừng trận đấu.</p>
           </div>
         </aside>
 
@@ -470,14 +470,14 @@ function GameHelpDialog({
 
 function getEngineLabel(game: PlayableGameDefinition) {
   return {
-    "legacy-three": "Legacy Three adapter",
-    "r3f-ghost": "R3F engine",
-    "camera-dodge": "Camera runtime",
+    "legacy-three": "Không gian 3D",
+    "r3f-ghost": "Không gian 3D",
+    "camera-dodge": "Chơi bằng camera",
   }[game.runtime];
 }
 
 function getPlayerLabel(count: number, game: PlayableGameDefinition) {
-  if (game.requiresCamera) return "Camera motion";
-  if (count === 1) return "Solo";
-  return "Local co-op/versus";
+  if (game.requiresCamera) return "Điều khiển bằng chuyển động";
+  if (count === 1) return "Chơi một mình";
+  return "Cùng chơi trên một máy";
 }

@@ -1,8 +1,10 @@
-const CACHE_NAME = "gps-tracker-v1";
+const CACHE_NAME = "gps-tracker-v2-glass";
 const ASSETS_TO_CACHE = [
-    "./",
     "./sender.html",
     "./manifest.json",
+    "/portal-tokens.css",
+    "/portal-ui.css",
+    "/portal-ui.js",
     "https://cdn.socket.io/4.8.1/socket.io.min.js"
 ];
 

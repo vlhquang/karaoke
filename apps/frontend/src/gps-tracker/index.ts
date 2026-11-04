@@ -58,7 +58,7 @@ export const initGoogleSheets = async () => {
         console.log("GPS Tracker: Google Sheets connected successfully.");
     } catch (err) {
         sheetInitError = `Connection failed: ${err instanceof Error ? err.message : String(err)}`;
-        console.error("GPS Tracker: Google Sheets init failed:", err);
+        console.error("GPS Tracker: Google Sheets init failed:", sheetInitError);
     }
 };
 
@@ -76,7 +76,7 @@ const saveToSheet = async (data: GPSLocation): Promise<boolean> => {
         });
         return true;
     } catch (err) {
-        console.error("GPS Tracker: Google Sheets save failed:", err);
+        console.error("GPS Tracker: Google Sheets save failed:", err instanceof Error ? err.message : String(err));
         return false;
     }
 };

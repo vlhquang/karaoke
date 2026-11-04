@@ -73,8 +73,9 @@ export default function HostPage() {
 
         {!roomCode ? (
           <section className="max-w-md rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
-            <label className="mb-2 block text-sm text-slate-300">Tên chủ phòng</label>
+            <label htmlFor="karaoke-host-name" className="mb-2 block text-sm text-slate-300">Tên chủ phòng</label>
             <input
+              id="karaoke-host-name"
               className="mb-3 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2"
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}

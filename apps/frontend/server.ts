@@ -19,6 +19,7 @@ import { startNewsTeamsWorker } from "./src/lib/news-teams-worker";
 import { registerGpsTracker } from "./src/gps-tracker";
 import { registerCoTyPhuNamespace } from "./src/co-ty-phu/socket/register-co-ty-phu";
 import { registerFitnessGameNamespace } from "./src/fitness-game/socket";
+import { registerDrawingNamespace } from "./src/ve-vui/socket";
 import { registerBtcBotService } from "./src/lib/btc-bot-service";
 import type {
   AddSongPayload,
@@ -409,6 +410,7 @@ app.prepare().then(() => {
   registerLiXiNamespace(io.of("/lixi"), liXiRoomService);
   registerCoTyPhuNamespace(io.of("/co-ty-phu"));
   registerFitnessGameNamespace(io.of("/fitness-game"));
+  registerDrawingNamespace(io.of("/ve-vui"));
   registerGpsTracker(io as any, null as any); // Bind socket ONLY after HTTP server starts
   setInterval(() => liXiRoomService.cleanupExpiredRooms(Date.now()), 5 * 60 * 1000);
 

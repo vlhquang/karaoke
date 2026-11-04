@@ -23,6 +23,10 @@ Realtime karaoke app runs as one Next.js service:
 - In-memory mode supports realtime multi-device while the process is running.
 - Restarting app clears all rooms and queues.
 
+## Portal UI
+
+The portal uses a shared light Liquid Glass theme across its Next.js apps and standalone HTML pages. See [the design analysis and implementation notes](docs/portal-liquid-glass.md) for coverage, architecture and validation. Run `npm run test:portal -w @karaoke/frontend` for navigation, search and saved-app checks.
+
 ## Docker
 
 - Dev: `docker compose up --build`

@@ -139,10 +139,10 @@ export default function TaoVideoPage() {
       </div>
 
       <section className="mb-4 rounded-2xl border border-emerald-600/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-        Đang dùng API key từ biến môi trường server (`.env`). Giao diện không còn nhập/lưu key phía client.
+        Biến ý tưởng và câu chuyện của bạn thành video ngắn. Bắt đầu bằng nội dung bạn muốn kể.
       </section>
-      <section className="mb-4 rounded-2xl border border-slate-700 bg-slate-900/60 p-4 text-sm">
-        <p className="mb-2 text-xs uppercase tracking-wider text-cyan-300">Trạng thái API kết nối</p>
+      <details className="mb-4 rounded-2xl border border-slate-700 bg-slate-900/60 p-4 text-sm">
+        <summary className="cursor-pointer font-semibold text-cyan-300">Thông tin công cụ AI</summary>
         {apiInfoError ? (
           <p className="text-rose-400">{apiInfoError}</p>
         ) : !apiInfo ? (
@@ -170,14 +170,13 @@ export default function TaoVideoPage() {
             <p>
               Gemini key: <span className="font-semibold">{apiInfo.gemini?.keyConfigured ? "Đã cấu hình" : "Chưa cấu hình"}</span>
             </p>
-            <p className="text-slate-400">Provider endpoint/key hiển thị trong JSON trạng thái.</p>
           </div>
         )}
-      </section>
+      </details>
 
       <section className="grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
-          <p className="mb-2 text-xs uppercase tracking-wider text-cyan-300">Input</p>
+          <p className="mb-2 text-xs uppercase tracking-wider text-cyan-300">Ý tưởng của bạn</p>
           <label className="mb-2 block text-sm font-semibold">Nội dung gốc</label>
           <textarea
             value={inputText}
@@ -208,7 +207,7 @@ export default function TaoVideoPage() {
                 onChange={(e) => setPromptProvider(e.target.value as PromptProvider)}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm outline-none focus:border-cyan-400"
               >
-                <option value="auto">Auto (theo cấu hình .env)</option>
+                <option value="auto">Tự động chọn</option>
                 <option value="openai">OpenAI</option>
                 <option value="gemini">Gemini</option>
               </select>

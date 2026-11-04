@@ -1,0 +1,135 @@
+/* Theme bridge for existing Tailwind screens. Colorful states and canvas pixels retain their meaning. */
+.portal-themed { color: var(--portal-text); }
+.portal-themed :is([class~="bg-slate-950"], [class~="bg-slate-900"], [class~="bg-slate-900/60"], [class~="bg-slate-900/50"], [class~="bg-slate-900/40"], [class~="bg-slate-900/80"], [class~="bg-slate-900/75"], [class~="bg-slate-900/70"], [class~="bg-slate-900/90"], [class~="bg-slate-950/40"], [class~="bg-slate-950/60"], [class~="bg-slate-950/70"], [class~="bg-slate-950/80"], [class~="bg-slate-950/85"], [class~="bg-slate-950/90"], [class~="bg-slate-950/95"], [class~="bg-brand-panel"], [class~="bg-brand.panel"], [class~="bg-zinc-950"], [class~="bg-zinc-950/86"], [class~="bg-zinc-900"]) { background-color: var(--portal-surface); color: var(--portal-text); }
+.portal-themed :is([class~="bg-slate-800"], [class~="bg-slate-800/50"], [class~="bg-slate-800/60"], [class~="bg-slate-800/40"], [class~="bg-slate-800/80"], [class~="bg-slate-700"], [class~="bg-slate-700/80"], [class~="bg-slate-600"], [class~="bg-zinc-800"], [class~="bg-white/5"], [class~="bg-white/10"], [class~="bg-white/20"]) { background-color: var(--portal-surface-soft); }
+.portal-themed > :is(main, div)[class~="bg-slate-950"], .portal-themed > :is(main, div)[class~="bg-zinc-950"] { background: transparent; }
+.portal-themed :is([class~="border-slate-500"], [class~="border-slate-600"], [class~="border-slate-700"], [class~="border-slate-800"], [class~="border-slate-800/50"], [class~="border-slate-700/40"], [class~="border-zinc-700"], [class~="border-zinc-800"], [class~="border-white/10"], [class~="border-white/20"], [class~="border-white/5"]) { border-color: var(--portal-line); }
+.portal-themed :is([class~="text-slate-50"], [class~="text-slate-100"], [class~="text-slate-200"], [class~="text-slate-900"], [class~="text-slate-950"], [class~="text-zinc-100"], [class~="text-zinc-200"], [class~="text-zinc-950"], [class~="text-white"]) { color: var(--portal-text); }
+.portal-themed :is([class~="text-slate-300"], [class~="text-slate-400"], [class~="text-slate-500"], [class~="text-slate-600"], [class~="text-slate-700"], [class~="text-zinc-300"], [class~="text-zinc-400"], [class~="text-zinc-500"], [class~="text-white/40"]) { color: var(--portal-muted); }
+.portal-themed :is([class~="text-cyan-100"], [class~="text-cyan-200"], [class~="text-cyan-200/80"], [class~="text-cyan-300"], [class~="text-cyan-400"], [class~="text-cyan-500"], [class~="text-blue-400"], [class~="text-sky-300"]) { color: var(--portal-primary); }
+.portal-themed :is([class~="bg-cyan-500"], [class~="bg-cyan-600"], [class~="bg-blue-600"], [class~="bg-indigo-600"]) { background-color: var(--portal-button-bg); color: var(--portal-button-fg); box-shadow: inset 0 1px 0 #ffffff30, 0 3px 7px #6557d812; }
+.portal-themed :is([class~="bg-cyan-500"], [class~="bg-cyan-600"], [class~="bg-blue-600"], [class~="bg-indigo-600"]) > :is(span, svg) { color: inherit; }
+.portal-themed :is(button, a)[class~="bg-cyan-500"]:hover, .portal-themed :is(button, a)[class~="bg-cyan-600"]:hover { background-color: var(--portal-primary-hover); }
+.portal-themed :is([class~="bg-cyan-500/10"], [class~="bg-cyan-500/20"], [class~="bg-cyan-500/30"], [class~="bg-cyan-900/60"]) { background-color: #e9e4fc9c; }
+.portal-themed :is([class~="border-cyan-300/20"], [class~="border-cyan-300/40"], [class~="border-cyan-300/50"], [class~="border-cyan-300/60"], [class~="border-cyan-400/40"], [class~="border-cyan-400/50"], [class~="border-cyan-500/30"], [class~="border-cyan-500/50"], [class~="border-cyan-400"], [class~="border-cyan-500"], [class~="border-cyan-300"]) { border-color: #a89bd65e; }
+.portal-themed :is([class~="text-emerald-100"], [class~="text-emerald-200"], [class~="text-emerald-300"], [class~="text-emerald-400"], [class~="text-emerald-500"], [class~="text-green-200"], [class~="text-green-300"], [class~="text-green-400"]) { color: #18785b; }
+.portal-themed :is([class~="text-red-100"], [class~="text-red-200"], [class~="text-red-300"], [class~="text-red-400"], [class~="text-rose-100"], [class~="text-rose-200"], [class~="text-rose-300"], [class~="text-rose-400"]) { color: #b93d58; }
+.portal-themed :is([class~="text-amber-100"], [class~="text-amber-200"], [class~="text-amber-300"], [class~="text-amber-400"], [class~="text-yellow-200"], [class~="text-yellow-300"], [class~="text-yellow-400"]) { color: #956515; }
+.portal-themed :is([class~="text-violet-300"], [class~="text-purple-300"], [class~="text-purple-400"]) { color: #7945af; }
+.portal-themed :is([class~="bg-rose-500"], [class~="bg-rose-600"], [class~="bg-red-500"], [class~="bg-red-600"], [class~="bg-emerald-600"], [class~="bg-green-600"], [class~="bg-violet-600"], [class~="bg-purple-600"]) { color: #fff; }
+.portal-themed :is([class~="rounded-3xl"], [class~="rounded-2xl"])[class~="border"] { box-shadow: var(--portal-sheen), var(--portal-shadow); }
+.portal-themed [class~="rounded-3xl"] { border-radius: var(--portal-radius-lg); }
+.portal-themed [class~="rounded-2xl"] { border-radius: var(--portal-radius); }
+.portal-themed :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]), select, textarea) { color: var(--portal-text); background-color: var(--portal-field-bg); border-color: #ced6e580; border-radius: var(--portal-radius-sm); min-height: 44px; color-scheme: light; }
+.portal-themed :is(input, textarea)::placeholder { color: #7b879b; }
+.portal-themed :is(input, select, textarea):focus { border-color: #9c8cdb; box-shadow: 0 0 0 3px #9c8cdb14; }
+.portal-themed input[type="checkbox"], .portal-themed input[type="radio"] { accent-color: var(--portal-primary); }
+.portal-themed :is(main, section, article, aside) { min-width: 0; }
+.portal-content > :is(main, div)[class~="min-h-screen"] { min-height: calc(100dvh - var(--portal-header-height)); }
+.portal-content > main[class~="h-screen"] { height: calc(100dvh - var(--portal-header-height)); }
+.portal-content > main { padding-top: 28px; }
+.portal-themed h1 { letter-spacing: -.8px; font-weight: 650; }
+.portal-themed :is(h1, h2, h3)[class~="uppercase"] { text-transform: none; }
+.portal-themed [class~="tracking-[0.3em]"] { letter-spacing: .03em; text-transform: none; color: var(--portal-muted); }
+.portal-themed [class~="from-slate-900"], .portal-themed [class~="from-slate-950"], .portal-themed [class~="from-zinc-950"] { --tw-gradient-from: #f5f7fc var(--tw-gradient-from-position); --tw-gradient-to: #f5f7fc00 var(--tw-gradient-to-position); }
+.portal-themed [class~="to-slate-950"], .portal-themed [class~="to-slate-900"] { --tw-gradient-to: #e9edf8 var(--tw-gradient-to-position); }
+.portal-themed :is([class~="bg-black"], [class~="bg-black/80"], [class~="bg-black/70"], [class~="bg-black/60"], [class~="bg-black/50"], [class~="bg-black/40"], [class~="bg-black/30"]) { color: #f8fafc; }
+.portal-themed :is([class~="bg-black"], [class~="bg-black/80"], [class~="bg-black/70"], [class~="bg-black/60"], [class~="bg-black/50"]):where(:not([class~="fixed"]):not([class~="absolute"])) :is([class~="text-white"], [class~="text-slate-100"], [class~="text-slate-200"], [class~="text-slate-300"]) { color: #f8fafc; }
+.portal-themed [class~="fixed"][class~="inset-0"][class~="bg-black/60"], .portal-themed [class~="fixed"][class~="inset-0"][class~="bg-black/50"] { backdrop-filter: blur(6px); }
+.portal-themed .price-update-flash { color: inherit; }
+.portal-themed .text-stock-ceiling { color: #a52ba6 !important; }
+.portal-themed .text-stock-floor { color: #007d9d !important; }
+.portal-themed :is([class~="text-cyan-50"], [class~="text-purple-200"], [class~="text-violet-200"], [class~="text-violet-400"], [class~="text-indigo-400"]) { color: #7945af; }
+.portal-themed :is([class~="text-zinc-50"], [class~="text-slate-800"]) { color: var(--portal-text); }
+.portal-themed :is([class~="text-orange-200"], [class~="text-orange-300"], [class~="text-orange-400"]) { color: #99581d; }
+.portal-themed [class~="text-green-500"] { color: #18785b; }
+.portal-themed :is([class~="bg-cyan-950"], [class~="bg-emerald-950"], [class~="bg-emerald-900/10"]) { background-color: #e6f2ed; }
+.portal-themed :is([class~="text-emerald-500/60"], [class~="text-emerald-500/80"]) { color: #18785b; }
+.portal-themed :is([class~="text-red-500/60"], [class~="text-red-500/80"]) { color: #b93d58; }
+.stock-heading-row { flex-wrap: wrap; gap: 20px; }
+.stock-toolbar { flex-wrap: wrap; }
+.stock-toolbar button { font-size: 11px; font-weight: 600; text-transform: none; min-height: 36px; }
+.portal-app[data-portal-app="lo-to"] .portal-themed :is([class~="bg-amber-700"], [class~="bg-orange-700"], [class~="bg-emerald-700"], [class~="bg-blue-700"], [class~="bg-rose-700"]) { color: #fff; }
+
+/* Drawing: keep the paper white and retain every drawing tool and touch guard. */
+.portal-app .vv-app { --vv-ink: var(--portal-text); --vv-muted: var(--portal-muted); --vv-green: var(--portal-primary); --vv-line: var(--portal-line); --vv-bg: transparent; background: var(--portal-background); }
+.portal-app .vv-header { border-bottom-color: var(--portal-line); }
+.portal-app .vv-brand-icon { background: linear-gradient(145deg, #fff, #e5e0fa); color: var(--portal-primary); border-color: #fff; box-shadow: var(--portal-sheen), var(--portal-shadow); }
+.portal-app :is(.vv-entry-card, .vv-panel, .vv-gallery-picture) { background: var(--portal-surface); border-color: var(--portal-border); border-radius: 22px; box-shadow: var(--portal-sheen), var(--portal-shadow); }
+.portal-app .vv-pill { background: #eee9f9ae; border-color: #fff; color: #6f6390; }
+.portal-app .vv-tabs { background: #ebe9f58c; border-color: var(--portal-line); }
+.portal-app .vv-tabs button.active { color: var(--portal-primary); background: #ffffffa8; border-bottom-color: var(--portal-primary); }
+.portal-app .vv-room-code { background: #ffffff85; border-color: #bcb2df; border-radius: 20px; }
+.portal-app .vv-board-top { background: linear-gradient(110deg, #f5f3fceb, #eae9f8bd); border-color: #dcd9ed; }
+.portal-app .vv-board-top > div:first-child, .portal-app .vv-timer { color: #6a5a90; }
+.portal-app .vv-share-dialog { background: #fbfbfff5; border: 1px solid #fff; border-radius: 25px; box-shadow: 0 24px 80px #343b6c33, var(--portal-sheen); backdrop-filter: blur(18px); }
+.portal-app .vv-share-dialog::backdrop { background: #34425f66; backdrop-filter: blur(3px); }
+.portal-app .vv-primary { background: var(--portal-primary); box-shadow: 0 3px 0 #5142b4; }
+.portal-app .vv-primary:hover:not(:disabled) { background: var(--portal-primary-hover); }
+.portal-app .vv-secondary { background: #eeebf8; border-color: #d1c9e8; color: #6b5e91; }
+.portal-app .vv-send { background: var(--portal-primary); }
+.portal-app .vv-mobile-guess .vv-guess-form { background: #fafbfffa; border-top-color: #e2dff0; }
+
+/* Board game: neutral chrome changes; land colors, dice and game spaces stay meaningful. */
+.portal-app .co-ty-phu-scope { --surface: rgba(255,255,255,.83); --surface-soft: #f5f5fc; --ink: var(--portal-text); --muted: var(--portal-muted); --line: #dce0ed; --green: #6960a9; --shadow: var(--portal-shadow-raised); background: var(--portal-background); color: var(--portal-text); }
+.portal-app .co-ty-phu-scope :is(.app-shell, .mode-screen) { background: var(--portal-background); }
+.portal-app .co-ty-phu-scope :is(.mode-card, .setup-card) { border: 1px solid #fff; background: var(--portal-surface); border-radius: 26px; box-shadow: var(--portal-sheen), var(--portal-shadow-raised); backdrop-filter: blur(16px); }
+.portal-app .co-ty-phu-scope :is(.panel, .room-panel, .status-card, .player-card, .action-panel, .detail-panel) { background: var(--portal-surface); border-color: var(--portal-line); border-radius: 19px; box-shadow: var(--portal-sheen), var(--portal-shadow); }
+
+/* 3D game hub: translucent selection chrome; the rendered play scene remains opaque. */
+.portal-app .game-hub-scope { color: var(--portal-text); background: var(--portal-background); }
+.portal-app .game-hub-scope :is(.game-hub-hero, .game-hub-hero-panel, .game-hub-selected, .game-hub-detail, .game-hub-control-card, .game-hub-card, .game-hub-game-card, .game-hub-toolbar, .game-hub-status, .game-hub-player-panel) { color: var(--portal-text); background: var(--portal-surface); border-color: #fff; border-radius: 22px; box-shadow: var(--portal-sheen), var(--portal-shadow); }
+.portal-app .game-hub-scope :is(.game-hub-hero p, .game-hub-selected p, .game-hub-control-card p, .game-hub-detail p) { color: var(--portal-muted); }
+.portal-app .game-hub-kicker { background: #ede9f7; color: #6d5aa2; border: 1px solid #fff; border-radius: 20px; text-transform: none; }
+.portal-app .game-hub-hero h1 { font-size: clamp(2.3rem, 6vw, 4.7rem); line-height: 1.08; letter-spacing: -2px; color: var(--portal-text); }
+.portal-app .game-hub-hero-panel svg { color: var(--portal-primary); }
+.portal-app .game-hub-scope :is(button, input, select) { border-radius: 13px; }
+.portal-app .game-hub-scope :is(.game-card, .game-hub-step-header, .game-hub-player-setup, .game-hub-player-options button, .game-hub-player-summary, .game-hub-playbar, .game-help-dialog) { background: var(--portal-surface); color: var(--portal-text); border: 1px solid #fff; border-radius: 22px; box-shadow: var(--portal-sheen), var(--portal-shadow); }
+.portal-app .game-hub-scope :is(.game-hub-filter button, .game-hub-selected button, .game-hub-step-header button, .game-hub-playbar button, .game-hub-player-summary button, .game-help-footer button) { background: #ffffffbd; color: var(--portal-text); border-color: var(--portal-line); min-height: 44px; }
+.portal-app .game-hub-filter button.is-active, .portal-app .game-hub-player-options button.is-selected { background: #eee9fb; border-color: #aa98d2; color: #6551a5; }
+.portal-app .game-hub-scope :is(.game-hub-hero-panel span, .game-card-meta em, .game-card-footer, .game-hub-player-copy p, .game-hub-player-summary p, .game-hub-player-options span, .game-hub-step-header small) { color: var(--portal-muted); }
+.portal-app .game-hub-scope :is(.game-card-meta small, .game-hub-selected small, .game-hub-detail small) { color: var(--portal-primary); text-transform: none; }
+.portal-app .game-hub-scope :is(.game-hub-platform-list span, .game-hub-detail li) { background: #eeeff8; color: var(--portal-muted); border-color: #fff; border-radius: 13px; }
+.portal-app .co-ty-phu-scope :is(.panel-section, .top-bar, .bottom-nav, .detail-sheet) { background: var(--portal-surface-strong); border-color: #fff; box-shadow: var(--portal-sheen), var(--portal-shadow); }
+.portal-app .co-ty-phu-scope :is(.mode-option, .mode-options button) { border-radius: 18px; border-color: var(--portal-line); background: #ffffffb8; }
+
+/* Fullscreen visual tools use light glass controls, retaining their black scene/speed surface. */
+.portal-app[data-portal-app="simulation"] .portal-themed > main { background: #edf0fa; }
+.portal-app[data-portal-app="simulation"] .portal-themed :is([class~="bg-zinc-950/95"], [class~="bg-zinc-950/90"], [class~="bg-zinc-950/85"], [class~="bg-zinc-950/80"], [class~="bg-zinc-900/70"], [class~="bg-zinc-900/60"]) { background-color: var(--portal-surface-strong); color: var(--portal-text); }
+.portal-app[data-portal-app="simulation"] .portal-themed [class~="text-zinc-50"] { color: var(--portal-text); }
+.portal-app[data-portal-app="simulation"] .portal-themed [class~="text-zinc-600"] { color: var(--portal-muted); }
+.portal-app[data-portal-app="simulation"] .portal-themed :is([class~="text-cyan-50"], [class~="text-cyan-100"]) { color: var(--portal-primary); }
+.portal-app[data-portal-app="simulation"] .portal-themed button:disabled { background-color: #eef0f7; color: var(--portal-muted); }
+.portal-app[data-portal-app="simulation"] .portal-themed aside { box-shadow: var(--portal-shadow-raised); }
+.portal-app[data-portal-app="science"] .portal-themed > div { background: #090e1c; }
+.portal-app[data-portal-app="science"] .portal-themed :is([class~="bg-black/20"], [class~="bg-black/30"], [class~="bg-black/40"], [class~="bg-black/50"]) { background-color: #f0f1f9e8; color: var(--portal-text); }
+.portal-app[data-portal-app="science"] .portal-themed :is([class~="text-white/90"], [class~="text-purple-200"]) { color: var(--portal-muted); }
+.portal-app[data-portal-app="science"] .portal-themed [class~="text-slate-300"] { color: var(--portal-muted); }
+.portal-app[data-portal-app="science"] .portal-themed [class~="bg-slate-900"][class~="text-white"] { color: var(--portal-text); }
+.portal-app[data-portal-app="science"] .portal-themed :is([class~="bg-black/20"], [class~="bg-black/30"], [class~="bg-black/40"], [class~="bg-black/50"]) [class~="text-white"] { color: var(--portal-text); }
+.portal-app[data-portal-app="science"] .science-panel h1 { color: var(--portal-primary); background: none; -webkit-text-fill-color: currentColor; }
+.portal-app[data-portal-app="science"] .science-hint { width: 44px; height: 44px; min-height: 44px; flex-shrink: 0; color: var(--portal-primary); background: #fff; border: 1px solid var(--portal-line); font-size: 13px; }
+.portal-app[data-portal-app="science"] .science-instructions { max-width: calc(100% - 88px); white-space: normal; font-size: 12px; }
+.portal-app[data-portal-app="science"] .science-panel { width: min(340px, calc(100% - 32px)); max-height: calc(100dvh - 230px); }
+.portal-app[data-portal-app="science"] :is(.science-panel, .science-timeline) { background-color: var(--portal-surface-strong); }
+.portal-app[data-portal-app="science"] .science-panel h2 { font-size: 14px; }
+.portal-app[data-portal-app="science"] .science-timeline button { width: 44px; height: 44px; }
+.portal-app[data-portal-app="science"] .science-timeline-spacer { width: 0; }
+.portal-app[data-portal-app="hud"] :is([class~="bg-slate-900/80"], [class~="bg-slate-900/60"], [class~="bg-slate-950/90"]) { background: linear-gradient(135deg, #ffffff14, #ffffff05); border-color: #ffffff20; box-shadow: inset 0 1px 0 #ffffff14; backdrop-filter: blur(16px); }
+.portal-app[data-portal-app="hud"] #hud-main { color-scheme: dark; }
+
+@media (max-width: 700px) {
+  .stock-toolbar-wrapper { width: 100%; align-items: stretch; }
+  .stock-toolbar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+  .stock-toolbar button { width: 100%; min-height: 44px; }
+  .stock-page { padding-bottom: 90px; }
+  .stock-floating-actions { bottom: max(16px, env(safe-area-inset-bottom)); right: 16px; flex-direction: row; gap: 10px; }
+  .portal-content > main { padding-top: 22px; padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
+  .portal-themed :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]), select, textarea) { font-size: 16px; }
+  .portal-themed :is(button, a[class~="rounded-lg"], a[class~="rounded-xl"]) { min-height: 44px; }
+  .portal-themed [class~="rounded-3xl"] { border-radius: 22px; }
+  .portal-themed [class~="rounded-2xl"] { border-radius: 18px; }
+  .portal-app .co-ty-phu-scope :is(.mode-card, .setup-card) { backdrop-filter: none; }
+}
+@media (max-width: 359px) { .stock-toolbar { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (prefers-reduced-transparency: reduce) { .portal-app :is(.vv-entry-card, .vv-panel, .vv-share-dialog), .portal-app .co-ty-phu-scope .mode-card { background: #fff; backdrop-filter: none; } }

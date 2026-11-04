@@ -1,0 +1,95 @@
+@import url("/portal-tokens.css");
+
+html[data-portal-static] { color-scheme: light; }
+html[data-portal-static] body { font-family: var(--portal-font); -webkit-font-smoothing: antialiased; }
+html[data-portal-static] :is(button, input, select, textarea) { font-family: inherit; }
+html[data-portal-static] :is(a, button, input, select, textarea):focus-visible { outline: 3px solid var(--portal-ring); outline-offset: 4px; }
+.portal-static-home { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 10px 15px; border-radius: 13px; border: 1px solid #ffffffc4; background: #ffffff9e; color: var(--portal-primary); text-decoration: none; font-size: 12px; font-weight: 600; line-height: 1.4; font-family: var(--portal-font); box-sizing: border-box; }
+.portal-static-home svg { width: 16px; height: 16px; flex-shrink: 0; }
+html[data-portal-embedded="true"] .portal-static-home { display: none; }
+
+/* Java and long-form reading: opaque content, glass navigation and indexes. */
+html[data-portal-static="reading"] { --text-color: var(--portal-text); --bg-color: var(--portal-bg); --white: #fff; --border-color: #dfe4f0; --sidebar-bg: #f6f7fc; --java-blue-dark: #6656bb; --java-blue-light: #9889ce; }
+html[data-portal-static="reading"] body { background: var(--portal-background); color: var(--portal-text); }
+html[data-portal-static="reading"] header { background: #ffffffbf; color: var(--portal-text); border-bottom: 1px solid white; box-shadow: var(--portal-sheen), var(--portal-shadow); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); gap: 25px; }
+html[data-portal-static="reading"] header :is(a, .logo-text) { color: var(--portal-text); }
+html[data-portal-static="reading"] header nav a { color: var(--portal-muted); font-size: 13px; }
+html[data-portal-static="reading"] header nav a:hover { color: var(--portal-primary); }
+html[data-portal-static="reading"] header > .portal-static-home { margin-left: auto; color: var(--portal-primary); white-space: nowrap; }
+html[data-portal-static="reading"] .hero { background: linear-gradient(120deg, #fff8, #e9e7fa9c); border: 1px solid #fff; border-radius: 25px; color: var(--portal-text); margin: 28px auto; padding: 38px; max-width: min(1200px, calc(100% - 32px)); box-shadow: var(--portal-sheen), var(--portal-shadow); }
+html[data-portal-static="reading"] .hero h1 { color: var(--portal-text); font-size: clamp(32px, 5vw, 48px); letter-spacing: -1.5px; }
+html[data-portal-static="reading"] .hero p { color: var(--portal-muted); font-size: 15px; }
+html[data-portal-static="reading"] :is(.card, .sidebar) { border: 1px solid #fff; background: var(--portal-surface); border-radius: 19px; box-shadow: var(--portal-sheen), var(--portal-shadow); }
+html[data-portal-static="reading"] .card:hover { border-color: #c9bce9; box-shadow: var(--portal-shadow-raised); }
+html[data-portal-static="reading"] .card h3 { font-size: 17px; color: var(--portal-text); }
+html[data-portal-static="reading"] .card p { color: var(--portal-muted); }
+html[data-portal-static="reading"] .section-title { color: var(--portal-text); border-bottom-color: var(--portal-line); letter-spacing: -.6px; }
+html[data-portal-static="reading"] :is(.content, .main-content, .article-content) { background-color: #ffffffed; border-radius: 21px; border-color: var(--portal-line); color: var(--portal-text); }
+html[data-portal-static="reading"] a { color: var(--portal-primary); }
+html[data-portal-static="reading"] :is(pre, pre code) { color: #e4e9f4; background-color: #283149; }
+html[data-portal-static="reading"] .container { grid-template-columns: minmax(0, 1fr) 280px; gap: 28px; }
+html[data-portal-static="reading"] :is(article, main, section, .grid, .card, header nav) { min-width: 0; }
+html[data-portal-static="reading"] article { overflow-wrap: anywhere; }
+html[data-portal-static="reading"] article h1 { font-size: clamp(28px, 4vw, 36px); line-height: 1.3; }
+html[data-portal-static="reading"] article h2 { font-size: clamp(21px, 3vw, 26px); line-height: 1.45; }
+html[data-portal-static="reading"] :is(pre, .code-block, table) { max-width: 100%; overflow-x: auto; overflow-wrap: normal; }
+html[data-portal-static="reading"] table { display: block; }
+html[data-portal-static="reading"] .grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+html[data-portal-static="reading"] .logo-container img { width: 36px; height: 36px; }
+html[data-portal-static="reading"] .sidebar { top: 110px; }
+html[data-portal-static="reading"] footer { background: #eef0f8; color: var(--portal-muted); }
+html[data-portal-static="reading"] footer :is(h4, a) { color: var(--portal-text); }
+
+html[data-portal-static="utility"] body { background: var(--portal-background); color: var(--portal-text); }
+html[data-portal-static="utility"] :is(.bg-white, [class~="bg-slate-100"]) { background-color: var(--portal-surface); }
+html[data-portal-static="utility"] :is([class~="rounded-2xl"], [class~="rounded-xl"]) { border: 1px solid #fff; border-radius: 22px; box-shadow: var(--portal-sheen), var(--portal-shadow); }
+html[data-portal-static="utility"] :is(input, select) { min-height: 46px; border: 1px solid var(--portal-line); border-radius: 12px; background: #ffffffc4; color: var(--portal-text); }
+html[data-portal-static="utility"] :is(.bg-cyan-600, .bg-slate-900) { background: var(--portal-primary); color: white; }
+html[data-portal-static="utility"] .portal-static-home { margin: 18px 20px 0; }
+
+html[data-portal-static="gps"] { --bg: var(--portal-bg); --card-bg: var(--portal-surface); --bg-panel: var(--portal-surface-strong); --primary: var(--portal-primary); --primary-hover: var(--portal-primary-hover); --text: var(--portal-text); --text-muted: var(--portal-muted); --accent: #9782ca; }
+html[data-portal-static="gps"] body { background: var(--portal-background); color: var(--portal-text); }
+html[data-portal-static="gps"] :is(.container, #ui-panel) { border: 1px solid #fff; border-radius: 25px; box-shadow: var(--portal-sheen), var(--portal-shadow-raised); }
+html[data-portal-static="gps"] h1 { color: var(--portal-text); background: none; -webkit-text-fill-color: currentColor; letter-spacing: -.8px; }
+html[data-portal-static="gps"] :is(.info-card, .vehicle-card) { background: #ffffff75; border: 1px solid #fff; border-radius: 14px; }
+html[data-portal-static="gps"] :is(input, select) { color: var(--portal-text); background: #ffffffb8; border: 1px solid var(--portal-line); border-radius: 12px; min-height: 44px; }
+html[data-portal-static="gps"] .portal-static-home { margin-top: 16px; }
+
+/* Festive games keep red/gold semantic cues inside a lighter glass envelope. */
+html[data-portal-static="festive"] body { background: radial-gradient(ellipse at 10% 10%, #fae5e9, transparent 55%), var(--portal-background); color: #74394d; }
+html[data-portal-static="festive"] :is([class~="bg-white"], [class~="bg-white/90"], [class~="bg-white/95"], [class~="bg-red-900"], [class~="bg-red-950"]) { background: #ffffffd6; color: #74394d; border-color: #fff; border-radius: 24px; box-shadow: var(--portal-sheen), var(--portal-shadow); }
+html[data-portal-static="festive"] .premium-input { background: #ffffffdb; border-color: #ddbdd0; border-radius: 14px; color: #8b3e60; }
+html[data-portal-static="festive"] .btn-action { border-radius: 14px; box-shadow: inset 0 1px 0 #ffffff4d, 0 4px 12px #8f506b1f; }
+html[data-portal-static="festive"] .portal-static-home { margin: 15px; }
+
+html[data-portal-static="racing"] { --bg-dark: #eff3fc; --bg-card: rgba(255,255,255,.84); --bg-card-light: #eeebf9; --accent-primary: #7764ca; --accent-secondary: #e9e2fa; --text-primary: #33405a; --text-secondary: #69758e; --text-muted: #727e94; --radius: 24px; --radius-sm: 14px; --shadow: 0 14px 40px #64719412; --shadow-glow: 0 0 0 3px #a992d31a; }
+html[data-portal-static="racing"] body { background: var(--portal-background); }
+html[data-portal-static="racing"] :is(.lobby-container, .room-container, .results-container, .modal-content) { border: 1px solid #fff; background: var(--portal-surface); border-radius: 27px; box-shadow: var(--portal-sheen), var(--portal-shadow-raised); backdrop-filter: blur(15px); }
+html[data-portal-static="racing"] .lobby-container > .portal-static-home { margin-top: 15px; width: 100%; }
+html[data-portal-static="racing"] .btn-primary { background: linear-gradient(135deg, #8170ce, #6557bd); color: #fff; box-shadow: var(--portal-sheen), 0 5px 15px #8170ce22; }
+html[data-portal-static="racing"] .btn-secondary { background: #eae6f8; color: #675698; border: 1px solid #d4cbed; box-shadow: var(--portal-sheen); }
+html[data-portal-static="racing"] .btn-outline { background: #ffffff80; border-color: #d3c7e7; color: #75629c; }
+html[data-portal-static="racing"] .game-title { font-size: clamp(34px, 6vw, 48px); text-shadow: none; }
+html[data-portal-static="racing"] .game-title span { color: #8878aa; }
+html[data-portal-static="racing"] .input-field { background: #ffffffab; border-color: var(--portal-line); }
+html[data-portal-static="racing"] #game-screen { color: #fff; }
+
+html[data-portal-static="arcade"] :is(.popup-box, .shop-box, #start-screen, #gameover-screen) { border: 1px solid #ffffffd1; border-radius: 25px; box-shadow: var(--portal-sheen), 0 24px 70px #1f2b4933; backdrop-filter: blur(18px); }
+html[data-portal-static="arcade"] .popup-box { background: #f7f9fff0; color: var(--portal-text); }
+html[data-portal-static="arcade"] .popup-box :is(h1,h2,h3,p) { color: var(--portal-text); text-shadow: none; }
+html[data-portal-static="arcade"] .popup-box button { border-radius: 13px; }
+html[data-portal-static="arcade"] .portal-static-home { margin-top: 16px; }
+@media (max-width: 700px) {
+  html[data-portal-static] :is(input, select, textarea) { font-size: 16px; }
+  html[data-portal-static] :is(button, .portal-static-home) { min-height: 44px; }
+  html[data-portal-static="reading"] header { height: auto; min-height: 66px; padding: 10px 16px; flex-wrap: wrap; gap: 8px 15px; }
+  html[data-portal-static="reading"] header nav { order: 3; width: 100%; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  html[data-portal-static="reading"] header nav ul { display: flex; gap: 20px; width: max-content; }
+  html[data-portal-static="reading"] .hero { padding: 25px 22px; margin-top: 19px; }
+  html[data-portal-static="reading"] .card { border-radius: 17px; }
+  html[data-portal-static="reading"] .container { grid-template-columns: minmax(0, 1fr); padding: 0 18px; }
+  html[data-portal-static="reading"] .tutorial-nav { flex-wrap: wrap; gap: 10px; }
+}
+@media (min-width: 701px) and (max-width: 900px) { html[data-portal-static="reading"] .container { grid-template-columns: minmax(0, 1fr); } html[data-portal-static="reading"] .sidebar { display: none; } html[data-portal-static="reading"] header { flex-wrap: wrap; height: auto; padding: 12px 20px; gap: 10px; } html[data-portal-static="reading"] header nav { order: 3; width: 100%; overflow-x: auto; } }
+@media (prefers-reduced-motion: reduce) { html[data-portal-static] *, html[data-portal-static] *::before, html[data-portal-static] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+@media (prefers-reduced-transparency: reduce) { html[data-portal-static] :is(header, .card, .sidebar, .lobby-container, .popup-box) { backdrop-filter: none; background-color: #fff; } }

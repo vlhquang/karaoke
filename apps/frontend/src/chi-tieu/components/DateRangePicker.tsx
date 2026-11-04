@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId } from "react";
 import { formatDateVi, toIsoDateString, startOfMonth, endOfMonth } from "../lib/format";
 
 interface DateRangePickerProps {
@@ -10,6 +10,7 @@ interface DateRangePickerProps {
 }
 
 export default function DateRangePicker({ from, to, onChange }: DateRangePickerProps) {
+  const rangeId = useId();
   const today = new Date();
 
   const setQuick = (label: "this_month" | "last_month" | string) => {
@@ -42,10 +43,11 @@ export default function DateRangePicker({ from, to, onChange }: DateRangePickerP
           Tháng trước
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="mb-1 block text-xs text-slate-400">Từ ngày</label>
+          <label htmlFor={`${rangeId}-from`} className="mb-1 block text-xs text-slate-400">Từ ngày</label>
           <input
+            id={`${rangeId}-from`}
             type="date"
             value={from}
             max={to || toIsoDateString(today)}
@@ -54,8 +56,9 @@ export default function DateRangePicker({ from, to, onChange }: DateRangePickerP
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-slate-400">Đến ngày</label>
+          <label htmlFor={`${rangeId}-to`} className="mb-1 block text-xs text-slate-400">Đến ngày</label>
           <input
+            id={`${rangeId}-to`}
             type="date"
             value={to}
             min={from}

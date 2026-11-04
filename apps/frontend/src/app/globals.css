@@ -1,17 +1,21 @@
+@import "../../public/portal-tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
   min-height: 100vh;
   margin: 0;
-  background: radial-gradient(circle at 20% 20%, #15315a 0%, #080d19 45%, #05070d 100%);
-  color: #e2e8f0;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  background: var(--portal-background);
+  background-attachment: fixed;
+  color: var(--portal-text);
+  font-family: var(--portal-font);
+  -webkit-font-smoothing: antialiased;
 }
 
 a {

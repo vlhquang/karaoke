@@ -135,6 +135,9 @@ export default function SpaceLabPage() {
       <div className="absolute top-4 left-4 z-20 flex flex-col gap-3">
         {/* Toggle Panel Button */}
         <button 
+          aria-label={isPanelOpen ? "Đóng bảng khám phá" : "Mở bảng khám phá"}
+          aria-expanded={isPanelOpen}
+          aria-controls="science-panel"
           onClick={() => setIsPanelOpen(!isPanelOpen)}
           className="w-12 h-12 bg-slate-900/60 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-cyan-400 hover:text-white hover:bg-slate-800/80 transition-all shadow-lg"
         >
@@ -147,7 +150,7 @@ export default function SpaceLabPage() {
       </div>
 
       {/* Floating Control Panel */}
-      <div className={`absolute top-20 left-4 z-10 w-64 md:w-72 max-h-[calc(100vh-6rem)] flex flex-col bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-2xl md:rounded-3xl shadow-2xl overflow-y-auto transition-all duration-300 origin-top-left ${
+      <div id="science-panel" inert={!isPanelOpen} className={`science-panel absolute top-20 left-4 z-10 w-64 md:w-72 max-h-[calc(100vh-6rem)] flex flex-col bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-2xl md:rounded-3xl shadow-2xl overflow-y-auto transition-all duration-300 origin-top-left ${
         isPanelOpen ? "scale-100 opacity-100" : "scale-90 opacity-0 pointer-events-none"
       }`}>
         <div className="p-3 md:p-4 pb-2 md:pb-3 sticky top-0 bg-slate-900/60 backdrop-blur-lg z-20 border-b border-white/5">
@@ -161,7 +164,8 @@ export default function SpaceLabPage() {
 
         <div className="p-2 md:p-3 flex flex-col gap-2 md:gap-3">
           {/* View Mode Toggle */}
-          <div 
+          <button type="button"
+            aria-label="Đổi góc nhìn giữa không gian và mặt đất"
             onClick={() => setViewMode(prev => prev === 'space' ? 'surface' : 'space')}
             className="relative overflow-hidden rounded-xl md:rounded-2xl cursor-pointer transition-all duration-300 border border-purple-500/50 bg-black/40 hover:bg-black/60 shadow-lg p-2 md:p-3 flex items-center gap-3"
           >
@@ -175,7 +179,7 @@ export default function SpaceLabPage() {
                 {viewMode === 'space' ? "Từ Không gian" : "Từ Mặt đất (GPS)"}
               </p>
             </div>
-          </div>
+          </button>
 
           <div className="h-px w-full bg-white/10 my-1"></div>
 
@@ -186,7 +190,6 @@ export default function SpaceLabPage() {
             return (
               <div
                 key={mod.id}
-                onClick={() => toggleModule(mod.id)}
                 className={`relative overflow-hidden rounded-xl md:rounded-2xl cursor-pointer transition-all duration-300 border border-white/10 ${
                   isActive ? "bg-black/50 shadow-lg" : "bg-black/20 hover:bg-black/30"
                 }`}
@@ -196,28 +199,18 @@ export default function SpaceLabPage() {
                 )}
                 <div className="relative p-2 md:p-3 flex flex-col">
                   <div className="flex gap-2 items-center">
-                    <div className="shrink-0">
-                      <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-colors shadow-inner ${
+                    <button type="button" aria-pressed={isActive} onClick={() => toggleModule(mod.id)} className="flex flex-1 min-w-0 items-center gap-2 bg-transparent text-left">
+                      <span className={`w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-full flex items-center justify-center transition-colors shadow-inner ${
                         isActive ? "bg-slate-900" : "bg-slate-900/50"
                       }`}>
-                        <div className="scale-75 md:scale-100">{mod.icon}</div>
-                      </div>
-                    </div>
-                    <div className="flex-1 pr-6">
-                      <h2 className={`text-xs md:text-sm font-bold transition-colors ${
+                        <span className="scale-75 md:scale-100">{mod.icon}</span>
+                      </span>
+                      <span className={`flex-1 text-sm font-bold transition-colors ${
                         isActive ? "text-white" : "text-slate-300"
-                      } flex items-center gap-1`}>
+                      }`}>
                         {mod.title}
-                        <button 
-                          onClick={(e) => toggleHint(e, mod.id)}
-                          className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[9px] text-white hover:bg-white/20"
-                        >
-                          i
-                        </button>
-                      </h2>
-                    </div>
-                    <div className="absolute top-1/2 -translate-y-1/2 right-2 md:right-3">
-                      <div className={`w-4 h-4 md:w-5 md:h-5 rounded-[4px] flex items-center justify-center transition-colors border ${
+                      </span>
+                      <span aria-hidden="true" className={`w-4 h-4 shrink-0 rounded-[4px] flex items-center justify-center transition-colors border ${
                         isActive ? "bg-cyan-500 border-cyan-400" : "border-slate-500 bg-slate-800/50"
                       }`}>
                         {isActive && (
@@ -225,13 +218,14 @@ export default function SpaceLabPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
                           </svg>
                         )}
-                      </div>
-                    </div>
+                      </span>
+                    </button>
+                    <button type="button" aria-label={`Giải thích ${mod.title}`} aria-expanded={isHintOpen} onClick={event => toggleHint(event, mod.id)} className="science-hint rounded-full flex items-center justify-center">i</button>
                   </div>
                   
                   {isHintOpen && (
                     <div className="mt-2 p-2 bg-black/40 rounded-lg border border-white/5" onClick={(e) => e.stopPropagation()}>
-                      <p className="text-[10px] md:text-xs leading-relaxed text-cyan-100">
+                      <p className="text-sm leading-relaxed text-cyan-100">
                         💡 {mod.description}
                       </p>
                     </div>
@@ -244,13 +238,13 @@ export default function SpaceLabPage() {
       </div>
 
       {/* Instruction overlay */}
-      <div className="absolute top-4 right-4 pointer-events-none bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-white/90 text-[10px] md:text-sm flex items-center gap-2 shadow-xl whitespace-nowrap">
+      <div className="science-instructions absolute top-4 right-4 pointer-events-none bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-white/90 text-[10px] md:text-sm flex items-center gap-2 shadow-xl whitespace-nowrap">
         <span className="animate-bounce">👆</span> 
         {viewMode === 'space' ? "Vuốt để xoay góc nhìn, cuộn/zoom để phóng to" : "Di chuột/ngón tay để nhìn quanh bầu trời"}
       </div>
 
       {/* Bottom Timeline Scrubber */}
-      <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 w-[90%] md:w-[600px] z-20 bg-slate-900/60 backdrop-blur-md border border-white/20 p-3 md:p-4 rounded-2xl md:rounded-3xl shadow-2xl flex flex-col gap-2 transition-all">
+      <div className="science-timeline absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 w-[90%] md:w-[600px] z-20 bg-slate-900/60 backdrop-blur-md border border-white/20 p-3 md:p-4 rounded-2xl md:rounded-3xl shadow-2xl flex flex-col gap-2 transition-all">
         {showTimeConfig && (
           <div className="absolute bottom-[110%] left-0 w-64 bg-slate-900/90 backdrop-blur-xl border border-white/20 p-4 rounded-2xl shadow-2xl flex flex-col gap-4">
             <div>
@@ -290,12 +284,15 @@ export default function SpaceLabPage() {
         <div className="flex justify-between items-center px-1">
           <div className="flex items-center gap-2">
             <button 
+              aria-label={isPlaying ? "Tạm dừng mô phỏng" : "Chạy mô phỏng"}
               onClick={() => setIsPlaying(!isPlaying)}
               className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-cyan-500 hover:bg-cyan-400 text-black flex items-center justify-center transition-colors shadow-lg shrink-0"
             >
               {isPlaying ? <Pause className="w-4 h-4 md:w-5 md:h-5 fill-current" /> : <Play className="w-4 h-4 md:w-5 md:h-5 fill-current translate-x-[1px]" />}
             </button>
             <button 
+              aria-label="Cài đặt thời gian mô phỏng"
+              aria-expanded={showTimeConfig}
               onClick={() => setShowTimeConfig(!showTimeConfig)}
               className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-colors shadow-lg shrink-0 ${showTimeConfig ? "bg-purple-500 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
             >
@@ -307,11 +304,12 @@ export default function SpaceLabPage() {
             {formatDate(dayOfYear)}
           </div>
           
-          <div className="w-[72px] md:w-[88px] opacity-0 shrink-0">{/* spacer */}</div>
+          <div aria-hidden="true" className="science-timeline-spacer w-[72px] md:w-[88px] opacity-0 shrink-0">{/* spacer */}</div>
         </div>
         
         <div className="px-2 pb-1">
           <input 
+            aria-label="Thời điểm mô phỏng"
             type="range" 
             min="0" max={timeSpan} step={1/24} 
             value={dayOfYear}

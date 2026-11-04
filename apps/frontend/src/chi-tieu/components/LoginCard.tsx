@@ -21,8 +21,11 @@ export default function LoginCard() {
       <h1 className="text-2xl font-bold text-slate-100">Quản lý Chi tiêu</h1>
       <p className="mt-2 text-sm text-slate-500">Nhập mã truy cập để sử dụng.</p>
       <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+        <label htmlFor="spending-access-code" className="block text-sm text-slate-300">Mã truy cập</label>
         <input
+          id="spending-access-code"
           type="password"
+          autoComplete="current-password"
           value={code}
           onChange={(e) => setCode(e.target.value)}
           placeholder="Mã truy cập"

@@ -1,0 +1,52 @@
+/* Nhà mình — primitive → semantic → component tokens. Shared by Next and HTML apps. */
+:root {
+  --p-white: #ffffff;
+  --p-cloud: #f3f6fc;
+  --p-ink: #28334d;
+  --p-slate: #626f87;
+  --p-violet: #6557d8;
+  --p-blue: #4366d7;
+  --p-mint: #237e70;
+  --p-rose: #bd527d;
+  --p-amber: #a97022;
+  --portal-bg: var(--p-cloud);
+  --portal-text: var(--p-ink);
+  --portal-muted: var(--p-slate);
+  --portal-primary: var(--p-violet);
+  --portal-on-primary: var(--p-white);
+  --portal-primary-hover: #5144bd;
+  --portal-surface: rgba(255, 255, 255, .7);
+  --portal-surface-strong: rgba(255, 255, 255, .91);
+  --portal-surface-soft: rgba(242, 245, 253, .65);
+  --portal-input: rgba(255, 255, 255, .8);
+  --portal-border: rgba(255, 255, 255, .85);
+  --portal-line: rgba(123, 137, 174, .17);
+  --portal-ring: rgba(101, 87, 216, .4);
+  --portal-shadow: 0 8px 30px rgba(73, 84, 127, .045), 0 2px 5px rgba(73, 84, 127, .025);
+  --portal-shadow-raised: 0 16px 48px rgba(73, 84, 127, .1), 0 4px 12px rgba(73, 84, 127, .04);
+  --portal-sheen: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 -1px 0 rgba(255, 255, 255, .35);
+  --portal-background: radial-gradient(ellipse at 5% 8%, #e6f0fc 0, transparent 36%), radial-gradient(ellipse at 87% 14%, #eeebfd 0, transparent 38%), radial-gradient(ellipse at 65% 84%, #e9f4f1 0, transparent 45%), #f4f7fc;
+  --portal-radius-sm: 12px;
+  --portal-radius: 22px;
+  --portal-radius-lg: 28px;
+  --portal-font: "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --portal-duration: 170ms;
+  --portal-glass-blur: 18px;
+  --portal-button-bg: var(--portal-primary);
+  --portal-button-fg: var(--portal-on-primary);
+  --portal-card-bg: var(--portal-surface);
+  --portal-field-bg: var(--portal-input);
+  --portal-header-height: 92px;
+  --portal-tone-violet-ink: #6354c0;
+  --portal-tone-violet-bg: #e9e5ff;
+  --portal-tone-blue-ink: #4269c6;
+  --portal-tone-blue-bg: #e2ecff;
+  --portal-tone-mint-ink: #2c826f;
+  --portal-tone-mint-bg: #def1e9;
+  --portal-tone-rose-ink: #bd5b80;
+  --portal-tone-rose-bg: #f7e1eb;
+  --portal-tone-amber-ink: #9d762f;
+  --portal-tone-amber-bg: #faf0d6;
+}
+@media (max-width: 700px) { :root { --portal-header-height: 76px; --portal-glass-blur: 10px; } }
+@media (prefers-reduced-transparency: reduce) { :root { --portal-surface: #fff; --portal-surface-strong: #fff; --portal-surface-soft: #f1f4fa; --portal-input: #fff; --portal-glass-blur: 0px; } }

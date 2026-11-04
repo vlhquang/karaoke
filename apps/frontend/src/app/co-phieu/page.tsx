@@ -863,15 +863,18 @@ export default function StockPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                             </svg>
                         </div>
-                        <h2 className="mt-6 text-2xl font-black tracking-tight text-white uppercase">Danh Mục Đầu Tư</h2>
+                        <h1 className="mt-6 text-2xl font-bold tracking-tight text-white">Danh mục đầu tư</h1>
                         <p className="mt-2 text-sm text-slate-500">Nhập mã để quản lý danh mục</p>
                     </div>
 
                     <form className="mt-8 space-y-4" onSubmit={handleLogin}>
                         <div>
+                            <label htmlFor="stock-access-code" className="mb-2 block text-sm text-slate-300">Mã truy cập</label>
                             <input
-                                autoFocus
+                                id="stock-access-code"
                                 type="password"
+                                autoComplete="current-password"
+                                required
                                 value={accessCode}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setAccessCode(e.target.value)}
                                 className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-5 py-4 text-center font-mono text-xl tracking-[0.5em] text-white outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
@@ -884,7 +887,7 @@ export default function StockPage() {
                             disabled={isLoading}
                             className="w-full rounded-2xl bg-cyan-600 py-4 font-black text-white hover:bg-cyan-500 active:scale-[0.98] transition-all disabled:opacity-50"
                         >
-                            {isLoading ? "ĐANG XÁC THỰC..." : "TRUY CẬP HỆ THỐNG"}
+                            {isLoading ? "Đang xác nhận…" : "Mở danh mục"}
                         </button>
                     </form>
 
@@ -902,11 +905,11 @@ export default function StockPage() {
     }
 
     return (
-        <main className="min-h-screen bg-slate-950 font-sans text-slate-200">
+        <main className="stock-page min-h-screen bg-slate-950 font-sans text-slate-200">
             {/* Header section with worker status */}
             <header className="border-b border-slate-800 bg-slate-900/50 pt-8 pb-6 bg-transparent">
                 <div className="mx-auto max-w-6xl px-4 flex flex-col items-center">
-                    <div className="flex items-center justify-between w-full">
+                    <div className="stock-heading-row flex items-center justify-between w-full">
                         <div className="flex items-center gap-3">
                             <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-cyan-500 text-slate-950">
                                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -914,13 +917,13 @@ export default function StockPage() {
                                 </svg>
                             </div>
                             <div>
-                                <h1 className="text-xl font-black text-white leading-none uppercase">Stock Manager</h1>
-                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Portfolio Tracker Pro</p>
+                                <h1 className="text-xl font-bold text-white leading-none">Danh mục đầu tư</h1>
+                                <p className="text-xs text-slate-500 mt-1">Theo dõi tài sản của bạn</p>
                             </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
+                        <div className="stock-toolbar-wrapper flex flex-col items-end gap-1">
                             {/* Worker status and update time removed */}
-                            <div className="flex items-center gap-2">
+                            <div className="stock-toolbar flex items-center gap-2">
                                 <button
                                     onClick={() => {
                                         setIsVerifyingPassword(true);
@@ -1520,7 +1523,7 @@ export default function StockPage() {
                 )}
 
                 {/* Bubble Buttons at Bottom */}
-                <div className="fixed bottom-8 right-8 z-[90] flex flex-col gap-4 items-end">
+                <div className="stock-floating-actions fixed bottom-8 right-8 z-[90] flex flex-col gap-4 items-end">
                     <button
                         onClick={() => loadTransactions(accessCode)}
                         disabled={isRefreshingSheet}

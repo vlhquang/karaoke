@@ -154,7 +154,7 @@ export default function LotoHostPage() {
                     onClose={() => setShowWinnerPopup(false)}
                 />
                 <div className="space-y-3 md:space-y-4">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                         <h1 className="text-xl font-bold md:text-2xl">Lô tô - Chủ phòng</h1>
                         <div className="flex items-center gap-3">
                             <select
