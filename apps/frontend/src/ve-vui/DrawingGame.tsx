@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { io, type Socket } from "socket.io-client";
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Clock3, Copy, Crown, Download, Eraser, Heart, House, LogOut, Pencil, Play, QrCode, RotateCcw, Send, Settings2, ShieldCheck, Sparkles, Trash2, Trophy, Undo2, Users, Wifi, WifiOff, X } from "lucide-react";
-import { CATEGORIES, DEFAULT_SETTINGS, type Reply, type RoomView, type Session, type Settings, type Stroke, type TurnResult } from "./types";
+import { ArrowLeft, ArrowRight, Bell, Check, ChevronDown, Clock3, Copy, Crown, Download, Eraser, Heart, House, LogOut, PaintBucket, Pencil, Play, QrCode, RotateCcw, Send, Settings2, ShieldCheck, Sparkles, Trash2, Trophy, Undo2, Users, Wifi, WifiOff, X } from "lucide-react";
+import { attemptMultiplier, CATEGORIES, DEFAULT_SETTINGS, type Point, type Reply, type RoomView, type Session, type Settings, type Stroke, type TurnResult } from "./types";
 import { DrawingBoard, paintStrokes } from "./DrawingBoard";
 import { RoomInvite } from "./RoomInvite";
 import { useMobileControls } from "./use-mobile-controls";
+import { floodFillRuns } from "./fill";
+import { VoiceChat } from "./VoiceChat";
+import { useGuessNotifications } from "./use-guess-notifications";
 
 const SESSION_KEY = "ve-vui.session.v1";
 const COLORS = ["#253447", "#737985", "#ee5353", "#f68b42", "#f4c742", "#6dbd69", "#24886d", "#43b8c7", "#4a7be8", "#8f67c2", "#ea85b3", "#9b6746"];
@@ -42,6 +45,8 @@ function SettingsFields({ value, onChange, disabled = false }: { value: Settings
   return <div className="vv-settings">
     <label>Số vòng<select disabled={disabled} value={value.rounds} onChange={e => set("rounds", Number(e.target.value))}>{[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n} vòng</option>)}</select></label>
     <label>Thời gian mỗi lượt<select disabled={disabled} value={value.duration} onChange={e => set("duration", Number(e.target.value) as Settings["duration"])}>{[60, 90, 120].map(n => <option key={n} value={n}>{n} giây</option>)}</select></label>
+    <label>Chuẩn bị mỗi lượt<select disabled={disabled} value={value.preparation} onChange={e => set("preparation", Number(e.target.value) as Settings["preparation"])}>{[0, 3, 5, 10, 15].map(n => <option key={n} value={n}>{n ? `${n} giây` : "Vẽ ngay (0 giây)"}</option>)}</select></label>
+    <label>Trò chuyện bằng micro<select disabled={disabled} value={value.voiceEnabled ? "on" : "off"} onChange={e => set("voiceEnabled", e.target.value === "on")}><option value="off">Tắt trò chuyện</option><option value="on">Cho phép cả nhà trò chuyện</option></select></label>
     <label>Độ khó<select disabled={disabled} value={value.difficulty} onChange={e => set("difficulty", e.target.value as Settings["difficulty"])}><option value="easy">Dễ, ai cũng vẽ được</option><option value="medium">Vừa, thử tài một chút</option><option value="mixed">Hỗn hợp</option></select></label>
     <label>Chủ đề<select disabled={disabled} value={value.category} onChange={e => set("category", e.target.value as Settings["category"])}><option value="all">Tất cả chủ đề</option>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></label>
     <label>Cách chấm đáp án<select disabled={disabled} value={value.judging} onChange={e => set("judging", e.target.value as Settings["judging"])}><option value="hybrid">Kết hợp: máy + người vẽ</option><option value="manual">Người vẽ duyệt tất cả</option></select></label>
@@ -80,12 +85,22 @@ export function DrawingGame() {
   const [color, setColor] = useState(COLORS[0]);
   const [width, setWidth] = useState(10);
   const [eraser, setEraser] = useState(false);
+  const [filling, setFilling] = useState(false);
+  const [fillBusy, setFillBusy] = useState(false);
+  const [guessSending, setGuessSending] = useState(false);
+  const [answersOpen, setAnswersOpen] = useState(false);
+  const sendingRef = useRef(false);
+  const fillBusyRef = useRef(false);
+  const roomRef = useRef<RoomView | null>(null);
+  const strokesPending = useRef(new Set<Promise<unknown>>());
+  const answersRef = useRef<HTMLDialogElement>(null);
   const [time, setTime] = useState(Date.now());
   const [clockOffset, setClockOffset] = useState(0);
   const [cooldown, setCooldown] = useState(0);
   const socketRef = useRef<Socket | null>(null);
   const appRef = useRef<HTMLElement>(null);
   useMobileControls(appRef);
+  useGuessNotifications(room, setNotice);
 
   const request = useCallback((event: string, payload: unknown = {}): Promise<Reply> => new Promise(resolve => {
     const socket = socketRef.current;
@@ -112,21 +127,30 @@ export function DrawingGame() {
       }
       setRestoring(false);
     });
-    socket.on("room:state", (snapshot: RoomView) => { setRoom(snapshot); setClockOffset(snapshot.serverNow - Date.now()); });
-    socket.on("draw:stroke", (stroke: Stroke) => {
-      setRoom(previous => previous ? { ...previous, strokes: appendStroke(previous.strokes, stroke) } : previous);
+    socket.on("room:state", (snapshot: RoomView) => { roomRef.current = snapshot; setRoom(snapshot); setClockOffset(snapshot.serverNow - Date.now()); });
+    socket.on("draw:stroke", (stroke: Stroke, revision: number, turnId: string) => {
+      if (roomRef.current?.turnId !== turnId) return;
+      setRoom(previous => previous ? { ...previous, canvasRevision: revision, strokes: appendStroke(previous.strokes, stroke) } : previous);
     });
     socket.on("disconnect", () => setConnected(false));
     socket.on("connect_error", () => { setConnected(false); setRestoring(false); setError("Chưa kết nối được máy chủ. Hệ thống đang thử lại."); });
     socket.on("session:ended", (message: string) => {
       if (!message.includes("cửa sổ khác")) localStorage.removeItem(SESSION_KEY);
-      setRoom(null); setError(message);
+      roomRef.current = null; setRoom(null); setError(message);
     });
     return () => { mounted = false; socket.disconnect(); socketRef.current = null; };
   }, [request]);
   useEffect(() => { const timer = setInterval(() => setTime(Date.now()), 200); return () => clearInterval(timer); }, []);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(""), 4000); return () => clearTimeout(timer); }, [notice]);
-  useEffect(() => { setGuess(""); setEraser(false); }, [room?.drawerId, room?.round]);
+  useEffect(() => { setGuess(""); setEraser(false); setFilling(false); setAnswersOpen(false); }, [room?.turnId]);
+  useEffect(() => {
+    const dialog = answersRef.current;
+    if (!dialog) return;
+    if (!answersOpen) { if (dialog.open) dialog.close(); return; }
+    if (!dialog.open) dialog.showModal();
+    const previous = document.body.style.overflow; document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; if (dialog.open) dialog.close(); };
+  }, [answersOpen]);
 
   const action = async (event: string, payload: unknown = {}) => {
     setError("");
@@ -148,22 +172,47 @@ export function DrawingGame() {
   const leave = async () => {
     if (room && room.phase !== "lobby" && room.phase !== "finished" && !window.confirm("Rời trận đang chơi? Bạn sẽ cần vào lại như người chơi mới.")) return;
     if (connected) { const response = await action("room:leave"); if (!response.ok) return; }
-    localStorage.removeItem(SESSION_KEY); setRoom(null); setCode(""); window.history.replaceState({}, "", "/ve-vui");
+    localStorage.removeItem(SESSION_KEY); roomRef.current = null; setRoom(null); setCode(""); window.history.replaceState({}, "", "/ve-vui");
   };
   const sendStroke = (stroke: Stroke) => {
     setRoom(previous => previous ? { ...previous, strokes: appendStroke(previous.strokes, stroke) } : previous);
-    void request("draw:stroke", stroke).then(response => {
+    const turnId = roomRef.current?.turnId;
+    const pending = request("draw:stroke", { ...stroke, turnId }).then(response => {
+      const current = roomRef.current;
+      if (response.ok && current && current.turnId === turnId && response.turnId === turnId && response.canvasRevision !== undefined) roomRef.current = { ...current, canvasRevision: Math.max(current.canvasRevision, response.canvasRevision) };
       if (!response.ok) { setError(response.error ?? "Không gửi được nét vẽ."); void request("room:sync"); }
     });
+    strokesPending.current.add(pending); void pending.finally(() => strokesPending.current.delete(pending));
+  };
+  const fillRegion = async (point: Point) => {
+    if (fillBusyRef.current) return;
+    const turnId = roomRef.current?.turnId; fillBusyRef.current = true; setFillBusy(true); setError("");
+    try {
+      await Promise.all([...strokesPending.current]);
+      const sync = await request("room:sync");
+      if (!sync.ok) { setError(sync.error ?? "Chưa tải được bảng để tô màu. Thử lại nhé."); return; }
+      const current = roomRef.current;
+      if (!current || current.turnId !== turnId || current.phase !== "drawing" || current.paused || current.ownId !== current.drawerId) return;
+      const canvas = document.createElement("canvas"); canvas.width = 1000; canvas.height = 650;
+      paintStrokes(canvas, current.strokes);
+      const pixels = canvas.getContext("2d")!.getImageData(0, 0, 1000, 650);
+      const spans = floodFillRuns(pixels.data, 1000, 650, point.x, point.y, color);
+      if (!spans.length) { setNotice("Vùng này đã có màu bạn chọn."); return; }
+      await action("draw:fill", { id: crypto.randomUUID(), color, spans, revision: current.canvasRevision, turnId });
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Chưa tô được vùng này. Thử lại nhé."); }
+    finally { fillBusyRef.current = false; setFillBusy(false); }
   };
   const copyInvite = async () => {
     try { await navigator.clipboard.writeText(`${window.location.origin}/ve-vui?phong=${room!.code}`); setNotice("Đã sao chép liên kết. Gửi cho cả nhà nhé!"); }
     catch { setInviteOpen(true); }
   };
   const sendGuess = async (event: FormEvent) => {
-    event.preventDefault(); if (!guess.trim()) return;
-    const response = await action("guess:send", { text: guess });
-    if (response.ok) { setGuess(""); setCooldown(Date.now() + 2000); }
+    event.preventDefault(); if (!guess.trim() || sendingRef.current) return;
+    sendingRef.current = true; setGuessSending(true);
+    try {
+      const response = await action("guess:send", { text: guess });
+      if (response.ok) { setGuess(""); setCooldown(Date.now() + 2000); }
+    } finally { sendingRef.current = false; setGuessSending(false); }
   };
   const nextTurn = async () => {
     if (!room?.currentResult || advancing) return;
@@ -177,13 +226,17 @@ export function DrawingGame() {
   const isDrawer = !!room && room.drawerId === room.ownId;
   const drawerName = room?.players.find(p => p.id === room.drawerId)?.name ?? "Người vẽ";
   const accepted = room?.guesses.some(g => g.playerId === room.ownId && g.status === "accepted");
-  const canDraw = connected && isDrawer && room?.phase === "drawing" && !room.paused;
+  const canDraw = connected && isDrawer && room?.phase === "drawing" && !room.paused && !fillBusy;
   const canGuess = connected && room?.phase === "drawing" && !room.paused && !accepted && room.eligibleIds.includes(room.ownId);
   const seconds = room ? Math.max(0, Math.ceil((room.deadline - (room.paused ? room.serverNow : time + clockOffset)) / 1000)) : 0;
   const playerName = (id: string) => room?.players.find(p => p.id === id)?.name ?? "Người chơi";
   const ranked = room ? [...room.players].sort((a, b) => b.score - a.score) : [];
   const mobileGuessBar = !!room && !isDrawer && room.eligibleIds.includes(room.ownId) && ["preparing", "drawing"].includes(room.phase);
+  const ownAttempts = room?.guesses.filter(g => g.playerId === room.ownId).length ?? 0;
+  const pendingAnswers = room?.guesses.filter(g => g.status === "pending").length ?? 0;
   const isLastTurn = !!room && room.round >= room.settings.rounds && !room.order.slice(room.turnIndex + 1).some(id => room.players.some(player => player.id === id && player.connected));
+
+  const renderGuesses = () => room ? <div className="vv-guess-list" aria-label="Danh sách đáp án">{!room.guesses.length && <div className="vv-guess-empty"><Send size={28} /><span>{isDrawer ? "Chưa có dự đoán nào. Vẽ nét đầu tiên nào!" : "Bạn sẽ là người đoán đúng đầu tiên chứ?"}</span></div>}{room.guesses.map(g => <article key={g.id} className={`vv-guess ${g.status}${isDrawer && (g.similarity?.percent ?? 0) >= 80 ? " close" : ""}`}><div className="vv-guess-author"><b>{playerName(g.playerId)}{g.playerId === room.ownId ? " (Bạn)" : ""}</b><small>{g.status === "accepted" ? <><Check size={13} />Đoán đúng!</> : g.status === "pending" ? "Chờ duyệt" : "Chưa đúng"}</small></div><small className="vv-attempt">Lần thử {g.attempt} · {attemptMultiplier(g.attempt)}% điểm</small><p>{g.text ?? (g.status === "accepted" ? "Đã đoán đúng đáp án!" : "Có một dự đoán đang chờ duyệt.")}</p>{isDrawer && g.similarity && <div className="vv-similarity"><span>{g.similarity.percent === 100 ? "Khớp đáp án" : `${g.similarity.percent}% · ${g.similarity.label}`}</span><small>{g.similarity.explanation}</small></div>}{isDrawer && ["drawing", "review", "result"].includes(room.phase) && !room.currentResult?.cancelled && <div className="vv-judge-actions"><button type="button" disabled={!connected || room.paused || g.status === "accepted"} onClick={() => action("guess:judge", { guessId: g.id, accepted: true })}><Check size={15} />{g.status === "accepted" ? "Đã nhận" : "Chấp nhận"}</button><button type="button" disabled={!connected || room.paused || g.status === "rejected"} onClick={() => action("guess:judge", { guessId: g.id, accepted: false })}><X size={15} />Chưa đúng</button></div>}</article>)}</div> : null;
 
   return <main ref={appRef} className={`vv-app${room ? " vv-in-room" : ""}${room && room.phase !== "lobby" && room.phase !== "finished" ? " vv-in-game" : ""}${mobileGuessBar ? " vv-mobile-guess" : ""}`}>
     <div className="vv-container">
@@ -191,8 +244,11 @@ export function DrawingGame() {
         <Link href="/ve-vui" className="vv-brand" onClick={event => { if (room) event.preventDefault(); }}><span className="vv-brand-icon"><Pencil size={24} strokeWidth={2.4} /></span><span>vẽ vui<span className="vv-brand-sub">cùng nhà</span></span></Link>
         <div className="vv-nav">{room ? <><span className={`vv-connection${connected ? " online" : ""}`}>{connected ? <Wifi size={15} /> : <WifiOff size={15} />}{connected ? "Đã kết nối" : "Đang kết nối lại"}</span><button type="button" className="vv-text-btn vv-share-trigger" aria-label="Mời người chơi bằng liên kết hoặc mã QR" onClick={() => setInviteOpen(true)}><QrCode size={19} /><span>Mời người chơi</span></button><button type="button" className="vv-text-btn" onClick={leave}><LogOut size={17} /><span>Rời phòng</span></button></> : <><span className="vv-header-note"><Heart size={15} />Thêm một chút vui, gần nhau một chút.</span><Link href="/" className="vv-text-btn"><ArrowLeft size={16} />Portal</Link></>}</div>
       </header>
-      {notice && <div role="status" className="vv-toast"><Check size={18} />{notice}</div>}
-      {error && <div role="alert" className="vv-error"><span>{error}</span><button type="button" aria-label="Đóng thông báo" onClick={() => setError("")}><X size={18} /></button></div>}
+      <div className="vv-feedback" aria-label="Thông báo trò chơi">
+        {notice && <div role="status" className="vv-toast"><Check size={18} /><span>{notice}</span><button type="button" aria-label="Đóng thông báo trạng thái" onClick={() => setNotice("")}><X size={18} /></button></div>}
+        {error && <div role="alert" className="vv-error"><span>{error}</span><button type="button" aria-label="Đóng thông báo" onClick={() => setError("")}><X size={18} /></button></div>}
+      </div>
+      {room?.settings.voiceEnabled && <VoiceChat key={`${room.code}:${room.ownId}`} room={room} connected={connected} socket={socketRef.current} />}
 
       {!room ? <>
         <section className="vv-landing">
@@ -223,16 +279,19 @@ export function DrawingGame() {
           {room.phase === "result" && <div className="vv-result-controls">{isHost ? <button type="button" className="vv-btn vv-primary" disabled={!connected || room.paused || advancing} onClick={nextTurn}>{advancing ? "Đang chuyển lượt..." : isLastTurn ? "Xem kết quả trận" : "Chuyển sang người tiếp theo"}<ArrowRight size={19} /></button> : <p>Chờ chủ phòng bấm tiếp tục khi cả nhà đã xem xong kết quả.</p>}</div>}
           <div className="vv-board-top"><div><span className={`vv-phase-dot ${room.phase}`} />{phaseLabels[room.phase]}</div>{room.phase === "result" ? <span className="vv-result-waiting">Chờ chuyển lượt</span> : <div className={`vv-timer${seconds <= 15 ? " urgent" : ""}`} aria-label={`Còn ${seconds} giây`}><Clock3 size={18} /><strong>{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</strong></div>}</div>
           <div className="vv-word-bar">{room.answer ? <><span>{room.phase === "result" ? "Đáp án là" : "Đề bí mật của bạn"}</span><strong>{room.answer}</strong>{room.canReroll && <button type="button" className="vv-text-btn" onClick={() => action("turn:reroll")}><RotateCcw size={15} />Đổi đề (1 lần)</button>}</> : <><span>{room.phase === "preparing" ? "Họa sĩ đang chuẩn bị..." : `${room.wordCount} từ`}</span><strong className="vv-secret">{Array.from({ length: room.wordCount }, (_, i) => <span key={i}>___</span>)}</strong>{room.hintCategory && <span className="vv-hint">{room.hintCategory}{room.hintLetter ? ` · Bắt đầu bằng “${room.hintLetter}”` : ""}</span>}</>}</div>
-          <div className="vv-canvas-wrap"><DrawingBoard strokes={room.strokes} enabled={canDraw} color={eraser ? "#ffffff" : color} width={eraser ? 32 : width} onStroke={sendStroke} />{room.phase === "preparing" && <div className="vv-canvas-overlay"><div className="vv-preparing-icon"><Pencil size={38} /></div><h2>{isDrawer ? "Bạn sẽ vẽ gì nào?" : "Đợi một chút, sắp có tranh rồi!"}</h2><p>{isDrawer ? "Đọc đề ở trên. Bảng vẽ sẽ mở khi đếm ngược kết thúc." : "Đề chỉ hiện với người vẽ. Chuẩn bị tinh thần đoán nhé!"}</p><strong>{seconds}</strong></div>}{room.phase === "result" && <div className="vv-result-stamp">{room.currentResult?.cancelled ? "Lượt đã hủy · Không tính điểm" : `${room.currentResult?.accepted.length ?? 0}/${room.eligibleIds.length} người đoán đúng`}</div>}</div>
-          {isDrawer && room.phase === "drawing" ? <div className="vv-toolbar"><div className="vv-palette" role="group" aria-label="Chọn màu bút">{COLORS.map((c, index) => <button key={c} type="button" aria-label={COLOR_NAMES[index]} aria-pressed={!eraser && color === c} className={!eraser && color === c ? "selected" : ""} style={{ backgroundColor: c }} disabled={!canDraw} onClick={() => { setColor(c); setEraser(false); }} />)}</div><div className="vv-tools"><div className="vv-pen-widths" role="group" aria-label="Cỡ nét">{[4, 10, 20].map((w, i) => <button key={w} type="button" aria-label={`Nét ${["nhỏ", "vừa", "lớn"][i]}`} aria-pressed={width === w && !eraser} className={width === w && !eraser ? "active" : ""} onClick={() => { setWidth(w); setEraser(false); }}><span style={{ width: 5 + i * 4, height: 5 + i * 4 }} /></button>)}</div><button type="button" className={`vv-icon-btn${eraser ? " active" : ""}`} aria-label="Tẩy" aria-pressed={eraser} onClick={() => setEraser(!eraser)}><Eraser size={19} /></button><button type="button" className="vv-icon-btn" aria-label="Hoàn tác nét vừa vẽ" disabled={!canDraw || !room.strokes.length} onClick={() => action("draw:edit", { action: "undo" })}><Undo2 size={19} /></button><button type="button" className="vv-icon-btn" aria-label="Xóa toàn bộ bảng vẽ" disabled={!canDraw || !room.strokes.length} onClick={() => { if (window.confirm("Xóa toàn bộ bức tranh đang vẽ?")) void action("draw:edit", { action: "clear" }); }}><Trash2 size={18} /></button></div></div> : <div className="vv-board-caption"><Pencil size={16} />{room.phase === "review" ? "Hết giờ vẽ. Người vẽ có thêm 10 giây duyệt câu trả lời." : room.phase === "result" ? "Điểm đã cập nhật. Cả nhà xem kết quả rồi chủ phòng bấm chuyển lượt nhé." : "Một chút tưởng tượng, thật nhiều niềm vui."}</div>}
+          <div className="vv-canvas-wrap"><DrawingBoard strokes={room.strokes} enabled={canDraw} color={eraser ? "#ffffff" : color} width={eraser ? 32 : width} onStroke={sendStroke} filling={filling} onFill={fillRegion} />{room.phase === "preparing" && <div className="vv-canvas-overlay"><div className="vv-preparing-icon"><Pencil size={38} /></div><h2>{isDrawer ? "Bạn sẽ vẽ gì nào?" : "Đợi một chút, sắp có tranh rồi!"}</h2><p>{isDrawer ? "Đọc đề ở trên. Bảng sẽ mở khi hết đếm ngược, hoặc bấm Vẽ ngay." : "Đề chỉ hiện với người vẽ. Chuẩn bị tinh thần đoán nhé!"}</p><strong>{seconds}</strong>{isDrawer && <button type="button" className="vv-btn vv-primary vv-begin" disabled={!connected || room.paused} onClick={() => action("turn:begin", { turnId: room.turnId })}><Play size={17} />Vẽ ngay</button>}</div>}{room.phase === "result" && <div className="vv-result-stamp">{room.currentResult?.cancelled ? "Lượt đã hủy · Không tính điểm" : `${room.currentResult?.accepted.length ?? 0}/${room.eligibleIds.length} người đoán đúng`}</div>}</div>
+          {isDrawer && room.phase === "drawing" ? <div className="vv-toolbar"><div className="vv-palette" role="group" aria-label="Chọn màu bút">{COLORS.map((c, index) => <button key={c} type="button" aria-label={COLOR_NAMES[index]} aria-pressed={!eraser && color === c} className={!eraser && color === c ? "selected" : ""} style={{ backgroundColor: c }} disabled={!canDraw} onClick={() => { setColor(c); setEraser(false); }} />)}</div><div className="vv-tools"><div className="vv-pen-widths" role="group" aria-label="Cỡ nét">{[4, 10, 20].map((w, i) => <button key={w} type="button" aria-label={`Nét ${["nhỏ", "vừa", "lớn"][i]}`} aria-pressed={width === w && !eraser && !filling} className={width === w && !eraser && !filling ? "active" : ""} onClick={() => { setWidth(w); setEraser(false); setFilling(false); }}><span style={{ width: 5 + i * 4, height: 5 + i * 4 }} /></button>)}</div><button type="button" className={`vv-icon-btn${filling ? " active" : ""}`} aria-label="Tô vùng màu" aria-pressed={filling} disabled={!canDraw} onClick={() => { setFilling(!filling); setEraser(false); }}><PaintBucket size={19} /></button><button type="button" className={`vv-icon-btn${eraser ? " active" : ""}`} aria-label="Tẩy" aria-pressed={eraser} onClick={() => { setEraser(!eraser); setFilling(false); }}><Eraser size={19} /></button><button type="button" className="vv-icon-btn" aria-label="Hoàn tác thao tác vừa làm" disabled={!canDraw || !room.strokes.length} onClick={() => action("draw:edit", { action: "undo" })}><Undo2 size={19} /></button><button type="button" className="vv-icon-btn" aria-label="Xóa toàn bộ bảng vẽ" disabled={!canDraw || !room.strokes.length} onClick={() => { if (window.confirm("Xóa toàn bộ bức tranh đang vẽ?")) void action("draw:edit", { action: "clear" }); }}><Trash2 size={18} /></button></div></div> : <div className="vv-board-caption"><Pencil size={16} />{room.phase === "review" ? "Hết giờ vẽ. Người vẽ có thêm 10 giây duyệt câu trả lời." : room.phase === "result" ? "Điểm đã cập nhật. Cả nhà xem kết quả rồi chủ phòng bấm chuyển lượt nhé." : "Một chút tưởng tượng, thật nhiều niềm vui."}</div>}
+          {isDrawer && room.phase === "drawing" && <p className="vv-tool-help" role="status">{fillBusy ? "Đang tô màu…" : filling ? "Tô vùng: chọn màu rồi chạm vùng kín. Có thể hoàn tác nếu màu tràn." : "Chọn cỡ bút để vẽ, hoặc chọn Tô vùng để đổ màu."}</p>}
           {room.phase === "result" && <div className="vv-turn-awards">{room.currentResult?.accepted.map(a => <span key={a.playerId}><Check size={16} /><b>{playerName(a.playerId)}</b> “{a.text}” <strong>+{a.points}</strong></span>)}{room.currentResult && !room.currentResult.cancelled && <span><Pencil size={16} />{drawerName} nhận <strong>+{room.currentResult.awards[room.drawerId!] ?? 0}</strong> điểm vẽ</span>}</div>}
-        </section><aside className="vv-game-sidebar"><section className="vv-panel vv-guesses"><div className="vv-panel-title"><h2>{isDrawer ? <><ShieldCheck size={20} />Cả nhà đang đoán</> : <><Sparkles size={20} />Bạn đoán là gì?</>}</h2><span>{room.guesses.filter(g => g.status === "accepted").length}/{room.eligibleIds.length}</span></div><p className="vv-guess-help">{isDrawer ? "Gợi ý chỉ để tham khảo. Bạn quyết định câu nào đúng." : accepted ? "Bạn đã đoán đúng! Cổ vũ cho cả nhà nhé." : "Gửi ý tưởng của bạn. Đoán sai cũng không mất điểm."}</p>
-          <div className="vv-guess-list" aria-live="polite" aria-relevant="additions text">{!room.guesses.length && <div className="vv-guess-empty"><Send size={28} /><span>{isDrawer ? "Chưa có dự đoán nào. Vẽ nét đầu tiên nào!" : "Bạn sẽ là người đoán đúng đầu tiên chứ?"}</span></div>}{room.guesses.map(g => <article key={g.id} className={`vv-guess ${g.status}${isDrawer && (g.similarity?.percent ?? 0) >= 80 ? " close" : ""}`}><div className="vv-guess-author"><b>{playerName(g.playerId)}{g.playerId === room.ownId ? " (Bạn)" : ""}</b><small>{g.status === "accepted" ? <><Check size={13} />Đoán đúng!</> : g.status === "pending" ? "Chờ duyệt" : "Chưa đúng"}</small></div><p>{g.text ?? (g.status === "accepted" ? "Đã đoán đúng đáp án!" : "Có một dự đoán đang chờ duyệt.")}</p>{isDrawer && g.similarity && <div className="vv-similarity"><span>{g.similarity.percent === 100 ? "Khớp đáp án" : `${g.similarity.percent}% · ${g.similarity.label}`}</span><small>{g.similarity.explanation}</small></div>}{isDrawer && ["drawing", "review", "result"].includes(room.phase) && !room.currentResult?.cancelled && <div className="vv-judge-actions"><button type="button" disabled={!connected || room.paused || g.status === "accepted"} onClick={() => action("guess:judge", { guessId: g.id, accepted: true })}><Check size={15} />{g.status === "accepted" ? "Đã nhận" : "Chấp nhận"}</button><button type="button" disabled={!connected || room.paused || g.status === "rejected"} onClick={() => action("guess:judge", { guessId: g.id, accepted: false })}><X size={15} />Chưa đúng</button></div>}</article>)}</div>
-          {!isDrawer && <form className="vv-guess-form" onSubmit={sendGuess}><label htmlFor="vv-guess">Dự đoán của bạn</label><div><input id="vv-guess" maxLength={80} value={guess} onChange={e => setGuess(e.target.value)} placeholder={accepted ? "Bạn đã đoán đúng!" : "Mình nghĩ là..."} autoComplete="off" autoCorrect="off" enterKeyHint="send" disabled={!canGuess} /><button type="submit" className="vv-send" aria-label="Gửi dự đoán" disabled={!canGuess || !guess.trim() || time < cooldown}><Send size={19} /></button></div><small>{time < cooldown ? "Chờ một chút trước khi đoán tiếp nhé." : accepted ? "Lượt này bạn có thể tiếp tục xem tranh." : "Mỗi 2 giây gửi một dự đoán."}</small></form>}
+        </section><aside className="vv-game-sidebar"><section className="vv-panel vv-guesses"><div className="vv-panel-title"><h2>{isDrawer ? <><ShieldCheck size={20} />Cả nhà đang đoán</> : <><Sparkles size={20} />Bạn đoán là gì?</>}</h2><span>{room.guesses.filter(g => g.status === "accepted").length}/{room.eligibleIds.length}</span></div><p className="vv-guess-help">{isDrawer ? "Gợi ý chỉ để tham khảo. Bạn quyết định câu nào đúng." : accepted ? "Bạn đã đoán đúng! Cổ vũ cho cả nhà nhé." : "Thử thêm ý tưởng nhé. Mỗi lần thử giảm 10% điểm lượt, tối thiểu còn 50%."}</p>
+          {renderGuesses()}
+          {!isDrawer && <form className="vv-guess-form" onSubmit={sendGuess}><label htmlFor="vv-guess">{accepted ? "Bạn đã đoán đúng!" : `Lần thử ${ownAttempts + 1} · Hưởng ${attemptMultiplier(ownAttempts + 1)}% điểm`}</label><div><input id="vv-guess" maxLength={80} value={guess} onChange={e => setGuess(e.target.value)} placeholder={accepted ? "Bạn đã đoán đúng!" : "Mình nghĩ là..."} autoComplete="off" autoCorrect="off" enterKeyHint="send" disabled={!canGuess} /><button type="submit" className="vv-send" aria-label="Gửi dự đoán" disabled={!canGuess || guessSending || !guess.trim() || time < cooldown}><Send size={19} /></button></div><small>{guessSending ? "Đang gửi đáp án…" : time < cooldown ? "Chờ một chút trước khi đoán tiếp nhé." : accepted ? "Lượt này bạn có thể tiếp tục xem tranh." : "Mỗi 2 giây gửi một dự đoán."}</small></form>}
         </section><section className="vv-panel vv-scoreboard"><div className="vv-panel-title"><h2><Trophy size={19} />Bảng điểm</h2><span>{room.players.length} người</span></div>{ranked.map((p, index) => <div key={p.id} className={`vv-score-row${p.id === room.ownId ? " own" : ""}`}><span>{index + 1}</span><Avatar name={p.name} index={room.players.indexOf(p)} /><span><b>{p.name}{p.id === room.ownId ? " (Bạn)" : ""}</b><small>{p.id === room.drawerId ? "Đang vẽ" : !p.connected ? "Mất kết nối" : p.activeFromRound > room.round ? "Chờ vòng sau" : room.guesses.some(g => g.playerId === p.id && g.status === "accepted") ? "Đã đoán đúng" : "Đang đoán"}</small></span><strong>{p.score}</strong>{isHost && p.id !== room.ownId && <button type="button" className="vv-icon-btn" aria-label={`Mời ${p.name} rời phòng`} onClick={() => { if (window.confirm(`Mời ${p.name} rời phòng?`)) void action("room:kick", { playerId: p.id }); }}><X size={13} /></button>}</div>)}</section>{isHost && <div className="vv-host-controls"><button type="button" className="vv-text-btn" onClick={() => action("room:pause")}>{room.paused && room.pauseReason === "host" ? "Tiếp tục chơi" : room.phase === "result" ? "Tạm dừng" : room.pauseAfterTurn ? "Hủy nghỉ sau lượt này" : "Nghỉ sau lượt này"}</button><button type="button" className="vv-text-btn danger" onClick={() => { if (window.confirm("Kết thúc trận sớm? Lượt chưa hoàn thành sẽ không tính điểm.")) void action("room:finish"); }}>Kết thúc trận</button></div>}</aside>
           <section className="vv-turn-order"><h2>Hôm nay ai cũng là họa sĩ</h2><div>{room.order.map((id, index) => <span key={id} className={index === room.turnIndex ? "current" : index < room.turnIndex ? "done" : ""}><Avatar name={playerName(id)} index={room.players.findIndex(p => p.id === id)} /><span>{playerName(id)}<small>{index === room.turnIndex ? "Đang vẽ" : index < room.turnIndex ? "Đã vẽ" : "Sắp đến lượt"}</small></span></span>)}</div></section>
         </div>
       </>}
+      {room && isDrawer && pendingAnswers > 0 && ["drawing", "review", "result"].includes(room.phase) && <button type="button" className="vv-answer-alert" onClick={() => setAnswersOpen(true)} aria-haspopup="dialog"><Bell size={20} /><span><b>{pendingAnswers} đáp án chờ duyệt</b><small>Chạm để xem và duyệt ngay</small></span><ArrowRight size={18} /></button>}
+      <dialog ref={answersRef} className="vv-answer-dialog" aria-labelledby="vv-answer-title" onClose={() => setAnswersOpen(false)}><div className="vv-answer-dialog-header"><h2 id="vv-answer-title">Đáp án của cả nhà</h2><button type="button" className="vv-icon-btn" aria-label="Đóng bảng đáp án" onClick={() => setAnswersOpen(false)}><X size={20} /></button></div>{isDrawer && renderGuesses()}</dialog>
       {room && <RoomInvite code={room.code} open={inviteOpen} onClose={() => setInviteOpen(false)} />}
     </div>
   </main>;

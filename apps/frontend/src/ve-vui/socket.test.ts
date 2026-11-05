@@ -88,3 +88,66 @@ test("real multi-client room flow, secret isolation, reconnect, permissions, and
     await new Promise<void>(resolve => server.close(() => resolve()));
   }
 });
+
+test("voice signaling is restricted to current room members and voice sessions; mute, restore and kick revoke old sessions", async () => {
+  const http = createServer(), server = new Server(http), game = registerDrawingNamespace(server.of("/ve-vui"));
+  const clients: Socket[] = [];
+  await new Promise<void>(resolve => http.listen(0, "127.0.0.1", resolve));
+  const port = (http.address() as { port: number }).port;
+  const connect = () => new Promise<Socket>(resolve => { const client = io(`http://127.0.0.1:${port}/ve-vui`, { transports: ["websocket"], forceNew: true }); clients.push(client); client.once("connect", () => resolve(client)); });
+  const request = (client: Socket, event: string, payload: unknown = {}) => new Promise<Reply>((resolve, reject) => client.timeout(2000).emit(event, payload, (failure: Error | null, reply: Reply) => failure ? reject(failure) : resolve(reply)));
+  try {
+    const host = await connect(), guest = await connect(), outsider = await connect();
+    const created = await request(host, "room:create", { name: "Mẹ" });
+    const session = created.session!, room = game.rooms.get(session.code)!;
+    const joined = await request(guest, "room:join", { code: session.code, name: "Bé" });
+    const guestSession = joined.session!;
+    assert.equal((await request(host, "voice:join")).ok, false);
+    assert.equal((await request(outsider, "voice:join")).ok, false);
+    assert.equal((await request(host, "room:settings", { ...room.settings, preparation: 7 })).ok, false);
+    await request(host, "room:settings", { ...room.settings, voiceEnabled: true, preparation: 0 });
+    const hostVoice = (await request(host, "voice:join")).voice!, guestVoice = (await request(guest, "voice:join")).voice!;
+    assert.ok(hostVoice.id && guestVoice.id);
+    const refreshed = await request(host, "voice:ice", { voiceId: hostVoice.id });
+    assert.equal(refreshed.ok, true); assert.equal(refreshed.voice!.id, hostVoice.id);
+    assert.equal(typeof refreshed.voice!.relayConfigured, "boolean");
+    assert.equal((await request(outsider, "voice:ice", { voiceId: hostVoice.id })).ok, false);
+    assert.equal((await request(guest, "voice:ice", { voiceId: hostVoice.id })).ok, false);
+    assert.equal(room.players.find(player => player.id === session.playerId)!.voiceMuted, true);
+    const signal = { targetId: guestSession.playerId, targetVoiceId: guestVoice.id, fromVoiceId: hostVoice.id, description: { type: "offer", sdp: "audio-only-test" } };
+    const received = new Promise<any>(resolve => guest.once("voice:signal", resolve));
+    assert.equal((await request(host, "voice:signal", signal)).ok, true);
+    assert.equal((await received).fromId, session.playerId);
+    const restartReceived = new Promise<any>(resolve => guest.once("voice:signal", resolve));
+    assert.equal((await request(host, "voice:signal", { targetId: guestSession.playerId, targetVoiceId: guestVoice.id, fromVoiceId: hostVoice.id, restart: true, manual: true })).ok, true);
+    const restart = await restartReceived; assert.equal(restart.restart, true); assert.equal(restart.manual, true);
+    assert.equal((await request(host, "voice:signal", { ...signal, restart: true })).ok, false);
+    assert.equal((await request(host, "voice:signal", { ...signal, manual: true })).ok, false);
+    assert.equal((await request(host, "voice:signal", { ...signal, exchangeId: "invalid" })).ok, false);
+    assert.equal((await request(outsider, "voice:signal", signal)).ok, false);
+    assert.equal((await request(host, "voice:signal", { ...signal, targetVoiceId: hostVoice.id })).ok, false);
+    const otherRoom = await request(outsider, "room:create", { name: "Người lạ" });
+    const other = game.rooms.get(otherRoom.session!.code)!;
+    await request(outsider, "room:settings", { ...other.settings, voiceEnabled: true });
+    const otherVoice = (await request(outsider, "voice:join")).voice!;
+    assert.equal((await request(host, "voice:signal", { ...signal, targetId: otherRoom.session!.playerId, targetVoiceId: otherVoice.id })).ok, false);
+    assert.equal((await request(guest, "voice:state", { voiceId: guestVoice.id, muted: false })).ok, true);
+    assert.equal((await request(guest, "voice:mute-all")).ok, false);
+    await request(host, "voice:mute-all"); assert.ok(room.players.every(player => player.voiceMuted));
+    await request(host, "room:settings", { ...room.settings, voiceEnabled: false });
+    assert.ok(room.players.every(player => !player.voiceId && player.voiceMuted));
+    assert.equal((await request(host, "voice:signal", signal)).ok, false);
+    await request(host, "room:settings", { ...room.settings, voiceEnabled: true });
+    const newHostVoice = (await request(host, "voice:join")).voice!;
+    assert.notEqual(newHostVoice.id, hostVoice.id);
+    assert.equal((await request(host, "voice:ice", { voiceId: hostVoice.id })).ok, false);
+    assert.equal((await request(host, "voice:leave", { voiceId: hostVoice.id })).ok, false);
+    await request(guest, "voice:join");
+    guest.disconnect(); await new Promise(resolve => setTimeout(resolve, 20));
+    const restored = await connect(); await request(restored, "room:restore", guestSession);
+    assert.equal(room.players.find(player => player.id === guestSession.playerId)!.voiceId, null);
+    await request(restored, "voice:join"); await request(host, "room:kick", { playerId: guestSession.playerId });
+    assert.equal((await request(restored, "voice:join")).ok, false);
+    assert.ok(!room.players.find(player => player.id === guestSession.playerId)?.voiceId);
+  } finally { clients.forEach(client => client.disconnect()); game.dispose(); await new Promise<void>(resolve => server.close(() => resolve())); }
+});

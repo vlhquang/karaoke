@@ -1,7 +1,8 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { PROMPTS } from "./prompts";
 import { localSimilarity, matchesAnswer, normalizeAnswer } from "./matching";
-import { DEFAULT_SETTINGS, type GuessView, type Phase, type PlayerView, type Prompt, type RoomView, type Settings, type Similarity, type Stroke, type TurnResult } from "./types";
+import { attemptMultiplier, DEFAULT_SETTINGS, type GuessView, type Phase, type PlayerView, type Prompt, type RoomView, type Settings, type Similarity, type Stroke, type TurnResult } from "./types";
+import { MAX_CANVAS_COST, validFillRuns } from "./fill";
 
 export interface Player extends PlayerView { token: string; socketId: string | null; lastGuessAt: number; kicked?: boolean }
 interface Guess extends GuessView { text: string; similarity: Similarity; elapsedAtSend: number }
@@ -33,6 +34,7 @@ export class DrawingRoom {
   emptySince: number | null = null;
   private pointCount = 0;
   private turnId = "";
+  canvasRevision = 0;
   private lastHintStage = 0;
 
   constructor(code: string, readonly now: () => number = Date.now) { this.code = code; }
@@ -43,7 +45,7 @@ export class DrawingRoom {
     if (this.phase !== "lobby" && this.phase !== "finished" && this.availablePrompts().length < this.remainingTurns() + Math.max(0, this.settings.rounds - this.round)) {
       throw new Error("Kho đề của trận này không đủ cho thêm người. Hãy tham gia ở trận tiếp theo nhé.");
     }
-    const player: Player = { id: randomUUID(), token: randomUUID(), socketId, name, connected: true, ready: false, score: 0, activeFromRound, lastGuessAt: -Infinity };
+    const player: Player = { id: randomUUID(), token: randomUUID(), socketId, name, connected: true, ready: false, score: 0, activeFromRound, lastGuessAt: -Infinity, voiceId: null, voiceMuted: true };
     this.players.push(player);
     if (!this.hostId) this.hostId = player.id;
     this.emptySince = null;
@@ -56,6 +58,7 @@ export class DrawingRoom {
     if (!player) throw new Error("Phiên chơi không còn hợp lệ. Hãy vào lại phòng.");
     player.socketId = socketId;
     player.connected = true;
+    player.voiceId = null; player.voiceMuted = true;
     this.emptySince = null;
     if (!this.players.some(p => p.id === this.hostId && p.connected)) this.hostId = player.id;
     this.checkConnections();
@@ -68,6 +71,7 @@ export class DrawingRoom {
     player.connected = false;
     player.socketId = null;
     player.ready = false;
+    player.voiceId = null; player.voiceMuted = true;
     if (leave) player.kicked = true;
     const connected = this.players.filter(p => p.connected && !p.kicked);
     if (!connected.some(p => p.id === this.hostId)) this.hostId = connected[0]?.id ?? this.hostId;
@@ -83,7 +87,7 @@ export class DrawingRoom {
     this.requireHost(id);
     if (this.phase !== "lobby") throw new Error("Chỉ chỉnh cài đặt trong phòng chờ.");
     this.settings = settings;
-    this.players.forEach(p => { p.ready = false; });
+    this.players.forEach(p => { p.ready = false; if (!settings.voiceEnabled) { p.voiceId = null; p.voiceMuted = true; } });
   }
 
   ready(id: string): void {
@@ -138,7 +142,8 @@ export class DrawingRoom {
   addStroke(id: string, stroke: Stroke): void {
     this.requireDrawer(id);
     if (this.phase !== "drawing" || this.paused) throw new Error("Bảng vẽ hiện đang khóa.");
-    if (this.pointCount + stroke.points.length > 35000) throw new Error("Bảng vẽ đã đầy. Hoàn tác hoặc xóa bảng để vẽ tiếp.");
+    if (stroke.fill) throw new Error("Dùng công cụ tô vùng để gửi vùng màu.");
+    if (this.pointCount + stroke.points.length > MAX_CANVAS_COST) throw new Error("Bảng vẽ đã đầy. Hoàn tác hoặc xóa bảng để vẽ tiếp.");
     const last = this.strokes[this.strokes.length - 1];
     if (last?.id === stroke.id && last.color === stroke.color && last.width === stroke.width) last.points.push(...stroke.points);
     else {
@@ -146,6 +151,25 @@ export class DrawingRoom {
       this.strokes.push({ ...stroke, points: [...stroke.points] });
     }
     this.pointCount += stroke.points.length;
+    this.canvasRevision++;
+  }
+
+  addFill(id: string, data: { id: string; color: string; spans: number[]; revision: number; turnId: string }): Stroke {
+    this.requireDrawer(id);
+    if (this.phase !== "drawing" || this.paused) throw new Error("Bảng vẽ hiện đang khóa.");
+    if (data.turnId !== this.turnId || data.revision !== this.canvasRevision) throw new Error("Bảng vừa thay đổi. Chạm lại để tô màu nhé.");
+    if (!validFillRuns(data.spans) || this.strokes.some(stroke => stroke.id === data.id)) throw new Error("Vùng tô không hợp lệ.");
+    if (this.strokes.length >= 1500 || this.pointCount + data.spans.length / 2 > MAX_CANVAS_COST) throw new Error("Bảng vẽ đã đầy. Hoàn tác hoặc xóa bảng để vẽ tiếp.");
+    const fill: Stroke = { id: data.id, color: data.color, width: 0, points: [], fill: [...data.spans] };
+    this.strokes.push(fill); this.pointCount += data.spans.length / 2; this.canvasRevision++;
+    return fill;
+  }
+
+  beginDrawing(id: string, turnId: string): void {
+    this.requireDrawer(id);
+    if (this.phase !== "preparing" || this.paused || turnId !== this.turnId) throw new Error("Chưa thể bắt đầu lượt vẽ này.");
+    this.phase = "drawing"; this.drawingStartedAt = this.now();
+    this.deadline = this.now() + this.settings.duration * 1000;
   }
 
   editCanvas(id: string, action: "undo" | "clear"): void {
@@ -153,7 +177,8 @@ export class DrawingRoom {
     if (this.phase !== "drawing" || this.paused) throw new Error("Bảng vẽ hiện đang khóa.");
     if (action === "clear") this.strokes = [];
     else this.strokes.pop();
-    this.pointCount = this.strokes.reduce((sum, s) => sum + s.points.length, 0);
+    this.pointCount = this.strokes.reduce((sum, s) => sum + (s.fill ? s.fill.length / 2 : s.points.length), 0);
+    this.canvasRevision++;
   }
 
   submitGuess(id: string, text: string): Guess {
@@ -161,9 +186,9 @@ export class DrawingRoom {
     if (this.guesses.some(g => g.playerId === id && g.status === "accepted")) throw new Error("Bạn đã đoán đúng rồi!");
     const player = this.players.find(p => p.id === id)!;
     if (this.now() - player.lastGuessAt < 2000) throw new Error("Chờ 2 giây giữa hai lần đoán nhé.");
-    if (this.guesses.some(g => g.playerId === id && g.status === "pending" && normalizeAnswer(g.text) === normalizeAnswer(text))) throw new Error("Câu này đang chờ người vẽ duyệt.");
+    if (this.guesses.some(g => g.playerId === id && normalizeAnswer(g.text) === normalizeAnswer(text))) throw new Error("Bạn đã gửi đáp án này rồi. Câu đang chờ hoặc đã được duyệt, thử một ý khác nhé.");
     const exact = matchesAnswer(text, this.prompt!);
-    const guess: Guess = { id: randomUUID(), playerId: id, text, sentAt: this.now(), elapsedAtSend: this.now() - this.drawingStartedAt, status: exact && this.settings.judging === "hybrid" ? "accepted" : "pending", similarity: localSimilarity(text, this.prompt!) };
+    const guess: Guess = { id: randomUUID(), playerId: id, text, attempt: this.guesses.filter(g => g.playerId === id).length + 1, sentAt: this.now(), elapsedAtSend: this.now() - this.drawingStartedAt, status: exact && this.settings.judging === "hybrid" ? "accepted" : "pending", similarity: localSimilarity(text, this.prompt!) };
     player.lastGuessAt = this.now();
     this.guesses.push(guess);
     this.finishIfAllCorrect();
@@ -254,7 +279,7 @@ export class DrawingRoom {
     const hintStage = this.hintStage();
     return {
       code: this.code, ownId: id, hostId: this.hostId, phase: this.phase, settings: { ...this.settings },
-      players: this.players.filter(p => !p.kicked || p.score > 0 || this.order.includes(p.id)).map(({ id: playerId, name, connected, ready, score, activeFromRound }) => ({ id: playerId, name, connected, ready, score, activeFromRound })),
+      players: this.players.filter(p => !p.kicked || p.score > 0 || this.order.includes(p.id)).map(({ id: playerId, name, connected, ready, score, activeFromRound, voiceId, voiceMuted }) => ({ id: playerId, name, connected, ready, score, activeFromRound, voiceId, voiceMuted })),
       round: this.round, order: [...this.order], turnIndex: this.turnIndex, drawerId: this.drawerId,
       deadline: this.deadline && this.paused ? this.deadline + this.now() - this.pauseStartedAt : this.deadline,
       serverNow: this.now(), paused: this.paused, pauseReason: this.pauseReason, pauseDeadline: this.pauseDeadline,
@@ -262,8 +287,8 @@ export class DrawingRoom {
       wordCount: this.prompt?.answer.split(/\s+/).length ?? 0,
       hintCategory: this.settings.hints && hintStage >= 1 ? this.prompt?.category ?? null : null,
       hintLetter: this.settings.hints && hintStage >= 2 ? this.prompt?.answer.charAt(0).toLocaleUpperCase("vi") ?? null : null,
-      strokes: this.strokes, eligibleIds: [...this.eligibleIds],
-      guesses: this.guesses.map(g => ({ id: g.id, playerId: g.playerId, sentAt: g.sentAt, status: g.status,
+      strokes: this.strokes, eligibleIds: [...this.eligibleIds], turnId: this.turnId, canvasRevision: this.canvasRevision,
+      guesses: this.guesses.map(g => ({ id: g.id, playerId: g.playerId, sentAt: g.sentAt, status: g.status, attempt: g.attempt,
         text: drawer || reveal || g.playerId === id || g.status === "rejected" ? g.text : null,
         ...(drawer ? { similarity: g.similarity } : {}),
       })),
@@ -310,13 +335,15 @@ export class DrawingRoom {
       this.eligibleIds = this.players.filter(p => p.id !== drawer.id && !p.kicked && p.connected && p.activeFromRound <= this.round).map(p => p.id);
       this.strokes = [];
       this.pointCount = 0;
+      this.canvasRevision = 0;
       this.guesses = [];
       this.rerolled = false;
       this.drawingElapsed = 0;
       this.drawingStartedAt = 0;
       this.lastHintStage = 0;
       this.phase = "preparing";
-      this.deadline = this.now() + 10000;
+      this.deadline = this.now() + this.settings.preparation * 1000;
+      if (!this.settings.preparation) this.beginDrawing(drawer.id, this.turnId);
       this.players.forEach(p => { p.lastGuessAt = -Infinity; });
       this.checkConnections();
       return;
@@ -333,7 +360,8 @@ export class DrawingRoom {
     const accepted = cancelled ? [] : this.eligibleIds.flatMap(id => {
       const guess = this.guesses.find(g => g.playerId === id && g.status === "accepted");
       if (!guess) return [];
-      const points = 100 + Math.round(50 * Math.max(0, Math.min(1, 1 - guess.elapsedAtSend / (this.settings.duration * 1000))));
+      const base = 100 + Math.round(50 * Math.max(0, Math.min(1, 1 - guess.elapsedAtSend / (this.settings.duration * 1000))));
+      const points = Math.round(base * attemptMultiplier(guess.attempt) / 100);
       awards[id] = points;
       return [{ playerId: id, text: guess.text, points }];
     });

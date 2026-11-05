@@ -1,12 +1,15 @@
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import type { Namespace } from "socket.io";
 import { z } from "zod";
 import { DrawingRoom, type Player } from "./engine";
 import { aiSimilarity } from "./matching";
 import { CATEGORIES, type Reply, type Settings } from "./types";
+import { hasVoiceRelay, voiceIceServers } from "./voice-config";
 
 const settingsSchema = z.object({
   rounds: z.number().int().min(1).max(5), duration: z.union([z.literal(60), z.literal(90), z.literal(120)]),
+  preparation: z.union([z.literal(0), z.literal(3), z.literal(5), z.literal(10), z.literal(15)]).default(5),
+  voiceEnabled: z.boolean().default(false),
   difficulty: z.enum(["easy", "medium", "mixed"]), category: z.string().refine(value => value === "all" || CATEGORIES.includes(value as typeof CATEGORIES[number])),
   judging: z.enum(["hybrid", "manual"]), hints: z.boolean(),
 });
@@ -126,6 +129,10 @@ export function registerDrawingNamespace(namespace: Namespace) {
       broadcast(room);
     });
     handle("turn:reroll", () => { const { room, player } = current(); room.reroll(player.id); broadcast(room); });
+    handle("turn:begin", payload => {
+      const { room, player } = current();
+      room.beginDrawing(player.id, z.object({ turnId: z.string().uuid() }).parse(payload).turnId); broadcast(room);
+    });
     handle("turn:next", payload => {
       const { room, player } = current();
       const { resultId } = z.object({ resultId: z.string().uuid() }).parse(payload);
@@ -134,9 +141,17 @@ export function registerDrawingNamespace(namespace: Namespace) {
     });
     handle("draw:stroke", payload => {
       const { room, player } = current();
+      const { turnId } = z.object({ turnId: z.string().uuid().optional() }).parse(payload);
+      if (turnId && turnId !== room.view(player.id).turnId) throw new Error("Lượt vẽ này đã kết thúc.");
       const stroke = strokeSchema.parse(payload);
       room.addStroke(player.id, stroke);
-      socket.to(room.code).emit("draw:stroke", stroke);
+      socket.to(room.code).emit("draw:stroke", stroke, room.canvasRevision, room.view(player.id).turnId);
+      return { ok: true, canvasRevision: room.canvasRevision, turnId: room.view(player.id).turnId };
+    });
+    handle("draw:fill", payload => {
+      const { room, player } = current();
+      const data = z.object({ id: z.string().uuid(), color: z.string().regex(/^#[a-fA-F0-9]{6}$/), spans: z.array(z.number().int().min(0).max(650000)).min(2).max(70000), revision: z.number().int().nonnegative(), turnId: z.string().uuid() }).parse(payload);
+      room.addFill(player.id, data); broadcast(room);
     });
     handle("draw:edit", payload => {
       const { room, player } = current();
@@ -160,6 +175,48 @@ export function registerDrawingNamespace(namespace: Namespace) {
       const data = z.object({ guessId: z.string().uuid(), accepted: z.boolean() }).parse(payload);
       room.judge(player.id, data.guessId, data.accepted);
       broadcast(room);
+    });
+    handle("voice:join", () => {
+      const { room, player } = current();
+      if (!room.settings.voiceEnabled) throw new Error("Chủ phòng chưa bật trò chuyện bằng micro.");
+      const iceServers = voiceIceServers(player.id);
+      player.voiceId = randomUUID(); player.voiceMuted = true; broadcast(room);
+      return { ok: true, voice: { id: player.voiceId, iceServers, relayConfigured: hasVoiceRelay(iceServers) } };
+    });
+    const voiceMember = (payload: unknown) => {
+      const { room, player } = current();
+      const { voiceId } = z.object({ voiceId: z.string().uuid() }).parse(payload);
+      if (!room.settings.voiceEnabled || !player.voiceId || player.voiceId !== voiceId) throw new Error("Hãy tham gia lại phòng thoại.");
+      return { room, player };
+    };
+    handle("voice:ice", payload => {
+      const { player } = voiceMember(payload);
+      const iceServers = voiceIceServers(player.id);
+      return { ok: true, voice: { id: player.voiceId!, iceServers, relayConfigured: hasVoiceRelay(iceServers) } };
+    });
+    handle("voice:leave", payload => {
+      const { room, player } = voiceMember(payload);
+      player.voiceId = null; player.voiceMuted = true; broadcast(room);
+    });
+    handle("voice:state", payload => {
+      const { room, player } = voiceMember(payload);
+      player.voiceMuted = z.object({ muted: z.boolean() }).parse(payload).muted; broadcast(room);
+    });
+    handle("voice:mute-all", () => {
+      const { room, player } = current(); room.requireHost(player.id);
+      room.players.forEach(member => { member.voiceMuted = true; }); broadcast(room);
+    });
+    handle("voice:signal", payload => {
+      const { room, player } = current();
+      const data = z.object({
+        targetId: z.string().uuid(), targetVoiceId: z.string().uuid(), fromVoiceId: z.string().uuid(),
+        exchangeId: z.string().uuid().optional(), restart: z.literal(true).optional(), manual: z.boolean().optional(),
+        description: z.object({ type: z.enum(["offer", "answer"]), sdp: z.string().min(1).max(32000) }).optional(),
+        candidate: z.object({ candidate: z.string().max(4096), sdpMid: z.string().max(256).nullable().optional(), sdpMLineIndex: z.number().int().min(0).max(16).nullable().optional(), usernameFragment: z.string().max(256).nullable().optional() }).optional(),
+      }).refine(value => Number(!!value.description) + Number(!!value.candidate) + Number(!!value.restart) === 1 && (!value.manual || !!value.restart)).parse(payload);
+      const target = room.players.find(member => member.id === data.targetId && member.connected && !member.kicked);
+      if (!room.settings.voiceEnabled || player.voiceId !== data.fromVoiceId || !target?.socketId || target.voiceId !== data.targetVoiceId || target.id === player.id) throw new Error("Kết nối âm thanh đã hết hạn.");
+      namespace.to(target.socketId).emit("voice:signal", { fromId: player.id, fromVoiceId: player.voiceId, targetVoiceId: target.voiceId, exchangeId: data.exchangeId, ...(data.description ? { description: data.description } : data.restart ? { restart: true, manual: data.manual } : { candidate: data.candidate }) });
     });
     socket.on("disconnect", () => {
       const identity = socket.data.drawing as Identity | undefined;

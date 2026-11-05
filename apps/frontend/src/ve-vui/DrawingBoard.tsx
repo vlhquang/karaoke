@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type PointerEvent } from "react";
 import type { Point, Stroke } from "./types";
+import { BOARD_WIDTH } from "./fill";
 
 export function paintStrokes(canvas: HTMLCanvasElement, strokes: Stroke[]) {
   const context = canvas.getContext("2d");
@@ -12,6 +13,14 @@ export function paintStrokes(canvas: HTMLCanvasElement, strokes: Stroke[]) {
   context.lineCap = "round";
   context.lineJoin = "round";
   for (const stroke of strokes) {
+    if (stroke.fill) {
+      context.fillStyle = stroke.color;
+      for (let i = 0; i < stroke.fill.length; i += 2) {
+        const start = stroke.fill[i];
+        context.fillRect(start % BOARD_WIDTH, Math.floor(start / BOARD_WIDTH), stroke.fill[i + 1], 1);
+      }
+      continue;
+    }
     if (!stroke.points.length) continue;
     context.strokeStyle = stroke.color;
     context.fillStyle = stroke.color;
@@ -28,9 +37,9 @@ export function paintStrokes(canvas: HTMLCanvasElement, strokes: Stroke[]) {
   }
 }
 
-export function DrawingBoard({ strokes, enabled, color, width, onStroke, label = "Bảng vẽ trực tiếp" }: {
+export function DrawingBoard({ strokes, enabled, color, width, onStroke, onFill, filling = false, label = "Bảng vẽ trực tiếp" }: {
   strokes: Stroke[]; enabled: boolean; color: string; width: number;
-  onStroke: (stroke: Stroke) => void; label?: string;
+  onStroke: (stroke: Stroke) => void; onFill?: (point: Point) => void; filling?: boolean; label?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const active = useRef<{ id: string; pointerId: number; color: string; width: number; points: Point[]; last: Point } | null>(null);
@@ -52,6 +61,7 @@ export function DrawingBoard({ strokes, enabled, color, width, onStroke, label =
   };
   const start = (event: PointerEvent<HTMLCanvasElement>) => {
     if (!enabled || (event.pointerType === "mouse" && event.button !== 0) || (event.pointerType === "touch" && !event.isPrimary) || active.current) return;
+    if (filling && onFill) { onFill(point(event)); return; }
     event.currentTarget.setPointerCapture(event.pointerId);
     const first = point(event);
     active.current = { id: crypto.randomUUID(), pointerId: event.pointerId, color, width, points: [first], last: first };
