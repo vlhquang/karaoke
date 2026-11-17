@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:btc-bot": "tsx --test src/lib/btc-bot-*.test.ts",
     "test:ve-vui": "tsx --test src/ve-vui/*.test.ts",
-    "test:portal": "tsx --test src/portal/*.test.ts"
+    "test:portal": "tsx --test src/portal/*.test.ts",
+    "test:phong-thuy": "tsx --test src/phong-thuy/*.test.ts"
   },
   "dependencies": {
     "@karaoke/shared": "1.0.0",

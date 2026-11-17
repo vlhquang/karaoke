@@ -5,6 +5,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   
   return [
     {
+      url: `${baseUrl}/phong-thuy`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
       url: `${baseUrl}`,
       lastModified: new Date(),
       changeFrequency: 'daily',

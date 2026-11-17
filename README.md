@@ -27,6 +27,10 @@ Realtime karaoke app runs as one Next.js service:
 
 The portal uses a shared light Liquid Glass theme across its Next.js apps and standalone HTML pages. See [the design analysis and implementation notes](docs/portal-liquid-glass.md) for coverage, architecture and validation. Run `npm run test:portal -w @karaoke/frontend` for navigation, search and saved-app checks.
 
+## Bản đồ phong thuỷ
+
+Mở `/phong-thuy` hoặc chọn **Bản đồ phong thuỷ** trong nhóm **Tiện ích mỗi ngày**. Đặt nhiều la bàn, phác thảo nhà theo mét và đánh dấu hướng cửa chính, bếp, lối vào. Bản vẽ tự lưu trên thiết bị và có thể xuất/nhập JSON. Xem [hướng dẫn sử dụng và kiểm tra](docs/phong-thuy.md).
+
 ## Docker
 
 - Dev: `docker compose up --build`
