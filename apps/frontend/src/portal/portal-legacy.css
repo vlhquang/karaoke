@@ -49,6 +49,9 @@
 .stock-heading-row { flex-wrap: wrap; gap: 20px; }
 .stock-toolbar { flex-wrap: wrap; }
 .stock-toolbar button { font-size: 11px; font-weight: 600; text-transform: none; min-height: 36px; }
+.stock-mode-summary { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+.portal-app .portal-inline-back { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 0 12px; border: 1px solid var(--portal-line); border-radius: var(--portal-radius-sm); background: var(--portal-surface); color: var(--portal-primary); font-size: 12px; font-weight: 600; white-space: nowrap; transition: background var(--portal-duration), border-color var(--portal-duration); }
+.portal-app .portal-inline-back:hover { background: var(--portal-surface-strong); border-color: var(--portal-ring); }
 .portal-app[data-portal-app="lo-to"] .portal-themed :is([class~="bg-amber-700"], [class~="bg-orange-700"], [class~="bg-emerald-700"], [class~="bg-blue-700"], [class~="bg-rose-700"]) { color: #fff; }
 
 /* Drawing: keep the paper white and retain every drawing tool and touch guard. */

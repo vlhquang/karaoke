@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, FormEvent, ChangeEvent } from "react";
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, FormEvent, ChangeEvent } from "react";
 import { createPortal } from "react-dom";
 
 interface Transaction {
@@ -77,6 +77,7 @@ export default function StockPage() {
     const pipWindowRef = useRef<any>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
+    const stockHeaderRef = useRef<HTMLElement>(null);
     const isFramelessPiPActiveRef = useRef(false);
     const [isFramelessActive, setIsFramelessActive] = useState(false);
 
@@ -84,6 +85,30 @@ export default function StockPage() {
     const [showHidden, setShowHidden] = useState(false);
     const isSyncingPricesRef = useRef(false);
     const highlightTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+    useLayoutEffect(() => {
+        if (!isLoggedIn) return;
+
+        const header = stockHeaderRef.current;
+        if (!header) return;
+        const stockPage = header.closest<HTMLElement>(".stock-page");
+        if (!stockPage) return;
+
+        const updateOverlayTop = () => {
+            stockPage.style.setProperty("--stock-overlay-top", `${Math.ceil(header.getBoundingClientRect().bottom)}px`);
+        };
+
+        updateOverlayTop();
+        const observer = new ResizeObserver(updateOverlayTop);
+        observer.observe(header);
+        window.addEventListener("resize", updateOverlayTop);
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener("resize", updateOverlayTop);
+            stockPage.style.removeProperty("--stock-overlay-top");
+        };
+    }, [isLoggedIn]);
 
     useEffect(() => {
         const savedCode = localStorage.getItem("stock_access_code");
@@ -907,7 +932,7 @@ export default function StockPage() {
     return (
         <main className="stock-page min-h-screen bg-slate-950 font-sans text-slate-200">
             {/* Header section with worker status */}
-            <header className="border-b border-slate-800 bg-slate-900/50 pt-8 pb-6 bg-transparent">
+            <header ref={stockHeaderRef} className="border-b border-slate-800 bg-slate-900/50 pt-8 pb-6 bg-transparent">
                 <div className="mx-auto max-w-6xl px-4 flex flex-col items-center">
                     <div className="stock-heading-row flex items-center justify-between w-full">
                         <div className="flex items-center gap-3">
@@ -1523,7 +1548,10 @@ export default function StockPage() {
                 )}
 
                 {/* Bubble Buttons at Bottom */}
-                <div className="stock-floating-actions fixed bottom-8 right-8 z-[90] flex flex-col gap-4 items-end">
+                <div
+                    className="stock-floating-actions fixed bottom-8 right-8 z-[90] flex flex-col gap-4 items-end"
+                    style={{ bottom: isMinimalMode || isAnalysisMode ? "calc(6rem + env(safe-area-inset-bottom))" : undefined }}
+                >
                     <button
                         onClick={() => loadTransactions(accessCode)}
                         disabled={isRefreshingSheet}
@@ -1575,7 +1603,7 @@ export default function StockPage() {
 
             {/* Minimalist Mode View */}
             {isMinimalMode && !isPiPActive && (
-                <div className="fixed inset-0 top-[120px] bg-slate-950 z-10 overflow-y-auto px-4 pb-32">
+                <div className="fixed inset-x-0 bottom-0 bg-slate-950 z-10 overflow-y-auto px-4 pb-32" style={{ top: "var(--stock-overlay-top, 120px)" }}>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {Object.entries(groupedTransactions).map(([symbol, txs]) => {
                             const holdTxs = txs.filter(t => t.status === "HOLD");
@@ -1627,7 +1655,7 @@ export default function StockPage() {
                     </div>
 
                     {/* Quick Summary in Minimal Mode - Simplified */}
-                    <div className="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 p-4 flex justify-end items-center z-20">
+                    <div className="stock-mode-summary fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 p-4 flex justify-end items-center z-20">
                         <div className="flex items-center gap-3">
                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2">Refresh in</span>
                             {!isAutoUpdateEnabled && (
@@ -1652,10 +1680,10 @@ export default function StockPage() {
 
             {/* Analysis Mode View */}
             {isAnalysisMode && !isPiPActive && (
-                <div className="fixed inset-0 top-[100px] bg-slate-950 z-10 overflow-y-auto px-0 pb-32 snap-y snap-mandatory scroll-smooth">
+                <div className="fixed inset-x-0 bottom-0 bg-slate-950 z-10 overflow-y-auto px-0 pb-32 snap-y snap-mandatory scroll-smooth" style={{ top: "var(--stock-overlay-top, 120px)" }}>
                     <div className="flex flex-col gap-0 w-full">
                         {Array.from(new Set(transactions.filter(t => (t.status === "HOLD" || (showHidden && t.status === "HIDDEN"))).map(t => t.symbol))).map((symbol) => (
-                            <div key={symbol} className="flex flex-col h-[calc(100vh-100px)] w-full border-b border-slate-800 snap-start shrink-0">
+                            <div key={symbol} className="flex flex-col w-full border-b border-slate-800 snap-start shrink-0" style={{ height: "calc(100dvh - var(--stock-overlay-top, 120px))" }}>
                                 <div className="flex items-center justify-between px-6 py-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800/50 z-20">
                                     <div className="flex items-center gap-4">
                                         <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
@@ -1695,7 +1723,7 @@ export default function StockPage() {
                     </div>
 
                     {/* Quick Summary in Analysis Mode */}
-                    <div className="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 p-4 flex justify-end items-center z-20">
+                    <div className="stock-mode-summary fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 p-4 flex justify-end items-center z-20">
                         <div className="flex items-center gap-3">
                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2">Refresh in</span>
                             {!isAutoUpdateEnabled && (

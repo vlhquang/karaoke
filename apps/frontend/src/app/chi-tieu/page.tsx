@@ -55,7 +55,7 @@ export default function ChiTieuPage() {
         </button>
       </div>
 
-      <nav className="mt-5 flex flex-wrap gap-2">
+      <nav className="mt-5 flex flex-wrap gap-2" aria-label="Mục quản lý chi tiêu">
         {([
           { key: "quick", label: "⚡ Nhanh" },
           { key: "input", label: "Nhập" },
@@ -64,6 +64,8 @@ export default function ChiTieuPage() {
         ] as const).map((item) => (
           <button
             key={item.key}
+            type="button"
+            aria-pressed={tab === item.key}
             onClick={() => setTab(item.key)}
             className={`rounded-lg border px-4 py-2 text-sm font-semibold ${
               tab === item.key

@@ -128,17 +128,17 @@ export default function LotoRoomPage() {
                 <div className="space-y-3 md:space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <h1 className="text-xl font-bold md:text-2xl">Lô tô - Phòng {roomCodeParam}</h1>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                             <select
                                 value={theme}
                                 onChange={(e) => setTheme(e.target.value)}
-                                className={`rounded border ${themeConfig.inputBorder} ${themeConfig.inputBg} px-2 py-1 text-xs outline-none`}
+                                className={`min-h-11 rounded border ${themeConfig.inputBorder} ${themeConfig.inputBg} px-2 py-1 text-xs outline-none`}
                             >
                                 {Object.entries(LOTO_THEMES).map(([key, t]) => (
                                     <option key={key} value={key}>{t.name}</option>
                                 ))}
                             </select>
-                            <Link href="/lo-to" className={`text-xs ${themeConfig.muted} hover:opacity-80`}>
+                            <Link href="/lo-to" className="portal-inline-back">
                                 Quay lại
                             </Link>
                         </div>

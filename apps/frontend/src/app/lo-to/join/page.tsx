@@ -105,7 +105,7 @@ export default function LotoJoinPage() {
                 </button>
                 <Link
                     href="/lo-to"
-                    className="mt-3 inline-block text-xs text-slate-400 hover:text-cyan-300"
+                    className="portal-inline-back mt-3"
                 >
                     ← Quay lại Lô Tô
                 </Link>
