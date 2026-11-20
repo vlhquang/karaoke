@@ -206,7 +206,7 @@ export default function DailyEnglishCoach() {
   const savedForToday = todaySession?.lessonDay === selectedDay;
 
   return (
-    <section className="mt-6 overflow-hidden rounded-3xl border border-cyan-300/20 bg-slate-950/55 p-4 shadow-2xl shadow-cyan-950/20 backdrop-blur md:p-7">
+    <section className="mt-6 overflow-hidden rounded-3xl border border-cyan-300/20 bg-slate-950/40 p-4 shadow-2xl shadow-cyan-950/20 backdrop-blur md:p-7">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-300">Lộ trình 8 tuần · nghe và nói</p>
@@ -245,7 +245,7 @@ export default function DailyEnglishCoach() {
               </div>
               <p className="mt-3 text-xs text-slate-500">Bước 1: nghe 2 lần, thử đoán nghĩa trước khi mở phần dịch.</p>
             </div>
-            <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/50 p-4">
+            <div className="mt-3 rounded-xl border border-white/10 bg-slate-900/50 p-4">
               <p className="text-xs text-slate-400">Bước 2: đọc câu trên thành tiếng</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button onClick={recordSpeech} disabled={recording} className="rounded-xl border border-emerald-300/30 bg-emerald-400/10 px-4 py-2.5 text-sm font-semibold text-emerald-100 hover:bg-emerald-400/15 disabled:opacity-60">{recording ? "🎙 Đang nghe…" : "🎙 Nói và nhận diện"}</button>
@@ -258,8 +258,8 @@ export default function DailyEnglishCoach() {
 
           <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 md:p-5">
             <p className="text-xs font-bold uppercase tracking-wider text-cyan-200">Bước 3 · kiểm tra nhanh</p>
-            <fieldset className="mt-3"><legend className="text-sm font-semibold text-white">1. Câu mẫu có nghĩa gần nhất là gì?</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{quizOptions.map((option, index) => <button key={option} onClick={() => setQuizChoice(index)} className={`rounded-xl border px-3 py-2.5 text-left text-sm ${quizChoice === index ? "border-cyan-300 bg-cyan-400/10 text-cyan-100" : "border-white/10 bg-slate-950/50 text-slate-300 hover:border-white/25"}`}>{option}</button>)}</div></fieldset>
-            <fieldset className="mt-4"><legend className="text-sm font-semibold text-white">2. Nghe câu trả lời, người kia vừa nói gì?</legend><p className="mt-1 text-xs text-slate-400">Bấm nghe trước, rồi chọn ý nghĩa câu trả lời.</p><button onClick={() => speak(lesson.phrase.reply)} className="mt-2 rounded-lg border border-amber-300/30 px-3 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-400/10">▶ Nghe câu trả lời</button><div className="mt-2 grid gap-2 sm:grid-cols-2">{replyOptions.map((option, index) => <button key={option} onClick={() => setReplyChoice(index)} className={`rounded-xl border px-3 py-2.5 text-left text-sm ${replyChoice === index ? "border-amber-300 bg-amber-400/10 text-amber-100" : "border-white/10 bg-slate-950/50 text-slate-300 hover:border-white/25"}`}>{option}</button>)}</div></fieldset>
+            <fieldset className="mt-3"><legend className="text-sm font-semibold text-white">1. Câu mẫu có nghĩa gần nhất là gì?</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{quizOptions.map((option, index) => <button key={option} onClick={() => setQuizChoice(index)} className={`rounded-xl border px-3 py-2.5 text-left text-sm ${quizChoice === index ? "border-cyan-300 bg-cyan-400/10 text-cyan-100" : "border-white/10 bg-slate-900/50 text-slate-300 hover:border-white/25"}`}>{option}</button>)}</div></fieldset>
+            <fieldset className="mt-4"><legend className="text-sm font-semibold text-white">2. Nghe câu trả lời, người kia vừa nói gì?</legend><p className="mt-1 text-xs text-slate-400">Bấm nghe trước, rồi chọn ý nghĩa câu trả lời.</p><button onClick={() => speak(lesson.phrase.reply)} className="mt-2 rounded-lg border border-amber-300/30 px-3 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-400/10">▶ Nghe câu trả lời</button><div className="mt-2 grid gap-2 sm:grid-cols-2">{replyOptions.map((option, index) => <button key={option} onClick={() => setReplyChoice(index)} className={`rounded-xl border px-3 py-2.5 text-left text-sm ${replyChoice === index ? "border-amber-300 bg-amber-400/10 text-amber-100" : "border-white/10 bg-slate-900/50 text-slate-300 hover:border-white/25"}`}>{option}</button>)}</div></fieldset>
             <button onClick={() => saveSession(selfRating !== null)} className="mt-4 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-slate-950 hover:bg-cyan-100">Lưu kết quả hôm nay</button>
             {message && <p role="status" className="mt-3 rounded-xl border border-cyan-300/20 bg-cyan-400/5 px-3 py-2 text-sm text-cyan-100">{message}</p>}
           </div>
@@ -275,7 +275,7 @@ export default function DailyEnglishCoach() {
 
       {completedSessions.length > 0 && <div className="mt-5 rounded-2xl border border-white/10 bg-slate-900/50 p-4">
         <p className="text-sm font-semibold text-white">Nhật ký học gần đây</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(progress.sessions).sort(([a], [b]) => b.localeCompare(a)).slice(0, 6).map(([day, session]) => <div key={day} className="rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2"><p className="text-xs text-slate-400">{day} · Ngày học {session.lessonDay + 1}</p><p className="mt-1 text-sm text-slate-200">Kiểm tra {session.score}% · Nói {session.speakingScore}%</p><p className="mt-1 truncate text-xs text-amber-200">{session.missed[0] ?? "Đã hoàn thành tốt"}</p></div>)}</div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(progress.sessions).sort(([a], [b]) => b.localeCompare(a)).slice(0, 6).map(([day, session]) => <div key={day} className="rounded-xl border border-white/10 bg-slate-900/50 px-3 py-2"><p className="text-xs text-slate-400">{day} · Ngày học {session.lessonDay + 1}</p><p className="mt-1 text-sm text-slate-200">Kiểm tra {session.score}% · Nói {session.speakingScore}%</p><p className="mt-1 truncate text-xs text-amber-200">{session.missed[0] ?? "Đã hoàn thành tốt"}</p></div>)}</div>
       </div>}
     </section>
   );
