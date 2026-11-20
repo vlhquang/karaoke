@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import DailyEnglishCoach from "./DailyEnglishCoach";
 
 type LessonWord = {
   text: string;
@@ -314,6 +315,8 @@ export default function EnglishLearningPage() {
           />
         </div>
       </section>
+
+      <DailyEnglishCoach />
 
       <section className="mt-6 rounded-2xl border border-slate-700 bg-slate-900/60 p-4 md:p-6">
         <h2 className="text-lg font-semibold text-slate-100 md:text-xl">1. Bảng chữ cái và phiên âm</h2>
